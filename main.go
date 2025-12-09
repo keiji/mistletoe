@@ -18,6 +18,10 @@ type Config struct {
 	Repositories []Repository `json:"repositories"`
 }
 
+type GlobalOptions struct {
+	ConfigFile string
+}
+
 func ParseConfig(data []byte) (*Config, error) {
 	var config Config
 	err := json.Unmarshal(data, &config)
@@ -56,43 +60,6 @@ func parseArgs(args []string) (string, string, []string, error) {
 	return configFile, subcmdArgs[0], subcmdArgs[1:], nil
 }
 
-func loadConfig(configFile string) (*Config, error) {
-	if configFile == "" {
-		return nil, errors.New("Error: Please specify a configuration file using --file or -f")
-	}
-
-	data, err := os.ReadFile(configFile)
-	if err != nil {
-		return nil, fmt.Errorf("Error reading file: %v", err)
-	}
-
-	config, err := ParseConfig(data)
-	if err != nil {
-		return nil, fmt.Errorf("Error parsing JSON: %v", err)
-	}
-	return config, nil
-}
-
-func handleInit(args []string, configFile string) {
-	fmt.Printf("init command called with args: %v\n", args)
-	// Placeholder for init logic.
-	// In the future, this might create the config file at 'configFile' or default location.
-}
-
-func handlePrint(args []string, configFile string) {
-	config, err := loadConfig(configFile)
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-
-	for _, repo := range config.Repositories {
-		for _, label := range repo.Labels {
-			fmt.Printf("%s,%s, %s\n", repo.Repo, repo.Branch, label)
-		}
-	}
-}
-
 func main() {
 	configFile, subcmdName, subcmdArgs, err := parseArgs(os.Args)
 	if err != nil {
@@ -100,14 +67,18 @@ func main() {
 		os.Exit(1)
 	}
 
+	opts := GlobalOptions{
+		ConfigFile: configFile,
+	}
+
 	switch subcmdName {
 	case "init":
-		handleInit(subcmdArgs, configFile)
+		handleInit(subcmdArgs, opts)
 	case "print":
-		handlePrint(subcmdArgs, configFile)
+		handlePrint(subcmdArgs, opts)
 	case "":
 		// Default to print if no command provided
-		handlePrint(subcmdArgs, configFile)
+		handlePrint(subcmdArgs, opts)
 	default:
 		fmt.Printf("Unknown subcommand: %s\n", subcmdName)
 		os.Exit(1)
