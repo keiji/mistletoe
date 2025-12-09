@@ -29,7 +29,7 @@ func ParseConfig(data []byte) (*Config, error) {
 
 func parseArgs(args []string) (string, string, []string, error) {
 	var configFile string
-	var cmdArgs []string
+	var subcmdArgs []string
 
 	// Skip the first argument as it is the program name
 	for i := 1; i < len(args); i++ {
@@ -46,14 +46,14 @@ func parseArgs(args []string) (string, string, []string, error) {
 		} else if strings.HasPrefix(arg, "-f=") {
 			configFile = strings.TrimPrefix(arg, "-f=")
 		} else {
-			cmdArgs = append(cmdArgs, arg)
+			subcmdArgs = append(subcmdArgs, arg)
 		}
 	}
 
-	if len(cmdArgs) == 0 {
+	if len(subcmdArgs) == 0 {
 		return configFile, "", nil, nil
 	}
-	return configFile, cmdArgs[0], cmdArgs[1:], nil
+	return configFile, subcmdArgs[0], subcmdArgs[1:], nil
 }
 
 func loadConfig(configFile string) (*Config, error) {
@@ -94,22 +94,22 @@ func handlePrint(args []string, configFile string) {
 }
 
 func main() {
-	configFile, cmdName, cmdArgs, err := parseArgs(os.Args)
+	configFile, subcmdName, subcmdArgs, err := parseArgs(os.Args)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
 
-	switch cmdName {
+	switch subcmdName {
 	case "init":
-		handleInit(cmdArgs, configFile)
+		handleInit(subcmdArgs, configFile)
 	case "print":
-		handlePrint(cmdArgs, configFile)
+		handlePrint(subcmdArgs, configFile)
 	case "":
 		// Default to print if no command provided
-		handlePrint(cmdArgs, configFile)
+		handlePrint(subcmdArgs, configFile)
 	default:
-		fmt.Printf("Unknown command: %s\n", cmdName)
+		fmt.Printf("Unknown subcommand: %s\n", subcmdName)
 		os.Exit(1)
 	}
 }
