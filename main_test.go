@@ -83,3 +83,101 @@ func TestParseConfig(t *testing.T) {
 		})
 	}
 }
+
+func TestParseArgs(t *testing.T) {
+	tests := []struct {
+		name           string
+		args           []string
+		wantConfigFile string
+		wantCmdName    string
+		wantCmdArgs    []string
+		wantErr        bool
+	}{
+		{
+			name:           "Init command with file flag at end",
+			args:           []string{"gitc", "init", ".", "--file", "repos.json"},
+			wantConfigFile: "repos.json",
+			wantCmdName:    "init",
+			wantCmdArgs:    []string{"."},
+			wantErr:        false,
+		},
+		{
+			name:           "Init command with short file flag",
+			args:           []string{"gitc", "init", ".", "-f", "repos.json"},
+			wantConfigFile: "repos.json",
+			wantCmdName:    "init",
+			wantCmdArgs:    []string{"."},
+			wantErr:        false,
+		},
+		{
+			name:           "File flag at beginning",
+			args:           []string{"gitc", "--file", "repos.json", "init", "."},
+			wantConfigFile: "repos.json",
+			wantCmdName:    "init",
+			wantCmdArgs:    []string{"."},
+			wantErr:        false,
+		},
+		{
+			name:           "File flag with equal sign",
+			args:           []string{"gitc", "--file=repos.json", "init", "."},
+			wantConfigFile: "repos.json",
+			wantCmdName:    "init",
+			wantCmdArgs:    []string{"."},
+			wantErr:        false,
+		},
+		{
+			name:           "Short file flag with equal sign",
+			args:           []string{"gitc", "-f=repos.json", "init", "."},
+			wantConfigFile: "repos.json",
+			wantCmdName:    "init",
+			wantCmdArgs:    []string{"."},
+			wantErr:        false,
+		},
+		{
+			name:           "No command (legacy)",
+			args:           []string{"gitc", "--file", "repos.json"},
+			wantConfigFile: "repos.json",
+			wantCmdName:    "",
+			wantCmdArgs:    nil,
+			wantErr:        false,
+		},
+		{
+			name:           "Missing file argument value",
+			args:           []string{"gitc", "init", ".", "--file"},
+			wantConfigFile: "",
+			wantCmdName:    "",
+			wantCmdArgs:    nil,
+			wantErr:        true,
+		},
+		{
+			name:           "Mixed flags and args",
+			args:           []string{"gitc", "command", "-f", "conf.json", "arg1", "--flag2"},
+			wantConfigFile: "conf.json",
+			wantCmdName:    "command",
+			wantCmdArgs:    []string{"arg1", "--flag2"},
+			wantErr:        false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotConfigFile, gotCmdName, gotCmdArgs, err := parseArgs(tt.args)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("parseArgs() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if gotConfigFile != tt.wantConfigFile {
+				t.Errorf("parseArgs() configFile = %v, want %v", gotConfigFile, tt.wantConfigFile)
+			}
+			if gotCmdName != tt.wantCmdName {
+				t.Errorf("parseArgs() cmdName = %v, want %v", gotCmdName, tt.wantCmdName)
+			}
+			if !reflect.DeepEqual(gotCmdArgs, tt.wantCmdArgs) {
+				// Handle nil vs empty slice if necessary, but DeepEqual handles it reasonably well usually.
+				// However, if we append to nil slice, it becomes non-nil empty slice in some cases?
+				// In my implementation: var cmdArgs []string. If nothing appended, it is nil.
+				t.Errorf("parseArgs() cmdArgs = %v, want %v", gotCmdArgs, tt.wantCmdArgs)
+			}
+		})
+	}
+}

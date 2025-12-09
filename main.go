@@ -2,9 +2,10 @@ package main
 
 import (
 	"encoding/json"
-	"flag"
+	"errors"
 	"fmt"
 	"os"
+	"strings"
 )
 
 type Repository struct {
@@ -26,33 +27,62 @@ func ParseConfig(data []byte) (*Config, error) {
 	return &config, nil
 }
 
-func main() {
-	var fileFlag string
-	var fFlag string
+func parseArgs(args []string) (string, string, []string, error) {
+	var configFile string
+	var cmdArgs []string
 
-	flag.StringVar(&fileFlag, "file", "", "Configuration file path")
-	flag.StringVar(&fFlag, "f", "", "Configuration file path (shorthand)")
-	flag.Parse()
-
-	configFile := fileFlag
-	if configFile == "" {
-		configFile = fFlag
+	// Skip the first argument as it is the program name
+	for i := 1; i < len(args); i++ {
+		arg := args[i]
+		if arg == "--file" || arg == "-f" {
+			if i+1 < len(args) {
+				configFile = args[i+1]
+				i++
+			} else {
+				return "", "", nil, errors.New("Error: --file argument missing")
+			}
+		} else if strings.HasPrefix(arg, "--file=") {
+			configFile = strings.TrimPrefix(arg, "--file=")
+		} else if strings.HasPrefix(arg, "-f=") {
+			configFile = strings.TrimPrefix(arg, "-f=")
+		} else {
+			cmdArgs = append(cmdArgs, arg)
+		}
 	}
 
+	if len(cmdArgs) == 0 {
+		return configFile, "", nil, nil
+	}
+	return configFile, cmdArgs[0], cmdArgs[1:], nil
+}
+
+func loadConfig(configFile string) (*Config, error) {
 	if configFile == "" {
-		fmt.Println("Error: Please specify a configuration file using --file or -f")
-		os.Exit(1)
+		return nil, errors.New("Error: Please specify a configuration file using --file or -f")
 	}
 
 	data, err := os.ReadFile(configFile)
 	if err != nil {
-		fmt.Printf("Error reading file: %v\n", err)
-		os.Exit(1)
+		return nil, fmt.Errorf("Error reading file: %v", err)
 	}
 
 	config, err := ParseConfig(data)
 	if err != nil {
-		fmt.Printf("Error parsing JSON: %v\n", err)
+		return nil, fmt.Errorf("Error parsing JSON: %v", err)
+	}
+	return config, nil
+}
+
+func handleInit(args []string, configFile string) {
+	fmt.Printf("init command called with args: %v\n", args)
+	// Placeholder for init logic.
+	// In the future, this might create the config file at 'configFile' or default location.
+}
+
+func handlePrint(args []string, configFile string) {
+	config, err := loadConfig(configFile)
+	if err != nil {
+		fmt.Println(err)
 		os.Exit(1)
 	}
 
@@ -60,5 +90,26 @@ func main() {
 		for _, label := range repo.Labels {
 			fmt.Printf("%s,%s, %s\n", repo.Repo, repo.Branch, label)
 		}
+	}
+}
+
+func main() {
+	configFile, cmdName, cmdArgs, err := parseArgs(os.Args)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	switch cmdName {
+	case "init":
+		handleInit(cmdArgs, configFile)
+	case "print":
+		handlePrint(cmdArgs, configFile)
+	case "":
+		// Default to print if no command provided
+		handlePrint(cmdArgs, configFile)
+	default:
+		fmt.Printf("Unknown command: %s\n", cmdName)
+		os.Exit(1)
 	}
 }
