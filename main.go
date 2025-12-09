@@ -34,24 +34,32 @@ func ParseConfig(data []byte) (*Config, error) {
 func parseArgs(args []string) (string, string, []string, error) {
 	var configFile string
 	var subcmdArgs []string
+	parsingGlobalOptions := true
 
 	// Skip the first argument as it is the program name
 	for i := 1; i < len(args); i++ {
 		arg := args[i]
-		if arg == "--file" || arg == "-f" {
-			if i+1 < len(args) {
-				configFile = args[i+1]
-				i++
-			} else {
-				return "", "", nil, errors.New("Error: --file argument missing")
+
+		if parsingGlobalOptions {
+			if arg == "--file" || arg == "-f" {
+				if i+1 < len(args) {
+					configFile = args[i+1]
+					i++
+				} else {
+					return "", "", nil, errors.New("Error: --file argument missing")
+				}
+				continue
+			} else if strings.HasPrefix(arg, "--file=") {
+				configFile = strings.TrimPrefix(arg, "--file=")
+				continue
+			} else if strings.HasPrefix(arg, "-f=") {
+				configFile = strings.TrimPrefix(arg, "-f=")
+				continue
 			}
-		} else if strings.HasPrefix(arg, "--file=") {
-			configFile = strings.TrimPrefix(arg, "--file=")
-		} else if strings.HasPrefix(arg, "-f=") {
-			configFile = strings.TrimPrefix(arg, "-f=")
-		} else {
-			subcmdArgs = append(subcmdArgs, arg)
 		}
+
+		parsingGlobalOptions = false
+		subcmdArgs = append(subcmdArgs, arg)
 	}
 
 	if len(subcmdArgs) == 0 {
