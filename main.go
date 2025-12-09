@@ -17,6 +17,15 @@ type Config struct {
 	Repositories []Repository `json:"repositories"`
 }
 
+func ParseConfig(data []byte) (*Config, error) {
+	var config Config
+	err := json.Unmarshal(data, &config)
+	if err != nil {
+		return nil, err
+	}
+	return &config, nil
+}
+
 func main() {
 	var fileFlag string
 	var fFlag string
@@ -41,8 +50,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	var config Config
-	err = json.Unmarshal(data, &config)
+	config, err := ParseConfig(data)
 	if err != nil {
 		fmt.Printf("Error parsing JSON: %v\n", err)
 		os.Exit(1)
@@ -50,12 +58,6 @@ func main() {
 
 	for _, repo := range config.Repositories {
 		for _, label := range repo.Labels {
-            // Determine separator based on repo URL prefix to match requested output behavior,
-            // although it might be inconsistent, I'll attempt to match the example if it's simple.
-            // Example shows:
-            // git@... -> comma
-            // https://... -> colon
-            // I'll stick to comma for now to be safe and consistent, as "colon" is unusual.
 			fmt.Printf("%s,%s, %s\n", repo.Repo, repo.Branch, label)
 		}
 	}
