@@ -2,9 +2,9 @@ package main
 
 import (
 	"encoding/json"
-	"flag"
 	"fmt"
 	"os"
+	"strings"
 )
 
 type Repository struct {
@@ -26,18 +26,50 @@ func ParseConfig(data []byte) (*Config, error) {
 	return &config, nil
 }
 
-func main() {
-	var fileFlag string
-	var fFlag string
+func parseArgs() (string, string, []string) {
+	var configFile string
+	var args []string
 
-	flag.StringVar(&fileFlag, "file", "", "Configuration file path")
-	flag.StringVar(&fFlag, "f", "", "Configuration file path (shorthand)")
-	flag.Parse()
-
-	configFile := fileFlag
-	if configFile == "" {
-		configFile = fFlag
+	for i := 1; i < len(os.Args); i++ {
+		arg := os.Args[i]
+		if arg == "--file" || arg == "-f" {
+			if i+1 < len(os.Args) {
+				configFile = os.Args[i+1]
+				i++
+			} else {
+				fmt.Println("Error: --file argument missing")
+				os.Exit(1)
+			}
+		} else if strings.HasPrefix(arg, "--file=") {
+			configFile = strings.TrimPrefix(arg, "--file=")
+		} else if strings.HasPrefix(arg, "-f=") {
+			configFile = strings.TrimPrefix(arg, "-f=")
+		} else {
+			args = append(args, arg)
+		}
 	}
+
+	if len(args) == 0 {
+		return configFile, "", nil
+	}
+	return configFile, args[0], args[1:]
+}
+
+func handleInit(args []string, config *Config) {
+	fmt.Printf("init command called with args: %v\n", args)
+	// Placeholder for init logic
+}
+
+func handlePrint(args []string, config *Config) {
+	for _, repo := range config.Repositories {
+		for _, label := range repo.Labels {
+			fmt.Printf("%s,%s, %s\n", repo.Repo, repo.Branch, label)
+		}
+	}
+}
+
+func main() {
+	configFile, cmdName, cmdArgs := parseArgs()
 
 	if configFile == "" {
 		fmt.Println("Error: Please specify a configuration file using --file or -f")
@@ -56,9 +88,16 @@ func main() {
 		os.Exit(1)
 	}
 
-	for _, repo := range config.Repositories {
-		for _, label := range repo.Labels {
-			fmt.Printf("%s,%s, %s\n", repo.Repo, repo.Branch, label)
-		}
+	switch cmdName {
+	case "init":
+		handleInit(cmdArgs, config)
+	case "print":
+		handlePrint(cmdArgs, config)
+	case "":
+		// Default to print if no command provided
+		handlePrint(cmdArgs, config)
+	default:
+		fmt.Printf("Unknown command: %s\n", cmdName)
+		os.Exit(1)
 	}
 }
