@@ -26,8 +26,7 @@ func TestParseConfig(t *testing.T) {
 			want: &Config{
 				Repositories: []Repository{
 					{
-						Id:     nil,
-						Url:    "user/repo",
+						URL:    "user/repo",
 						Branch: "main",
 						Labels: []string{"bug", "feature"},
 					},
@@ -61,8 +60,7 @@ func TestParseConfig(t *testing.T) {
 			want: &Config{
 				Repositories: []Repository{
 					{
-						Id:     nil,
-						Url:    "user/repo",
+						URL:    "user/repo",
 						Branch: "",
 						Labels: nil,
 					},
@@ -84,8 +82,8 @@ func TestParseConfig(t *testing.T) {
 			want: &Config{
 				Repositories: []Repository{
 					{
-						Id:     func() *string { s := "repo1"; return &s }(),
-						Url:    "user/repo",
+						ID:     func() *string { s := "repo1"; return &s }(),
+						URL:    "user/repo",
 						Branch: "main",
 						Labels: nil,
 					},

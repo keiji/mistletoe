@@ -23,7 +23,7 @@ func loadConfig(configFile string) (*Config, error) {
 	return config, nil
 }
 
-func handlePrint(args []string, opts GlobalOptions) {
+func handlePrint(_ []string, opts GlobalOptions) {
 	config, err := loadConfig(opts.ConfigFile)
 	if err != nil {
 		fmt.Println(err)
@@ -32,7 +32,7 @@ func handlePrint(args []string, opts GlobalOptions) {
 
 	for _, repo := range config.Repositories {
 		for _, label := range repo.Labels {
-			fmt.Printf("%s,%s, %s\n", repo.Url, repo.Branch, label)
+			fmt.Printf("%s,%s, %s\n", repo.URL, repo.Branch, label)
 		}
 	}
 }
