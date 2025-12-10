@@ -6,13 +6,11 @@ on:
     paths-ignore:
       - '**.md'
       - '.gitignore'
-      - 'repos.json'
   pull_request:
     branches: [ "main" ]
     paths-ignore:
       - '**.md'
       - '.gitignore'
-      - 'repos.json'
 
 jobs:
   build:
