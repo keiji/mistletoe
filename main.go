@@ -1,3 +1,4 @@
+// Package main is the entry point for the gitc tool.
 package main
 
 import (
@@ -9,7 +10,8 @@ import (
 )
 
 type Repository struct {
-	Url    string   `json:"url"`
+	ID     *string  `json:"id"`
+	URL    string   `json:"url"`
 	Branch string   `json:"branch"`
 	Labels []string `json:"labels"`
 }
