@@ -33,3 +33,4 @@ jobs:
         reporter: github-pr-review
         golangci_lint_flags: "--enable=revive"
         fail_level: any
+        filter_mode: nofilter
