@@ -134,7 +134,8 @@ func TestValidateEnvironment(t *testing.T) {
 
 			tt.setup()
 
-			err := validateEnvironment(tt.repos)
+			// Use "git" for testing (assuming system git is available)
+			err := validateEnvironment(tt.repos, "git")
 			if (err != nil) != tt.wantErr {
 				t.Errorf("validateEnvironment() error = %v, wantErr %v", err, tt.wantErr)
 			}

@@ -7,8 +7,8 @@ import (
 	"os/exec"
 )
 
-func branchExists(dir, branch string) bool {
-	cmd := exec.Command("git", "-C", dir, "show-ref", "--verify", "--quiet", "refs/heads/"+branch)
+func branchExists(dir, branch, gitPath string) bool {
+	cmd := exec.Command(gitPath, "-C", dir, "show-ref", "--verify", "--quiet", "refs/heads/"+branch)
 	return cmd.Run() == nil
 }
 
@@ -61,7 +61,7 @@ func handleSwitch(args []string, opts GlobalOptions) {
 			os.Exit(1)
 		}
 
-		exists := branchExists(dir, branchName)
+		exists := branchExists(dir, branchName, opts.GitPath)
 		dirExists[dir] = exists
 	}
 
@@ -87,7 +87,7 @@ func handleSwitch(args []string, opts GlobalOptions) {
 		for _, repo := range config.Repositories {
 			dir := getRepoDir(repo)
 			fmt.Printf("Switching %s to branch %s...\n", dir, branchName)
-			cmd := exec.Command("git", "-C", dir, "checkout", branchName)
+			cmd := exec.Command(opts.GitPath, "-C", dir, "checkout", branchName)
 			cmd.Stdout = os.Stdout
 			cmd.Stderr = os.Stderr
 			if err := cmd.Run(); err != nil {
@@ -103,7 +103,7 @@ func handleSwitch(args []string, opts GlobalOptions) {
 
 			if exists {
 				fmt.Printf("Branch %s exists in %s. Switching...\n", branchName, dir)
-				cmd := exec.Command("git", "-C", dir, "checkout", branchName)
+				cmd := exec.Command(opts.GitPath, "-C", dir, "checkout", branchName)
 				cmd.Stdout = os.Stdout
 				cmd.Stderr = os.Stderr
 				if err := cmd.Run(); err != nil {
@@ -112,7 +112,7 @@ func handleSwitch(args []string, opts GlobalOptions) {
 				}
 			} else {
 				fmt.Printf("Creating and switching to branch %s in %s...\n", branchName, dir)
-				cmd := exec.Command("git", "-C", dir, "checkout", "-b", branchName)
+				cmd := exec.Command(opts.GitPath, "-C", dir, "checkout", "-b", branchName)
 				cmd.Stdout = os.Stdout
 				cmd.Stderr = os.Stderr
 				if err := cmd.Run(); err != nil {
