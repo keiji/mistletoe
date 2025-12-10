@@ -118,6 +118,8 @@ func main() {
 	switch subcmdName {
 	case "init":
 		handleInit(subcmdArgs, opts)
+	case "switch":
+		handleSwitch(subcmdArgs, opts)
 	case "print":
 		handlePrint(subcmdArgs, opts)
 	case "version":
