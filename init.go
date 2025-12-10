@@ -36,6 +36,62 @@ func getRepoDir(repo Repository) string {
 	return strings.TrimSuffix(base, ".git")
 }
 
+// validateEnvironment checks if the current directory state is consistent with the configuration.
+func validateEnvironment(repos []Repository) error {
+	for _, repo := range repos {
+		targetDir := getRepoDir(repo)
+		info, err := os.Stat(targetDir)
+		if os.IsNotExist(err) {
+			continue // Directory doesn't exist, safe to clone
+		}
+		if err != nil {
+			return fmt.Errorf("error checking directory %s: %v", targetDir, err)
+		}
+
+		if !info.IsDir() {
+			return fmt.Errorf("target %s exists and is not a directory", targetDir)
+		}
+
+		// Check if it is a git repo
+		gitDir := path.Join(targetDir, ".git")
+		if _, err := os.Stat(gitDir); err == nil {
+			// It's a git repo. Check remote.
+			cmd := exec.Command("git", "-C", targetDir, "config", "--get", "remote.origin.url")
+			out, err := cmd.Output()
+			if err != nil {
+				// Failed to get remote origin (maybe none configured).
+				return fmt.Errorf("directory %s is a git repo but failed to get remote origin: %v", targetDir, err)
+			}
+			currentURL := strings.TrimSpace(string(out))
+			if currentURL != repo.URL {
+				return fmt.Errorf("directory %s exists with different remote origin: %s (expected %s)", targetDir, currentURL, repo.URL)
+			}
+			// Match -> OK.
+		} else {
+			// Not a git repo. Check if empty.
+			err := func() error {
+				f, err := os.Open(targetDir)
+				if err != nil {
+					return fmt.Errorf("failed to open directory %s: %v", targetDir, err)
+				}
+				defer f.Close()
+
+				_, err = f.Readdirnames(1)
+				if err == nil {
+					// No error means we found at least one file/dir, so it's not empty.
+					return fmt.Errorf("directory %s exists, is not a git repo, and is not empty", targetDir)
+				}
+				// io.EOF is expected if empty.
+				return nil
+			}()
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 func handleInit(args []string, opts GlobalOptions) {
 	var fShort, fLong string
 	fs := flag.NewFlagSet("init", flag.ExitOnError)
@@ -62,6 +118,11 @@ func handleInit(args []string, opts GlobalOptions) {
 
 	if err := validateRepositories(config.Repositories); err != nil {
 		fmt.Println("Error validating configuration:", err)
+		os.Exit(1)
+	}
+
+	if err := validateEnvironment(config.Repositories); err != nil {
+		fmt.Println("Error validating environment:", err)
 		os.Exit(1)
 	}
 
