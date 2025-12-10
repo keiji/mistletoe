@@ -9,33 +9,6 @@ import (
 	"strings"
 )
 
-// validateRepositories checks for duplicate IDs in the repository list.
-// IDs that are nil are ignored.
-func validateRepositories(repos []Repository) error {
-	seenIDs := make(map[string]bool)
-	for _, repo := range repos {
-		if repo.ID != nil && *repo.ID != "" {
-			if seenIDs[*repo.ID] {
-				return fmt.Errorf("duplicate repository ID found: %s", *repo.ID)
-			}
-			seenIDs[*repo.ID] = true
-		}
-	}
-	return nil
-}
-
-// getRepoDir determines the checkout directory name.
-// If ID is present and not empty, it is used. Otherwise, it is derived from the URL.
-func getRepoDir(repo Repository) string {
-	if repo.ID != nil && *repo.ID != "" {
-		return *repo.ID
-	}
-	// Derive from URL using path.Base because URLs use forward slashes
-	url := strings.TrimRight(repo.URL, "/")
-	base := path.Base(url)
-	return strings.TrimSuffix(base, ".git")
-}
-
 // validateEnvironment checks if the current directory state is consistent with the configuration.
 func validateEnvironment(repos []Repository) error {
 	for _, repo := range repos {
@@ -115,11 +88,6 @@ func handleInit(args []string, opts GlobalOptions) {
 	config, err := loadConfig(configFile)
 	if err != nil {
 		fmt.Println(err)
-		os.Exit(1)
-	}
-
-	if err := validateRepositories(config.Repositories); err != nil {
-		fmt.Println("Error validating configuration:", err)
 		os.Exit(1)
 	}
 
