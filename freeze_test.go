@@ -87,7 +87,9 @@ func TestFreeze(t *testing.T) {
 	setupDummyRepo(t, repo2Dir, repo2URL, repo2Branch)
 
 	// Create a non-git dir
-	os.Mkdir(filepath.Join(tmpDir, "not-git"), 0755)
+	if err := os.Mkdir(filepath.Join(tmpDir, "not-git"), 0755); err != nil {
+		t.Fatalf("failed to create non-git dir: %v", err)
+	}
 
 	// Run freeze
 	outputFile := "frozen.json"
@@ -171,7 +173,9 @@ func TestFreeze_FileExists(t *testing.T) {
 	// Create existing output file
 	outputFile := "existing.json"
 	fullOutputPath := filepath.Join(tmpDir, outputFile)
-	os.WriteFile(fullOutputPath, []byte("{}"), 0644)
+	if err := os.WriteFile(fullOutputPath, []byte("{}"), 0644); err != nil {
+		t.Fatalf("failed to create existing output file: %v", err)
+	}
 
 	cmd := exec.Command(binaryPath, "freeze", "-f", outputFile)
 	cmd.Dir = tmpDir
