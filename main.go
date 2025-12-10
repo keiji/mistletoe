@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 )
 
@@ -25,8 +26,27 @@ type Config struct {
 	Repositories []Repository `json:"repositories"`
 }
 
+// GlobalOptions holds global command line options.
 type GlobalOptions struct {
 	ConfigFile string
+	// GitPath is the path to the git executable.
+	GitPath string
+}
+
+func resolveGitPath() string {
+	if p := os.Getenv("GIT_EXEC_PATH"); p != "" {
+		return filepath.Join(p, "git")
+	}
+	path, err := exec.LookPath("git")
+	if err != nil {
+		return "git"
+	}
+	return path
+}
+
+func checkGitAvailability(path string) bool {
+	cmd := exec.Command(path, "--version")
+	return cmd.Run() == nil
 }
 
 func ParseConfig(data []byte) (*Config, error) {
@@ -77,22 +97,21 @@ func parseArgs(args []string) (string, string, []string, error) {
 	return configFile, subcmdArgs[0], subcmdArgs[1:], nil
 }
 
-func handleVersion() {
+func handleVersion(opts GlobalOptions) {
 	v := appVersion
 	if commitHash != "" {
 		v = fmt.Sprintf("%s-%s", appVersion, commitHash)
 	}
 	fmt.Printf("gitc version %s\n", v)
 
-	path, err := exec.LookPath("git")
-	if err != nil {
-		fmt.Println("git path: not found")
-		fmt.Println("git version: not found")
+	fmt.Printf("git path: %s\n", opts.GitPath)
+
+	if !checkGitAvailability(opts.GitPath) {
+		fmt.Println("git binary is not found")
 		return
 	}
-	fmt.Printf("git path: %s\n", path)
 
-	out, err := exec.Command("git", "--version").Output()
+	out, err := exec.Command(opts.GitPath, "--version").Output()
 	if err != nil {
 		fmt.Println("git version: error getting version")
 		return
@@ -111,8 +130,20 @@ func main() {
 		os.Exit(1)
 	}
 
+	gitPath := resolveGitPath()
+	gitAvailable := checkGitAvailability(gitPath)
+
+	if !gitAvailable {
+		// Only allow print (default) or version
+		if subcmdName != "print" && subcmdName != "" && subcmdName != "version" {
+			fmt.Println("git binary is not found")
+			os.Exit(1)
+		}
+	}
+
 	opts := GlobalOptions{
 		ConfigFile: configFile,
+		GitPath:    gitPath,
 	}
 
 	switch subcmdName {
@@ -125,7 +156,7 @@ func main() {
 	case "print":
 		handlePrint(subcmdArgs, opts)
 	case "version":
-		handleVersion()
+		handleVersion(opts)
 	case "":
 		// Default to print if no command provided
 		handlePrint(subcmdArgs, opts)

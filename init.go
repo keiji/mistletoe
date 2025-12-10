@@ -38,7 +38,7 @@ func getRepoDir(repo Repository) string {
 }
 
 // validateEnvironment checks if the current directory state is consistent with the configuration.
-func validateEnvironment(repos []Repository) error {
+func validateEnvironment(repos []Repository, gitPath string) error {
 	for _, repo := range repos {
 		targetDir := getRepoDir(repo)
 		info, err := os.Stat(targetDir)
@@ -57,7 +57,7 @@ func validateEnvironment(repos []Repository) error {
 		gitDir := filepath.Join(targetDir, ".git")
 		if _, err := os.Stat(gitDir); err == nil {
 			// It's a git repo. Check remote.
-			cmd := exec.Command("git", "-C", targetDir, "config", "--get", "remote.origin.url")
+			cmd := exec.Command(gitPath, "-C", targetDir, "config", "--get", "remote.origin.url")
 			out, err := cmd.Output()
 			if err != nil {
 				// Failed to get remote origin (maybe none configured).
@@ -124,7 +124,7 @@ func handleInit(args []string, opts GlobalOptions) {
 		os.Exit(1)
 	}
 
-	if err := validateEnvironment(config.Repositories); err != nil {
+	if err := validateEnvironment(config.Repositories, opts.GitPath); err != nil {
 		fmt.Println("Error validating environment:", err)
 		os.Exit(1)
 	}
@@ -156,7 +156,7 @@ func handleInit(args []string, opts GlobalOptions) {
 
 		if shouldClone {
 			fmt.Printf("Cloning %s into %s...\n", repo.URL, targetDir)
-			cmd := exec.Command("git", gitArgs...)
+			cmd := exec.Command(opts.GitPath, gitArgs...)
 			cmd.Stdout = os.Stdout
 			cmd.Stderr = os.Stderr
 			if err := cmd.Run(); err != nil {
@@ -170,7 +170,7 @@ func handleInit(args []string, opts GlobalOptions) {
 		// "チェックアウト後、各要素についてbranchで示されたブランチに切り替える。"
 		if repo.Branch != "" {
 			fmt.Printf("Switching %s to branch %s...\n", targetDir, repo.Branch)
-			checkoutCmd := exec.Command("git", "-C", targetDir, "checkout", repo.Branch)
+			checkoutCmd := exec.Command(opts.GitPath, "-C", targetDir, "checkout", repo.Branch)
 			checkoutCmd.Stdout = os.Stdout
 			checkoutCmd.Stderr = os.Stderr
 			if err := checkoutCmd.Run(); err != nil {
