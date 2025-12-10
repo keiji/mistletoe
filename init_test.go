@@ -40,7 +40,9 @@ func TestValidateEnvironment(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to get wd: %v", err)
 	}
-	defer os.Chdir(wd)
+	defer func() {
+		_ = os.Chdir(wd)
+	}()
 	if err := os.Chdir(tmpDir); err != nil {
 		t.Fatalf("failed to chdir: %v", err)
 	}
