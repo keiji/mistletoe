@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path"
+	"path/filepath"
 	"strings"
 )
 
@@ -26,7 +26,7 @@ func validateEnvironment(repos []Repository) error {
 		}
 
 		// Check if it is a git repo
-		gitDir := path.Join(targetDir, ".git")
+		gitDir := filepath.Join(targetDir, ".git")
 		if _, err := os.Stat(gitDir); err == nil {
 			// It's a git repo. Check remote.
 			cmd := exec.Command("git", "-C", targetDir, "config", "--get", "remote.origin.url")
