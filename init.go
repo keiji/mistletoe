@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"path/filepath"
 	"strings"
 )
 
@@ -53,7 +54,7 @@ func validateEnvironment(repos []Repository) error {
 		}
 
 		// Check if it is a git repo
-		gitDir := path.Join(targetDir, ".git")
+		gitDir := filepath.Join(targetDir, ".git")
 		if _, err := os.Stat(gitDir); err == nil {
 			// It's a git repo. Check remote.
 			cmd := exec.Command("git", "-C", targetDir, "config", "--get", "remote.origin.url")
@@ -94,9 +95,11 @@ func validateEnvironment(repos []Repository) error {
 
 func handleInit(args []string, opts GlobalOptions) {
 	var fShort, fLong string
+	var depth int
 	fs := flag.NewFlagSet("init", flag.ExitOnError)
 	fs.StringVar(&fLong, "file", "", "configuration file")
 	fs.StringVar(&fShort, "f", "", "configuration file (short)")
+	fs.IntVar(&depth, "depth", 0, "Create a shallow clone with a history truncated to the specified number of commits")
 
 	if err := fs.Parse(args); err != nil {
 		fmt.Println("Error parsing flags:", err)
@@ -130,20 +133,37 @@ func handleInit(args []string, opts GlobalOptions) {
 		// 1. Git Clone
 		// We prefer external git command.
 		// "urlでgit cloneする。IDが指定されていればチェックアウト先のディレクトリ名としてidを採用する"
-		gitArgs := []string{"clone", repo.URL}
+		gitArgs := []string{"clone"}
+		if depth > 0 {
+			gitArgs = append(gitArgs, "--depth", fmt.Sprintf("%d", depth))
+		}
+		gitArgs = append(gitArgs, repo.URL)
 		targetDir := getRepoDir(repo)
 
 		// Explicitly pass target directory to avoid ambiguity and to know where to checkout later.
 		gitArgs = append(gitArgs, targetDir)
 
-		fmt.Printf("Cloning %s into %s...\n", repo.URL, targetDir)
-		cmd := exec.Command("git", gitArgs...)
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		if err := cmd.Run(); err != nil {
-			fmt.Printf("Error cloning %s: %v\n", repo.URL, err)
-			// Skip checkout if clone failed
-			continue
+		// Check if directory already exists and is a git repo.
+		// validateEnvironment already checked that if it exists, it's safe (matching remote).
+		shouldClone := true
+		if info, err := os.Stat(targetDir); err == nil && info.IsDir() {
+			gitDir := filepath.Join(targetDir, ".git")
+			if _, err := os.Stat(gitDir); err == nil {
+				fmt.Printf("Repository %s already exists. Skipping clone.\n", targetDir)
+				shouldClone = false
+			}
+		}
+
+		if shouldClone {
+			fmt.Printf("Cloning %s into %s...\n", repo.URL, targetDir)
+			cmd := exec.Command("git", gitArgs...)
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+			if err := cmd.Run(); err != nil {
+				fmt.Printf("Error cloning %s: %v\n", repo.URL, err)
+				// Skip checkout if clone failed
+				continue
+			}
 		}
 
 		// 2. Switch Branch
