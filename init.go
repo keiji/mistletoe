@@ -110,14 +110,27 @@ func handleInit(args []string, opts GlobalOptions) {
 		// Explicitly pass target directory to avoid ambiguity and to know where to checkout later.
 		gitArgs = append(gitArgs, targetDir)
 
-		fmt.Printf("Cloning %s into %s...\n", repo.URL, targetDir)
-		cmd := exec.Command("git", gitArgs...)
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		if err := cmd.Run(); err != nil {
-			fmt.Printf("Error cloning %s: %v\n", repo.URL, err)
-			// Skip checkout if clone failed
-			continue
+		// Check if directory already exists and is a git repo.
+		// validateEnvironment already checked that if it exists, it's safe (matching remote).
+		shouldClone := true
+		if info, err := os.Stat(targetDir); err == nil && info.IsDir() {
+			gitDir := filepath.Join(targetDir, ".git")
+			if _, err := os.Stat(gitDir); err == nil {
+				fmt.Printf("Repository %s already exists. Skipping clone.\n", targetDir)
+				shouldClone = false
+			}
+		}
+
+		if shouldClone {
+			fmt.Printf("Cloning %s into %s...\n", repo.URL, targetDir)
+			cmd := exec.Command("git", gitArgs...)
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+			if err := cmd.Run(); err != nil {
+				fmt.Printf("Error cloning %s: %v\n", repo.URL, err)
+				// Skip checkout if clone failed
+				continue
+			}
 		}
 
 		// 2. Switch Branch

@@ -168,6 +168,8 @@ func main() {
 	switch subcmdName {
 	case "init":
 		handleInit(subcmdArgs, opts)
+	case "freeze":
+		handleFreeze(subcmdArgs, opts)
 	case "switch":
 		handleSwitch(subcmdArgs, opts)
 	case "print":
