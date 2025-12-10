@@ -33,5 +33,5 @@ jobs:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         reporter: github-pr-review
         golangci_lint_flags: "--enable=revive"
-        fail_on_error: true
+        fail_level: any
         filter_mode: nofilter
