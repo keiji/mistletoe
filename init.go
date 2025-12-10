@@ -94,9 +94,11 @@ func validateEnvironment(repos []Repository) error {
 
 func handleInit(args []string, opts GlobalOptions) {
 	var fShort, fLong string
+	var depth int
 	fs := flag.NewFlagSet("init", flag.ExitOnError)
 	fs.StringVar(&fLong, "file", "", "configuration file")
 	fs.StringVar(&fShort, "f", "", "configuration file (short)")
+	fs.IntVar(&depth, "depth", 0, "Create a shallow clone with a history truncated to the specified number of commits")
 
 	if err := fs.Parse(args); err != nil {
 		fmt.Println("Error parsing flags:", err)
@@ -130,7 +132,11 @@ func handleInit(args []string, opts GlobalOptions) {
 		// 1. Git Clone
 		// We prefer external git command.
 		// "urlでgit cloneする。IDが指定されていればチェックアウト先のディレクトリ名としてidを採用する"
-		gitArgs := []string{"clone", repo.URL}
+		gitArgs := []string{"clone"}
+		if depth > 0 {
+			gitArgs = append(gitArgs, "--depth", fmt.Sprintf("%d", depth))
+		}
+		gitArgs = append(gitArgs, repo.URL)
 		targetDir := getRepoDir(repo)
 
 		// Explicitly pass target directory to avoid ambiguity and to know where to checkout later.
