@@ -9,7 +9,7 @@ import (
 )
 
 type Repository struct {
-	Repo   string   `json:"repo"`
+	Url    string   `json:"url"`
 	Branch string   `json:"branch"`
 	Labels []string `json:"labels"`
 }

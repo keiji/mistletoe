@@ -1,12 +1,12 @@
 {
     "repositories": [
         {
-             "repo": "git@github.com:keiji/gitc.git",
+             "url": "git@github.com:keiji/gitc.git",
              "branch": "main",
              "labels": ["tool", "go"]
         },
         {
-             "repo": "https://github.com/keiji/rfc4648-java.git",
+             "url": "https://github.com/keiji/rfc4648-java.git",
              "branch": "main",
              "labels": ["tool", "java"]
         }
