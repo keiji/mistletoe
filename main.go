@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"path/filepath"
 	"strings"
 )
 
@@ -28,6 +29,7 @@ type Config struct {
 
 type GlobalOptions struct {
 	ConfigFile string
+	GitPath    string
 }
 
 func ParseConfig(data []byte) (*Config, error) {
@@ -127,22 +129,31 @@ func parseArgs(args []string) (string, string, []string, error) {
 	return configFile, subcmdArgs[0], subcmdArgs[1:], nil
 }
 
-func handleVersion() {
+func handleVersion(opts GlobalOptions) {
 	v := appVersion
 	if commitHash != "" {
 		v = fmt.Sprintf("%s-%s", appVersion, commitHash)
 	}
 	fmt.Printf("gitc version %s\n", v)
 
-	path, err := exec.LookPath("git")
-	if err != nil {
-		fmt.Println("git path: not found")
-		fmt.Println("git version: not found")
+	// In handleVersion, we check existence again or assume the one passed in GlobalOptions
+	// If the startup validation failed for print/version, opts.GitPath is still set to what was attempted.
+
+	if err := validateGit(opts.GitPath); err != nil {
+		fmt.Println("git binary is not found")
 		return
 	}
-	fmt.Printf("git path: %s\n", path)
 
-	out, err := exec.Command("git", "--version").Output()
+	// Resolve absolute path for display if possible, mostly for clarity
+	displayPath := opts.GitPath
+	if resolved, err := exec.LookPath(opts.GitPath); err == nil {
+		displayPath = resolved
+	} else if filepath.IsAbs(opts.GitPath) {
+		displayPath = opts.GitPath
+	}
+	fmt.Printf("git path: %s\n", displayPath)
+
+	out, err := exec.Command(opts.GitPath, "--version").Output()
 	if err != nil {
 		fmt.Println("git version: error getting version")
 		return
@@ -154,6 +165,18 @@ func handleVersion() {
 	}
 }
 
+func getGitPath() string {
+	if envPath := os.Getenv("GIT_EXEC_PATH"); envPath != "" {
+		return filepath.Join(envPath, "git")
+	}
+	return "git"
+}
+
+func validateGit(gitPath string) error {
+	cmd := exec.Command(gitPath, "--version")
+	return cmd.Run()
+}
+
 func main() {
 	configFile, subcmdName, subcmdArgs, err := parseArgs(os.Args)
 	if err != nil {
@@ -161,8 +184,20 @@ func main() {
 		os.Exit(1)
 	}
 
+	gitPath := getGitPath()
+	gitErr := validateGit(gitPath)
+
+	// If git is not found/valid, we error out unless the command is print or version (or default/empty which is print)
+	isPermissive := subcmdName == "print" || subcmdName == "version" || subcmdName == ""
+
+	if gitErr != nil && !isPermissive {
+		fmt.Printf("Error: git is not callable at '%s'. (%v)\n", gitPath, gitErr)
+		os.Exit(1)
+	}
+
 	opts := GlobalOptions{
 		ConfigFile: configFile,
+		GitPath:    gitPath,
 	}
 
 	switch subcmdName {
@@ -175,7 +210,7 @@ func main() {
 	case "print":
 		handlePrint(subcmdArgs, opts)
 	case "version":
-		handleVersion()
+		handleVersion(opts)
 	case "":
 		// Default to print if no command provided
 		handlePrint(subcmdArgs, opts)

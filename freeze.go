@@ -59,11 +59,11 @@ func handleFreeze(args []string, opts GlobalOptions) {
 		}
 
 		// Get remote origin URL
-		cmdURL := exec.Command("git", "-C", dirName, "remote", "get-url", "origin")
+		cmdURL := exec.Command(opts.GitPath, "-C", dirName, "remote", "get-url", "origin")
 		outURL, err := cmdURL.Output()
 		if err != nil {
 			// Try getting it via config if get-url fails (older git versions or odd setups)
-			cmdURL = exec.Command("git", "-C", dirName, "config", "--get", "remote.origin.url")
+			cmdURL = exec.Command(opts.GitPath, "-C", dirName, "config", "--get", "remote.origin.url")
 			outURL, err = cmdURL.Output()
 			if err != nil {
 				fmt.Printf("Warning: Could not get remote origin for %s, skipping.\n", dirName)
@@ -73,7 +73,7 @@ func handleFreeze(args []string, opts GlobalOptions) {
 		url := strings.TrimSpace(string(outURL))
 
 		// Get current branch
-		cmdBranch := exec.Command("git", "-C", dirName, "rev-parse", "--abbrev-ref", "HEAD")
+		cmdBranch := exec.Command(opts.GitPath, "-C", dirName, "rev-parse", "--abbrev-ref", "HEAD")
 		outBranch, err := cmdBranch.Output()
 		branch := ""
 		if err != nil {
