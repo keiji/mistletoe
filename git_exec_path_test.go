@@ -58,16 +58,12 @@ func TestGitExecPath(t *testing.T) {
 		cmd := exec.Command(exe, "--version")
 		cmd.Env = append(os.Environ(), fmt.Sprintf("GIT_EXEC_PATH=%s", emptyDir))
 		out, err := cmd.CombinedOutput()
+		// We expect err to be nil as version command is permissive.
+		// However, if the command fails to execute for other reasons, we might log it.
+		// For the purpose of this test, we care about the output message.
 		if err != nil {
-			// Should not fail exit code because version is permissive
-			// Actually handleVersion doesn't exit(1), main doesn't exit(1) for version
-			// wait, main calls os.Exit(1) if gitErr != nil AND !isPermissive.
-			// version IS permissive. So it should exit 0.
-			// But check handleVersion output.
+			t.Logf("Command exited with error: %v (output: %s)", err, out)
 		}
-
-		// It might return non-zero if handleVersion fails?
-		// No, handleVersion just prints errors.
 
 		if !bytes.Contains(out, []byte("git binary is not found")) {
 			t.Errorf("Expected 'git binary is not found' message, got: %s", out)
@@ -79,7 +75,9 @@ func TestGitExecPath(t *testing.T) {
 		emptyDir := t.TempDir()
 		// create a dummy config file
 		configFile := filepath.Join(t.TempDir(), "repos.json")
-		os.WriteFile(configFile, []byte(`{"repositories": []}`), 0644)
+		if err := os.WriteFile(configFile, []byte(`{"repositories": []}`), 0644); err != nil {
+			t.Fatalf("Failed to write config file: %v", err)
+		}
 
 		cmd := exec.Command(exe, "init", "-f", configFile)
 		cmd.Env = append(os.Environ(), fmt.Sprintf("GIT_EXEC_PATH=%s", emptyDir))
