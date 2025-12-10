@@ -50,7 +50,11 @@ func TestHandleSwitch(t *testing.T) {
 
 	// Change to tmpDir so that gitc operates relatively if needed (though we use absolute paths in config)
 	cwd, _ := os.Getwd()
-	defer os.Chdir(cwd)
+	defer func() {
+		if err := os.Chdir(cwd); err != nil {
+			t.Errorf("failed to restore original working directory: %v", err)
+		}
+	}()
 	if err := os.Chdir(tmpDir); err != nil {
 		t.Fatalf("failed to chdir: %v", err)
 	}
@@ -151,7 +155,9 @@ func TestHandleSwitch(t *testing.T) {
 
 	// Scenario 4: Partial existence with -c
 	// Create branch 'partial' on repo1 only manually
-	exec.Command("git", "-C", repo1, "branch", "partial").Run()
+	if err := exec.Command("git", "-C", repo1, "branch", "partial").Run(); err != nil {
+		t.Fatalf("failed to create partial branch manually: %v", err)
+	}
 
 	// Run switch -c partial. Should skip create on repo1, create on repo2.
 	if err := runGitc("switch", "-c", "partial"); err != nil {
