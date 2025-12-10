@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path"
 	"strings"
 )
 
@@ -36,6 +37,55 @@ func ParseConfig(data []byte) (*Config, error) {
 		return nil, err
 	}
 	return &config, nil
+}
+
+// validateRepositories checks for duplicate IDs in the repository list.
+// IDs that are nil are ignored.
+func validateRepositories(repos []Repository) error {
+	seenIDs := make(map[string]bool)
+	for _, repo := range repos {
+		if repo.ID != nil && *repo.ID != "" {
+			if seenIDs[*repo.ID] {
+				return fmt.Errorf("duplicate repository ID found: %s", *repo.ID)
+			}
+			seenIDs[*repo.ID] = true
+		}
+	}
+	return nil
+}
+
+// getRepoDir determines the checkout directory name.
+// If ID is present and not empty, it is used. Otherwise, it is derived from the URL.
+func getRepoDir(repo Repository) string {
+	if repo.ID != nil && *repo.ID != "" {
+		return *repo.ID
+	}
+	// Derive from URL using path.Base because URLs use forward slashes
+	url := strings.TrimRight(repo.URL, "/")
+	base := path.Base(url)
+	return strings.TrimSuffix(base, ".git")
+}
+
+func loadConfig(configFile string) (*Config, error) {
+	if configFile == "" {
+		return nil, errors.New("Error: Please specify a configuration file using --file or -f")
+	}
+
+	data, err := os.ReadFile(configFile)
+	if err != nil {
+		return nil, fmt.Errorf("Error reading file: %v", err)
+	}
+
+	config, err := ParseConfig(data)
+	if err != nil {
+		return nil, fmt.Errorf("Error parsing JSON: %v", err)
+	}
+
+	if err := validateRepositories(config.Repositories); err != nil {
+		return nil, fmt.Errorf("Error validating configuration: %v", err)
+	}
+
+	return config, nil
 }
 
 func parseArgs(args []string) (string, string, []string, error) {
