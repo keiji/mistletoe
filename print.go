@@ -32,7 +32,7 @@ func handlePrint(args []string, opts GlobalOptions) {
 
 	for _, repo := range config.Repositories {
 		for _, label := range repo.Labels {
-			fmt.Printf("%s,%s, %s\n", repo.Repo, repo.Branch, label)
+			fmt.Printf("%s,%s, %s\n", repo.Url, repo.Branch, label)
 		}
 	}
 }
