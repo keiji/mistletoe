@@ -44,17 +44,31 @@ func TestHandleInitDepth(t *testing.T) {
 
 	// Create content repo to push to remote
 	contentDir := t.TempDir()
-	exec.Command("git", "init", contentDir).Run()
-	exec.Command("git", "-C", contentDir, "config", "user.email", "test@example.com").Run()
-	exec.Command("git", "-C", contentDir, "config", "user.name", "Test User").Run()
-	exec.Command("git", "-C", contentDir, "remote", "add", "origin", remoteDir).Run()
+	if err := exec.Command("git", "init", contentDir).Run(); err != nil {
+		t.Fatalf("failed to init content repo: %v", err)
+	}
+	if err := exec.Command("git", "-C", contentDir, "config", "user.email", "test@example.com").Run(); err != nil {
+		t.Fatalf("failed to configure user.email: %v", err)
+	}
+	if err := exec.Command("git", "-C", contentDir, "config", "user.name", "Test User").Run(); err != nil {
+		t.Fatalf("failed to configure user.name: %v", err)
+	}
+	if err := exec.Command("git", "-C", contentDir, "remote", "add", "origin", remoteDir).Run(); err != nil {
+		t.Fatalf("failed to add remote origin: %v", err)
+	}
 
 	// Create 5 commits
 	for i := 0; i < 5; i++ {
 		fname := filepath.Join(contentDir, "file.txt")
-		os.WriteFile(fname, []byte(fmt.Sprintf("commit %d", i)), 0644)
-		exec.Command("git", "-C", contentDir, "add", "file.txt").Run()
-		exec.Command("git", "-C", contentDir, "commit", "-m", fmt.Sprintf("commit %d", i)).Run()
+		if err := os.WriteFile(fname, []byte(fmt.Sprintf("commit %d", i)), 0644); err != nil {
+			t.Fatalf("failed to write file: %v", err)
+		}
+		if err := exec.Command("git", "-C", contentDir, "add", "file.txt").Run(); err != nil {
+			t.Fatalf("failed to add file: %v", err)
+		}
+		if err := exec.Command("git", "-C", contentDir, "commit", "-m", fmt.Sprintf("commit %d", i)).Run(); err != nil {
+			t.Fatalf("failed to commit: %v", err)
+		}
 	}
 	if err := exec.Command("git", "-C", contentDir, "push", "origin", "master").Run(); err != nil {
 		t.Fatalf("failed to push to remote: %v", err)
