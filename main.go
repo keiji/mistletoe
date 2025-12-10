@@ -97,10 +97,10 @@ func handleVersion() {
 		fmt.Println("git version: error getting version")
 		return
 	}
-	// git --version output typically includes a newline, so we use Print instead of Println or ensure spacing
-	fmt.Printf("git version: %s", string(out))
-	if !strings.HasSuffix(string(out), "\n") {
-		fmt.Println()
+	// git --version output typically includes a newline. We only want the first line.
+	lines := strings.Split(string(out), "\n")
+	if len(lines) > 0 {
+		fmt.Println(lines[0])
 	}
 }
 
