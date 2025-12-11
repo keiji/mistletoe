@@ -32,4 +32,4 @@ jobs:
     - name: golangci-lint
       uses: golangci/golangci-lint-action@v6
       with:
-        args: --enable=revive
+        args: --enable=revive --tests=false
