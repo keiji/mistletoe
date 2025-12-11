@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"sync"
 )
 
 func branchExists(dir, branch, gitPath string) bool {
@@ -15,15 +16,34 @@ func branchExists(dir, branch, gitPath string) bool {
 func handleSwitch(args []string, opts GlobalOptions) {
 	var fShort, fLong string
 	var createShort, createLong string
+	var pVal, pValShort int
 
 	fs := flag.NewFlagSet("switch", flag.ExitOnError)
 	fs.StringVar(&fLong, "file", "", "configuration file")
 	fs.StringVar(&fShort, "f", "", "configuration file (short)")
 	fs.StringVar(&createLong, "create", "", "create branch if it does not exist")
 	fs.StringVar(&createShort, "c", "", "create branch if it does not exist (short)")
+	fs.IntVar(&pVal, "parallel", 1, "number of parallel processes")
+	fs.IntVar(&pValShort, "p", 1, "number of parallel processes (short)")
 
 	if err := ParseFlagsFlexible(fs, args); err != nil {
 		fmt.Println("Error parsing flags:", err)
+		os.Exit(1)
+	}
+
+	parallel := 1
+	if pVal != 1 {
+		parallel = pVal
+	} else if pValShort != 1 {
+		parallel = pValShort
+	}
+
+	if parallel < 1 {
+		fmt.Println("Error: parallel must be at least 1")
+		os.Exit(1)
+	}
+	if parallel > 128 {
+		fmt.Println("Error: parallel must be at most 128")
 		os.Exit(1)
 	}
 
@@ -70,20 +90,34 @@ func handleSwitch(args []string, opts GlobalOptions) {
 
 	// Map to store existence status for each repo (keyed by local directory path)
 	dirExists := make(map[string]bool)
+	var mu sync.Mutex
+
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, parallel)
 
 	// Pre-check phase
 	for _, repo := range config.Repositories {
-		dir := getRepoDir(repo)
+		wg.Add(1)
+		go func(repo Repository) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
 
-		// Check if directory exists
-		if _, err := os.Stat(dir); os.IsNotExist(err) {
-			fmt.Printf("Error: repository directory %s does not exist\n", dir)
-			os.Exit(1)
-		}
+			dir := getRepoDir(repo)
 
-		exists := branchExists(dir, branchName, opts.GitPath)
-		dirExists[dir] = exists
+			// Check if directory exists
+			if _, err := os.Stat(dir); os.IsNotExist(err) {
+				fmt.Printf("Error: repository directory %s does not exist\n", dir)
+				os.Exit(1)
+			}
+
+			exists := branchExists(dir, branchName, opts.GitPath)
+			mu.Lock()
+			dirExists[dir] = exists
+			mu.Unlock()
+		}(repo)
 	}
+	wg.Wait()
 
 	if !create {
 		// Strict mode: All must exist
@@ -105,24 +139,14 @@ func handleSwitch(args []string, opts GlobalOptions) {
 
 		// Execute Checkout
 		for _, repo := range config.Repositories {
-			dir := getRepoDir(repo)
-			fmt.Printf("Switching %s to branch %s...\n", dir, branchName)
-			cmd := exec.Command(opts.GitPath, "-C", dir, "checkout", branchName)
-			cmd.Stdout = os.Stdout
-			cmd.Stderr = os.Stderr
-			if err := cmd.Run(); err != nil {
-				fmt.Printf("Error switching branch for %s: %v\n", dir, err)
-				os.Exit(1)
-			}
-		}
-	} else {
-		// Create mode
-		for _, repo := range config.Repositories {
-			dir := getRepoDir(repo)
-			exists := dirExists[dir]
+			wg.Add(1)
+			go func(repo Repository) {
+				defer wg.Done()
+				sem <- struct{}{}
+				defer func() { <-sem }()
 
-			if exists {
-				fmt.Printf("Branch %s exists in %s. Switching...\n", branchName, dir)
+				dir := getRepoDir(repo)
+				fmt.Printf("Switching %s to branch %s...\n", dir, branchName)
 				cmd := exec.Command(opts.GitPath, "-C", dir, "checkout", branchName)
 				cmd.Stdout = os.Stdout
 				cmd.Stderr = os.Stderr
@@ -130,16 +154,44 @@ func handleSwitch(args []string, opts GlobalOptions) {
 					fmt.Printf("Error switching branch for %s: %v\n", dir, err)
 					os.Exit(1)
 				}
-			} else {
-				fmt.Printf("Creating and switching to branch %s in %s...\n", branchName, dir)
-				cmd := exec.Command(opts.GitPath, "-C", dir, "checkout", "-b", branchName)
-				cmd.Stdout = os.Stdout
-				cmd.Stderr = os.Stderr
-				if err := cmd.Run(); err != nil {
-					fmt.Printf("Error creating branch for %s: %v\n", dir, err)
-					os.Exit(1)
-				}
-			}
+			}(repo)
 		}
+		wg.Wait()
+	} else {
+		// Create mode
+		for _, repo := range config.Repositories {
+			wg.Add(1)
+			go func(repo Repository) {
+				defer wg.Done()
+				sem <- struct{}{}
+				defer func() { <-sem }()
+
+				dir := getRepoDir(repo)
+				mu.Lock()
+				exists := dirExists[dir]
+				mu.Unlock()
+
+				if exists {
+					fmt.Printf("Branch %s exists in %s. Switching...\n", branchName, dir)
+					cmd := exec.Command(opts.GitPath, "-C", dir, "checkout", branchName)
+					cmd.Stdout = os.Stdout
+					cmd.Stderr = os.Stderr
+					if err := cmd.Run(); err != nil {
+						fmt.Printf("Error switching branch for %s: %v\n", dir, err)
+						os.Exit(1)
+					}
+				} else {
+					fmt.Printf("Creating and switching to branch %s in %s...\n", branchName, dir)
+					cmd := exec.Command(opts.GitPath, "-C", dir, "checkout", "-b", branchName)
+					cmd.Stdout = os.Stdout
+					cmd.Stderr = os.Stderr
+					if err := cmd.Run(); err != nil {
+						fmt.Printf("Error creating branch for %s: %v\n", dir, err)
+						os.Exit(1)
+					}
+				}
+			}(repo)
+		}
+		wg.Wait()
 	}
 }

@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 )
 
 // branchExistsLocallyOrRemotely checks if a branch exists locally or remotely.
@@ -97,13 +98,33 @@ func validateEnvironment(repos []Repository, gitPath string) error {
 func handleInit(args []string, opts GlobalOptions) {
 	var fShort, fLong string
 	var depth int
+	var pVal, pValShort int
+
 	fs := flag.NewFlagSet("init", flag.ExitOnError)
 	fs.StringVar(&fLong, "file", "", "configuration file")
 	fs.StringVar(&fShort, "f", "", "configuration file (short)")
 	fs.IntVar(&depth, "depth", 0, "Create a shallow clone with a history truncated to the specified number of commits")
+	fs.IntVar(&pVal, "parallel", 1, "number of parallel processes")
+	fs.IntVar(&pValShort, "p", 1, "number of parallel processes (short)")
 
 	if err := ParseFlagsFlexible(fs, args); err != nil {
 		fmt.Println("Error parsing flags:", err)
+		os.Exit(1)
+	}
+
+	parallel := 1
+	if pVal != 1 {
+		parallel = pVal
+	} else if pValShort != 1 {
+		parallel = pValShort
+	}
+
+	if parallel < 1 {
+		fmt.Println("Error: parallel must be at least 1")
+		os.Exit(1)
+	}
+	if parallel > 128 {
+		fmt.Println("Error: parallel must be at most 128")
 		os.Exit(1)
 	}
 
@@ -125,74 +146,85 @@ func handleInit(args []string, opts GlobalOptions) {
 		os.Exit(1)
 	}
 
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, parallel)
+
 	for _, repo := range config.Repositories {
-		// 1. Git Clone
-		// We prefer external git command.
-		// "urlでgit cloneする。IDが指定されていればチェックアウト先のディレクトリ名としてidを採用する"
-		gitArgs := []string{"clone"}
-		if depth > 0 {
-			gitArgs = append(gitArgs, "--depth", fmt.Sprintf("%d", depth))
-		}
-		gitArgs = append(gitArgs, repo.URL)
-		targetDir := getRepoDir(repo)
+		wg.Add(1)
+		go func(repo Repository) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
 
-		// Explicitly pass target directory to avoid ambiguity and to know where to checkout later.
-		gitArgs = append(gitArgs, targetDir)
-
-		// Check if directory already exists and is a git repo.
-		// validateEnvironment already checked that if it exists, it's safe (matching remote).
-		shouldClone := true
-		if info, err := os.Stat(targetDir); err == nil && info.IsDir() {
-			gitDir := filepath.Join(targetDir, ".git")
-			if _, err := os.Stat(gitDir); err == nil {
-				fmt.Printf("Repository %s already exists. Skipping clone.\n", targetDir)
-				shouldClone = false
+			// 1. Git Clone
+			// We prefer external git command.
+			// "urlでgit cloneする。IDが指定されていればチェックアウト先のディレクトリ名としてidを採用する"
+			gitArgs := []string{"clone"}
+			if depth > 0 {
+				gitArgs = append(gitArgs, "--depth", fmt.Sprintf("%d", depth))
 			}
-		}
+			gitArgs = append(gitArgs, repo.URL)
+			targetDir := getRepoDir(repo)
 
-		if shouldClone {
-			fmt.Printf("Cloning %s into %s...\n", repo.URL, targetDir)
-			cmd := exec.Command(opts.GitPath, gitArgs...)
-			cmd.Stdout = os.Stdout
-			cmd.Stderr = os.Stderr
-			if err := cmd.Run(); err != nil {
-				fmt.Printf("Error cloning %s: %v\n", repo.URL, err)
-				// Skip checkout if clone failed
-				continue
-			}
-		}
+			// Explicitly pass target directory to avoid ambiguity and to know where to checkout later.
+			gitArgs = append(gitArgs, targetDir)
 
-		// 2. Switch Branch / Checkout Revision
-		if repo.Revision != nil && *repo.Revision != "" {
-			// Checkout revision
-			fmt.Printf("Checking out revision %s in %s...\n", *repo.Revision, targetDir)
-			cmd := exec.Command(opts.GitPath, "-C", targetDir, "checkout", *repo.Revision)
-			cmd.Stdout = os.Stdout
-			cmd.Stderr = os.Stderr
-			if err := cmd.Run(); err != nil {
-				fmt.Printf("Error checking out revision %s in %s: %v\n", *repo.Revision, targetDir, err)
-				continue
+			// Check if directory already exists and is a git repo.
+			// validateEnvironment already checked that if it exists, it's safe (matching remote).
+			shouldClone := true
+			if info, err := os.Stat(targetDir); err == nil && info.IsDir() {
+				gitDir := filepath.Join(targetDir, ".git")
+				if _, err := os.Stat(gitDir); err == nil {
+					fmt.Printf("Repository %s already exists. Skipping clone.\n", targetDir)
+					shouldClone = false
+				}
 			}
 
-			if repo.Branch != nil && *repo.Branch != "" {
-				// Create branch
-				fmt.Printf("Creating branch %s at revision %s in %s...\n", *repo.Branch, *repo.Revision, targetDir)
-				cmd := exec.Command(opts.GitPath, "-C", targetDir, "checkout", "-b", *repo.Branch)
+			if shouldClone {
+				fmt.Printf("Cloning %s into %s...\n", repo.URL, targetDir)
+				cmd := exec.Command(opts.GitPath, gitArgs...)
 				cmd.Stdout = os.Stdout
 				cmd.Stderr = os.Stderr
 				if err := cmd.Run(); err != nil {
-					fmt.Printf("Error creating branch %s in %s: %v\n", *repo.Branch, targetDir, err)
+					fmt.Printf("Error cloning %s: %v\n", repo.URL, err)
+					// Skip checkout if clone failed
+					return
 				}
 			}
-		} else if repo.Branch != nil && *repo.Branch != "" {
-			// "チェックアウト後、各要素についてbranchで示されたブランチに切り替える。"
-			fmt.Printf("Switching %s to branch %s...\n", targetDir, *repo.Branch)
-			checkoutCmd := exec.Command(opts.GitPath, "-C", targetDir, "checkout", *repo.Branch)
-			checkoutCmd.Stdout = os.Stdout
-			checkoutCmd.Stderr = os.Stderr
-			if err := checkoutCmd.Run(); err != nil {
-				fmt.Printf("Error switching branch for %s: %v\n", targetDir, err)
+
+			// 2. Switch Branch / Checkout Revision
+			if repo.Revision != nil && *repo.Revision != "" {
+				// Checkout revision
+				fmt.Printf("Checking out revision %s in %s...\n", *repo.Revision, targetDir)
+				cmd := exec.Command(opts.GitPath, "-C", targetDir, "checkout", *repo.Revision)
+				cmd.Stdout = os.Stdout
+				cmd.Stderr = os.Stderr
+				if err := cmd.Run(); err != nil {
+					fmt.Printf("Error checking out revision %s in %s: %v\n", *repo.Revision, targetDir, err)
+					return
+				}
+
+				if repo.Branch != nil && *repo.Branch != "" {
+					// Create branch
+					fmt.Printf("Creating branch %s at revision %s in %s...\n", *repo.Branch, *repo.Revision, targetDir)
+					cmd := exec.Command(opts.GitPath, "-C", targetDir, "checkout", "-b", *repo.Branch)
+					cmd.Stdout = os.Stdout
+					cmd.Stderr = os.Stderr
+					if err := cmd.Run(); err != nil {
+						fmt.Printf("Error creating branch %s in %s: %v\n", *repo.Branch, targetDir, err)
+					}
+				}
+			} else if repo.Branch != nil && *repo.Branch != "" {
+				// "チェックアウト後、各要素についてbranchで示されたブランチに切り替える。"
+				fmt.Printf("Switching %s to branch %s...\n", targetDir, *repo.Branch)
+				checkoutCmd := exec.Command(opts.GitPath, "-C", targetDir, "checkout", *repo.Branch)
+				checkoutCmd.Stdout = os.Stdout
+				checkoutCmd.Stderr = os.Stderr
+				if err := checkoutCmd.Run(); err != nil {
+					fmt.Printf("Error switching branch for %s: %v\n", targetDir, err)
+				}
 			}
-		}
+		}(repo)
 	}
+	wg.Wait()
 }
