@@ -6,7 +6,9 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/olekukonko/tablewriter"
@@ -14,12 +16,32 @@ import (
 
 func handleStatus(args []string, opts GlobalOptions) {
 	var fShort, fLong string
+	var pVal, pValShort int
+
 	fs := flag.NewFlagSet("status", flag.ExitOnError)
 	fs.StringVar(&fLong, "file", "", "configuration file")
 	fs.StringVar(&fShort, "f", "", "configuration file (short)")
+	fs.IntVar(&pVal, "parallel", DefaultParallel, "number of parallel processes")
+	fs.IntVar(&pValShort, "p", DefaultParallel, "number of parallel processes (short)")
 
 	if err := ParseFlagsFlexible(fs, args); err != nil {
 		fmt.Println("Error parsing flags:", err)
+		os.Exit(1)
+	}
+
+	parallel := DefaultParallel
+	if pVal != DefaultParallel {
+		parallel = pVal
+	} else if pValShort != DefaultParallel {
+		parallel = pValShort
+	}
+
+	if parallel < MinParallel {
+		fmt.Printf("Error: parallel must be at least %d\n", MinParallel)
+		os.Exit(1)
+	}
+	if parallel > MaxParallel {
+		fmt.Printf("Error: parallel must be at most %d\n", MaxParallel)
 		os.Exit(1)
 	}
 
@@ -120,113 +142,130 @@ func handleStatus(args []string, opts GlobalOptions) {
 		Color     []int
 	}
 	var rows []RowData
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, parallel)
 
 	for _, repo := range config.Repositories {
-		targetDir := getRepoDir(repo)
-		repoName := targetDir
-		if repo.ID != nil && *repo.ID != "" {
-			repoName = *repo.ID
-		}
+		wg.Add(1)
+		go func(repo Repository) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
 
-		if _, err := os.Stat(targetDir); os.IsNotExist(err) {
-			continue
-		}
-
-		// Local Branch/Rev
-		// git rev-parse --abbrev-ref HEAD
-		cmd := exec.Command(opts.GitPath, "-C", targetDir, "rev-parse", "--abbrev-ref", "HEAD")
-		out, err := cmd.Output()
-		localRef := ""
-		isDetached := false
-		if err == nil {
-			localRef = strings.TrimSpace(string(out))
-		}
-		if localRef == "HEAD" {
-			isDetached = true
-			// Get short sha
-			cmd := exec.Command(opts.GitPath, "-C", targetDir, "rev-parse", "--short", "HEAD")
-			out, _ := cmd.Output()
-			localRef = strings.TrimSpace(string(out))
-		}
-
-		// Local HEAD Rev (Full SHA for check, Short for display)
-		cmd = exec.Command(opts.GitPath, "-C", targetDir, "rev-parse", "HEAD")
-		out, err = cmd.Output()
-		localHeadFull := ""
-		localHeadDisplay := ""
-		if err == nil {
-			localHeadFull = strings.TrimSpace(string(out))
-			if len(localHeadFull) >= 7 {
-				localHeadDisplay = localHeadFull[:7]
-			} else {
-				localHeadDisplay = localHeadFull
+			targetDir := getRepoDir(repo)
+			repoName := targetDir
+			if repo.ID != nil && *repo.ID != "" {
+				repoName = *repo.ID
 			}
-		}
 
-		// Remote Rev
-		remoteHeadFull := ""
-		remoteHeadDisplay := ""
-		if !isDetached {
-			// Check if remote branch exists
-			// git ls-remote origin <localRef>
-			cmd = exec.Command(opts.GitPath, "-C", targetDir, "ls-remote", "origin", "refs/heads/"+localRef)
-			out, err = cmd.Output()
+			if _, err := os.Stat(targetDir); os.IsNotExist(err) {
+				return
+			}
+
+			// Local Branch/Rev
+			// git rev-parse --abbrev-ref HEAD
+			cmd := exec.Command(opts.GitPath, "-C", targetDir, "rev-parse", "--abbrev-ref", "HEAD")
+			out, err := cmd.Output()
+			localRef := ""
+			isDetached := false
 			if err == nil {
-				output := strings.TrimSpace(string(out))
-				if output != "" {
-					// Output format: <SHA>\trefs/heads/<branch>
-					fields := strings.Fields(output)
-					if len(fields) > 0 {
-						remoteHeadFull = fields[0]
-						if len(remoteHeadFull) >= 7 {
-							remoteHeadDisplay = remoteHeadFull[:7]
-						} else {
-							remoteHeadDisplay = remoteHeadFull
+				localRef = strings.TrimSpace(string(out))
+			}
+			if localRef == "HEAD" {
+				isDetached = true
+				// Get short sha
+				cmd := exec.Command(opts.GitPath, "-C", targetDir, "rev-parse", "--short", "HEAD")
+				out, _ := cmd.Output()
+				localRef = strings.TrimSpace(string(out))
+			}
+
+			// Local HEAD Rev (Full SHA for check, Short for display)
+			cmd = exec.Command(opts.GitPath, "-C", targetDir, "rev-parse", "HEAD")
+			out, err = cmd.Output()
+			localHeadFull := ""
+			localHeadDisplay := ""
+			if err == nil {
+				localHeadFull = strings.TrimSpace(string(out))
+				if len(localHeadFull) >= 7 {
+					localHeadDisplay = localHeadFull[:7]
+				} else {
+					localHeadDisplay = localHeadFull
+				}
+			}
+
+			// Remote Rev
+			remoteHeadFull := ""
+			remoteHeadDisplay := ""
+			if !isDetached {
+				// Check if remote branch exists
+				// git ls-remote origin <localRef>
+				cmd = exec.Command(opts.GitPath, "-C", targetDir, "ls-remote", "origin", "refs/heads/"+localRef)
+				out, err = cmd.Output()
+				if err == nil {
+					output := strings.TrimSpace(string(out))
+					if output != "" {
+						// Output format: <SHA>\trefs/heads/<branch>
+						fields := strings.Fields(output)
+						if len(fields) > 0 {
+							remoteHeadFull = fields[0]
+							if len(remoteHeadFull) >= 7 {
+								remoteHeadDisplay = remoteHeadFull[:7]
+							} else {
+								remoteHeadDisplay = remoteHeadFull
+							}
 						}
 					}
 				}
 			}
-		}
 
-		// Unpushed?
-		// Logic: if unpushed commits -> s (yellow), else -> -
-		unpushed := "-"
-		hasUnpushed := false
+			// Unpushed?
+			// Logic: if unpushed commits -> s (yellow), else -> -
+			unpushed := "-"
+			hasUnpushed := false
 
-		if remoteHeadFull != "" && localHeadFull != "" {
-			if remoteHeadFull != localHeadFull {
-				// Check if unpushed
-				cmd = exec.Command(opts.GitPath, "-C", targetDir, "rev-list", "--count", remoteHeadFull+".."+localHeadFull)
-				out, err := cmd.Output()
-				if err == nil {
-					count := strings.TrimSpace(string(out))
-					if count != "0" {
-						hasUnpushed = true
+			if remoteHeadFull != "" && localHeadFull != "" {
+				if remoteHeadFull != localHeadFull {
+					// Check if unpushed
+					cmd = exec.Command(opts.GitPath, "-C", targetDir, "rev-list", "--count", remoteHeadFull+".."+localHeadFull)
+					out, err := cmd.Output()
+					if err == nil {
+						count := strings.TrimSpace(string(out))
+						if count != "0" {
+							hasUnpushed = true
+						}
 					}
 				}
+			} else if !isDetached && remoteHeadFull == "" {
+				// Remote branch doesn't exist? Means all local commits are unpushed
+				hasUnpushed = true
 			}
-		} else if !isDetached && remoteHeadFull == "" {
-			// Remote branch doesn't exist? Means all local commits are unpushed
-			hasUnpushed = true
-		}
 
-		var color []int
-		if hasUnpushed {
-			unpushed = "s"
-			color = []int{tablewriter.FgYellowColor}
-		}
+			var color []int
+			if hasUnpushed {
+				unpushed = "s"
+				color = []int{tablewriter.FgYellowColor}
+			}
 
-		rows = append(rows, RowData{
-			Repo:      repoName,
-			LocalRef:  localRef,
-			RemoteRev: remoteHeadDisplay,
-			LocalHead: localHeadDisplay,
-			Unpushed:  unpushed,
-			Color:     color,
-		})
+			mu.Lock()
+			rows = append(rows, RowData{
+				Repo:      repoName,
+				LocalRef:  localRef,
+				RemoteRev: remoteHeadDisplay,
+				LocalHead: localHeadDisplay,
+				Unpushed:  unpushed,
+				Color:     color,
+			})
+			mu.Unlock()
+		}(repo)
 	}
+	wg.Wait()
 
 	stopSpinner()
+
+	sort.Slice(rows, func(i, j int) bool {
+		return rows[i].Repo < rows[j].Repo
+	})
 
 	table := tablewriter.NewWriter(os.Stdout)
 	table.SetHeader([]string{"Repository", "Local Branch/Rev", "Remote Rev", "Local HEAD Rev", ""})
