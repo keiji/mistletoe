@@ -53,14 +53,26 @@ func TestInit_MissingBranchAndRevision(t *testing.T) {
 		t.Fatalf("failed to init content repo: %v", err)
 	}
 	// Config user
-	exec.Command("git", "-C", contentDir, "config", "user.email", "test@example.com").Run()
-	exec.Command("git", "-C", contentDir, "config", "user.name", "Test User").Run()
-	exec.Command("git", "-C", contentDir, "remote", "add", "origin", remoteDir).Run()
+	if err := exec.Command("git", "-C", contentDir, "config", "user.email", "test@example.com").Run(); err != nil {
+		t.Fatalf("failed to config user.email: %v", err)
+	}
+	if err := exec.Command("git", "-C", contentDir, "config", "user.name", "Test User").Run(); err != nil {
+		t.Fatalf("failed to config user.name: %v", err)
+	}
+	if err := exec.Command("git", "-C", contentDir, "remote", "add", "origin", remoteDir).Run(); err != nil {
+		t.Fatalf("failed to add remote: %v", err)
+	}
 
 	// Commit
-	os.WriteFile(filepath.Join(contentDir, "file.txt"), []byte("content"), 0644)
-	exec.Command("git", "-C", contentDir, "add", "file.txt").Run()
-	exec.Command("git", "-C", contentDir, "commit", "-m", "initial").Run()
+	if err := os.WriteFile(filepath.Join(contentDir, "file.txt"), []byte("content"), 0644); err != nil {
+		t.Fatalf("failed to write file: %v", err)
+	}
+	if err := exec.Command("git", "-C", contentDir, "add", "file.txt").Run(); err != nil {
+		t.Fatalf("failed to add file: %v", err)
+	}
+	if err := exec.Command("git", "-C", contentDir, "commit", "-m", "initial").Run(); err != nil {
+		t.Fatalf("failed to commit: %v", err)
+	}
 
 	// Get branch name before push
 	defaultBranch := getCurrentBranchLocal(t, contentDir)
@@ -91,7 +103,9 @@ func TestInit_MissingBranchAndRevision(t *testing.T) {
 
 		// Verify strict absence of fields in JSON
 		var rawConfig map[string][]map[string]interface{}
-		json.Unmarshal(data, &rawConfig)
+		if err := json.Unmarshal(data, &rawConfig); err != nil {
+			t.Fatalf("failed to unmarshal json: %v", err)
+		}
 		repoMap := rawConfig["repositories"][0]
 		if _, ok := repoMap["branch"]; ok {
 			t.Error("expected branch to be omitted")
