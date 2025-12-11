@@ -134,12 +134,12 @@ func handleStatus(args []string, opts GlobalOptions) {
 
 	// Output Phase
 	type RowData struct {
-		Repo      string
-		LocalRef  string
-		RemoteRev string
-		LocalHead string
-		Unpushed  string
-		Color     []int
+		Repo           string
+		ConfigRef      string
+		LocalBranchRev string
+		RemoteRev      string
+		Status         string
+		Color          []int
 	}
 	var rows []RowData
 	var mu sync.Mutex
@@ -163,35 +163,53 @@ func handleStatus(args []string, opts GlobalOptions) {
 				return
 			}
 
-			// Local Branch/Rev
-			// git rev-parse --abbrev-ref HEAD
+			// 1. Get Branch Name (abbrev-ref)
 			cmd := exec.Command(opts.GitPath, "-C", targetDir, "rev-parse", "--abbrev-ref", "HEAD")
 			out, err := cmd.Output()
-			localRef := ""
+			branchName := ""
 			isDetached := false
 			if err == nil {
-				localRef = strings.TrimSpace(string(out))
+				branchName = strings.TrimSpace(string(out))
 			}
-			if localRef == "HEAD" {
+			if branchName == "HEAD" {
 				isDetached = true
-				// Get short sha
-				cmd := exec.Command(opts.GitPath, "-C", targetDir, "rev-parse", "--short", "HEAD")
-				out, _ := cmd.Output()
-				localRef = strings.TrimSpace(string(out))
 			}
 
-			// Local HEAD Rev (Full SHA for check, Short for display)
+			// 2. Get Short SHA
+			cmd = exec.Command(opts.GitPath, "-C", targetDir, "rev-parse", "--short", "HEAD")
+			out, err = cmd.Output()
+			shortSHA := ""
+			if err == nil {
+				shortSHA = strings.TrimSpace(string(out))
+			}
+
+			// 3. Construct LocalBranchRev
+			localBranchRev := ""
+			if branchName != "" && shortSHA != "" {
+				localBranchRev = fmt.Sprintf("%s/%s", branchName, shortSHA)
+			} else if shortSHA != "" {
+				localBranchRev = shortSHA
+			}
+
+			// 4. ConfigRef
+			configRef := ""
+			if repo.Branch != nil && *repo.Branch != "" {
+				configRef = *repo.Branch
+			}
+			if repo.Revision != nil && *repo.Revision != "" {
+				if configRef != "" {
+					configRef += "/" + *repo.Revision
+				} else {
+					configRef = *repo.Revision
+				}
+			}
+
+			// Local HEAD Rev (Full SHA for check)
 			cmd = exec.Command(opts.GitPath, "-C", targetDir, "rev-parse", "HEAD")
 			out, err = cmd.Output()
 			localHeadFull := ""
-			localHeadDisplay := ""
 			if err == nil {
 				localHeadFull = strings.TrimSpace(string(out))
-				if len(localHeadFull) >= 7 {
-					localHeadDisplay = localHeadFull[:7]
-				} else {
-					localHeadDisplay = localHeadFull
-				}
 			}
 
 			// Remote Rev
@@ -199,8 +217,11 @@ func handleStatus(args []string, opts GlobalOptions) {
 			remoteHeadDisplay := ""
 			if !isDetached {
 				// Check if remote branch exists
-				// git ls-remote origin <localRef>
-				cmd = exec.Command(opts.GitPath, "-C", targetDir, "ls-remote", "origin", "refs/heads/"+localRef)
+				// git ls-remote origin <branchName>
+				// branchName is safe because we checked it's not empty/HEAD in !isDetached (mostly)
+				// well, branchName could be empty if err != nil above, but usually fine.
+
+				cmd = exec.Command(opts.GitPath, "-C", targetDir, "ls-remote", "origin", "refs/heads/"+branchName)
 				out, err = cmd.Output()
 				if err == nil {
 					output := strings.TrimSpace(string(out))
@@ -219,9 +240,8 @@ func handleStatus(args []string, opts GlobalOptions) {
 				}
 			}
 
-			// Unpushed?
-			// Logic: if unpushed commits -> s (yellow), else -> -
-			unpushed := "-"
+			// Status (Unpushed?)
+			statusVal := "-"
 			hasUnpushed := false
 
 			if remoteHeadFull != "" && localHeadFull != "" {
@@ -243,18 +263,18 @@ func handleStatus(args []string, opts GlobalOptions) {
 
 			var color []int
 			if hasUnpushed {
-				unpushed = "s"
+				statusVal = "s"
 				color = []int{tablewriter.FgYellowColor}
 			}
 
 			mu.Lock()
 			rows = append(rows, RowData{
-				Repo:      repoName,
-				LocalRef:  localRef,
-				RemoteRev: remoteHeadDisplay,
-				LocalHead: localHeadDisplay,
-				Unpushed:  unpushed,
-				Color:     color,
+				Repo:           repoName,
+				ConfigRef:      configRef,
+				LocalBranchRev: localBranchRev,
+				RemoteRev:      remoteHeadDisplay,
+				Status:         statusVal,
+				Color:          color,
 			})
 			mu.Unlock()
 		}(repo)
@@ -268,7 +288,7 @@ func handleStatus(args []string, opts GlobalOptions) {
 	})
 
 	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader([]string{"Repository", "Local Branch/Rev", "Remote Rev", "Local HEAD Rev", ""})
+	table.SetHeader([]string{"Repository", "Branch/Rev", "Local Branch/Rev", "Remote Rev", "Status"})
 	table.SetBorders(tablewriter.Border{Left: true, Top: false, Right: true, Bottom: false})
 	table.SetCenterSeparator("|")
 	table.SetColumnSeparator("|")
@@ -280,7 +300,7 @@ func handleStatus(args []string, opts GlobalOptions) {
 		colors := []tablewriter.Colors{
 			{}, {}, {}, {}, tablewriter.Colors(row.Color),
 		}
-		table.Rich([]string{row.Repo, row.LocalRef, row.RemoteRev, row.LocalHead, row.Unpushed}, colors)
+		table.Rich([]string{row.Repo, row.ConfigRef, row.LocalBranchRev, row.RemoteRev, row.Status}, colors)
 	}
 	table.Render()
 }
