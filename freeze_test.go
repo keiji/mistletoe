@@ -141,8 +141,12 @@ func TestFreeze(t *testing.T) {
 		if r1.URL != repo1URL {
 			t.Errorf("repo1 URL mismatch: got %s, want %s", r1.URL, repo1URL)
 		}
-		if r1.Branch != repo1Branch {
-			t.Errorf("repo1 branch mismatch: got %s, want %s", r1.Branch, repo1Branch)
+		if r1.Branch == nil || *r1.Branch != repo1Branch {
+			got := "<nil>"
+			if r1.Branch != nil {
+				got = *r1.Branch
+			}
+			t.Errorf("repo1 branch mismatch: got %s, want %s", got, repo1Branch)
 		}
 		if len(r1.Labels) != 0 {
 			t.Errorf("repo1 labels not empty")
@@ -156,8 +160,12 @@ func TestFreeze(t *testing.T) {
 		if r2.URL != repo2URL {
 			t.Errorf("repo2 URL mismatch: got %s, want %s", r2.URL, repo2URL)
 		}
-		if r2.Branch != repo2Branch {
-			t.Errorf("repo2 branch mismatch: got %s, want %s", r2.Branch, repo2Branch)
+		if r2.Branch == nil || *r2.Branch != repo2Branch {
+			got := "<nil>"
+			if r2.Branch != nil {
+				got = *r2.Branch
+			}
+			t.Errorf("repo2 branch mismatch: got %s, want %s", got, repo2Branch)
 		}
 	}
 }
