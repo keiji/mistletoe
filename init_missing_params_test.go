@@ -10,15 +10,6 @@ import (
 	"testing"
 )
 
-func getHeadHashLocal(t *testing.T, dir string) string {
-	cmd := exec.Command("git", "-C", dir, "rev-parse", "HEAD")
-	out, err := cmd.Output()
-	if err != nil {
-		t.Fatalf("failed to get HEAD hash in %s: %v", dir, err)
-	}
-	return strings.TrimSpace(string(out))
-}
-
 func getCurrentBranchLocal(t *testing.T, dir string) string {
 	cmd := exec.Command("git", "-C", dir, "rev-parse", "--abbrev-ref", "HEAD")
 	out, err := cmd.Output()
