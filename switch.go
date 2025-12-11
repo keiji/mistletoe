@@ -14,20 +14,23 @@ func branchExists(dir, branch, gitPath string) bool {
 
 func handleSwitch(args []string, opts GlobalOptions) {
 	var fShort, fLong string
-	var createShort, createLong bool
+	var createShort, createLong string
 
 	fs := flag.NewFlagSet("switch", flag.ExitOnError)
 	fs.StringVar(&fLong, "file", "", "configuration file")
 	fs.StringVar(&fShort, "f", "", "configuration file (short)")
-	fs.BoolVar(&createLong, "create", false, "create branch if it does not exist")
-	fs.BoolVar(&createShort, "c", false, "create branch if it does not exist (short)")
+	fs.StringVar(&createLong, "create", "", "create branch if it does not exist")
+	fs.StringVar(&createShort, "c", "", "create branch if it does not exist (short)")
 
-	if err := fs.Parse(args); err != nil {
+	if err := ParseFlagsFlexible(fs, args); err != nil {
 		fmt.Println("Error parsing flags:", err)
 		os.Exit(1)
 	}
 
-	create := createLong || createShort
+	createBranchName := createLong
+	if createShort != "" {
+		createBranchName = createShort
+	}
 
 	configFile := opts.ConfigFile
 	if fLong != "" {
@@ -42,11 +45,28 @@ func handleSwitch(args []string, opts GlobalOptions) {
 		os.Exit(1)
 	}
 
-	if len(fs.Args()) == 0 {
-		fmt.Println("Error: branch name required")
-		os.Exit(1)
+	var branchName string
+	var create bool
+
+	if createBranchName != "" {
+		if len(fs.Args()) > 0 {
+			fmt.Printf("Error: Unexpected argument: %s\n", fs.Args()[0])
+			os.Exit(1)
+		}
+		branchName = createBranchName
+		create = true
+	} else {
+		// If create flag not set, look for positional argument
+		if len(fs.Args()) == 0 {
+			fmt.Println("Error: branch name required")
+			os.Exit(1)
+		} else if len(fs.Args()) > 1 {
+			fmt.Printf("Error: Too many arguments: %v\n", fs.Args())
+			os.Exit(1)
+		}
+		branchName = fs.Args()[0]
+		create = false
 	}
-	branchName := fs.Args()[0]
 
 	// Map to store existence status for each repo (keyed by local directory path)
 	dirExists := make(map[string]bool)

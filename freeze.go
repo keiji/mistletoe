@@ -15,7 +15,7 @@ func handleFreeze(args []string, opts GlobalOptions) {
 	fs.StringVar(&fLong, "file", "", "configuration file")
 	fs.StringVar(&fShort, "f", "", "configuration file (short)")
 
-	if err := fs.Parse(args); err != nil {
+	if err := ParseFlagsFlexible(fs, args); err != nil {
 		fmt.Println("Error parsing flags:", err)
 		os.Exit(1)
 	}
