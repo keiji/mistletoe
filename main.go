@@ -14,6 +14,12 @@ import (
 
 const appVersion = "0.0.1"
 
+const (
+	MinParallel     = 1
+	MaxParallel     = 128
+	DefaultParallel = 1
+)
+
 var commitHash string
 
 type Repository struct {

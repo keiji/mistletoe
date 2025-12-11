@@ -104,27 +104,27 @@ func handleInit(args []string, opts GlobalOptions) {
 	fs.StringVar(&fLong, "file", "", "configuration file")
 	fs.StringVar(&fShort, "f", "", "configuration file (short)")
 	fs.IntVar(&depth, "depth", 0, "Create a shallow clone with a history truncated to the specified number of commits")
-	fs.IntVar(&pVal, "parallel", 1, "number of parallel processes")
-	fs.IntVar(&pValShort, "p", 1, "number of parallel processes (short)")
+	fs.IntVar(&pVal, "parallel", DefaultParallel, "number of parallel processes")
+	fs.IntVar(&pValShort, "p", DefaultParallel, "number of parallel processes (short)")
 
 	if err := ParseFlagsFlexible(fs, args); err != nil {
 		fmt.Println("Error parsing flags:", err)
 		os.Exit(1)
 	}
 
-	parallel := 1
-	if pVal != 1 {
+	parallel := DefaultParallel
+	if pVal != DefaultParallel {
 		parallel = pVal
-	} else if pValShort != 1 {
+	} else if pValShort != DefaultParallel {
 		parallel = pValShort
 	}
 
-	if parallel < 1 {
-		fmt.Println("Error: parallel must be at least 1")
+	if parallel < MinParallel {
+		fmt.Printf("Error: parallel must be at least %d\n", MinParallel)
 		os.Exit(1)
 	}
-	if parallel > 128 {
-		fmt.Println("Error: parallel must be at most 128")
+	if parallel > MaxParallel {
+		fmt.Printf("Error: parallel must be at most %d\n", MaxParallel)
 		os.Exit(1)
 	}
 
