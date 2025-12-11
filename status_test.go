@@ -54,6 +54,15 @@ func setupRemoteAndContent(t *testing.T, commitCount int) (string, string) {
 	return remoteURL, contentDir
 }
 
+func configureGitUser(t *testing.T, dir string) {
+	if err := exec.Command("git", "-C", dir, "config", "user.email", "test@example.com").Run(); err != nil {
+		t.Fatalf("failed to config user.email in %s: %v", dir, err)
+	}
+	if err := exec.Command("git", "-C", dir, "config", "user.name", "Test User").Run(); err != nil {
+		t.Fatalf("failed to config user.name in %s: %v", dir, err)
+	}
+}
+
 func TestStatusCmd(t *testing.T) {
 	// 1. Build gitc binary
 	binPath := filepath.Join(t.TempDir(), "gitc")
@@ -119,10 +128,13 @@ func TestStatusCmd(t *testing.T) {
 		exec.Command("git", "clone", remote2, repo2Path).Run()
 
 		// Add new commit to Repo2 locally
+		configureGitUser(t, repo2Path)
 		fname := filepath.Join(repo2Path, "new.txt")
 		os.WriteFile(fname, []byte("new"), 0644)
 		exec.Command("git", "-C", repo2Path, "add", ".").Run()
-		exec.Command("git", "-C", repo2Path, "commit", "-m", "unpushed commit").Run()
+		if err := exec.Command("git", "-C", repo2Path, "commit", "-m", "unpushed commit").Run(); err != nil {
+			t.Fatalf("failed to commit in repo2: %v", err)
+		}
 
 		// Config
 		config := Config{
@@ -211,11 +223,19 @@ func TestStatusCmd(t *testing.T) {
 		// We can do this by cloning to another temp dir, committing, and pushing
 		otherClone := t.TempDir()
 		exec.Command("git", "clone", remoteDir, otherClone).Run()
-		exec.Command("git", "-C", otherClone, "commit", "--allow-empty", "-m", "Remote Commit B").Run()
-		exec.Command("git", "-C", otherClone, "push").Run()
+		configureGitUser(t, otherClone)
+		if err := exec.Command("git", "-C", otherClone, "commit", "--allow-empty", "-m", "Remote Commit B").Run(); err != nil {
+			t.Fatalf("failed to commit in otherClone: %v", err)
+		}
+		if err := exec.Command("git", "-C", otherClone, "push").Run(); err != nil {
+			t.Fatalf("failed to push from otherClone: %v", err)
+		}
 
 		// 2. Commit locally in "diverged-repo" (it currently has A, now adds C)
-		exec.Command("git", "-C", localRepoPath, "commit", "--allow-empty", "-m", "Local Commit C").Run()
+		configureGitUser(t, localRepoPath)
+		if err := exec.Command("git", "-C", localRepoPath, "commit", "--allow-empty", "-m", "Local Commit C").Run(); err != nil {
+			t.Fatalf("failed to commit in localRepoPath: %v", err)
+		}
 
 		// Important: Fetch so local has remote objects (B)
 		exec.Command("git", "-C", localRepoPath, "fetch").Run()
