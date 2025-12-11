@@ -17,10 +17,11 @@ const appVersion = "0.0.1"
 var commitHash string
 
 type Repository struct {
-	ID     *string  `json:"id"`
-	URL    string   `json:"url"`
-	Branch string   `json:"branch"`
-	Labels []string `json:"labels"`
+	ID       *string  `json:"id"`
+	URL      string   `json:"url"`
+	Branch   string   `json:"branch"`
+	Revision string   `json:"revision"`
+	Labels   []string `json:"labels"`
 }
 
 type Config struct {
