@@ -167,37 +167,37 @@ func TestHandleSwitch(t *testing.T) {
 			if !strings.Contains(out, "flag needs an argument") {
 				// It might fail with "flag needs an argument: -c"
 				if !strings.Contains(out, "flag needs an argument") {
-                     t.Logf("Output: %s", out)
+					t.Logf("Output: %s", out)
 				}
 			}
 		}
 	})
 
-    // Scenario 5: Error - switch -c branch extra
-    t.Run("Switch Extra Args", func(t *testing.T) {
-        out, err := runGitc("switch", "-c", "branch3", "extra", "--file", configPath)
-        if err == nil {
-            t.Fatal("expected error for extra args")
-        }
-        if !strings.Contains(out, "Unexpected argument: extra") {
-             t.Logf("Output: %s", out)
-             // Allow failure to match exact string if it fails for right reason
-        }
-    })
+	// Scenario 5: Error - switch -c branch extra
+	t.Run("Switch Extra Args", func(t *testing.T) {
+		out, err := runGitc("switch", "-c", "branch3", "extra", "--file", configPath)
+		if err == nil {
+			t.Fatal("expected error for extra args")
+		}
+		if !strings.Contains(out, "Unexpected argument: extra") {
+			t.Logf("Output: %s", out)
+			// Allow failure to match exact string if it fails for right reason
+		}
+	})
 
-    // Scenario 6: Mixed - switch branch -c branch2
-    // parser: branch (pos), -c (flag), branch2 (value).
-    // result: createBranchName=branch2, args=[branch].
-    // Error: Unexpected argument: branch.
-    t.Run("Switch Ambiguous Mixed", func(t *testing.T) {
-        out, err := runGitc("switch", "branchA", "-c", "branchB", "--file", configPath)
-        if err == nil {
-            t.Fatal("expected error for ambiguous mixed args")
-        }
-        if !strings.Contains(out, "Unexpected argument: branchA") {
-             t.Logf("Output: %s", out)
-        }
-    })
+	// Scenario 6: Mixed - switch branch -c branch2
+	// parser: branch (pos), -c (flag), branch2 (value).
+	// result: createBranchName=branch2, args=[branch].
+	// Error: Unexpected argument: branch.
+	t.Run("Switch Ambiguous Mixed", func(t *testing.T) {
+		out, err := runGitc("switch", "branchA", "-c", "branchB", "--file", configPath)
+		if err == nil {
+			t.Fatal("expected error for ambiguous mixed args")
+		}
+		if !strings.Contains(out, "Unexpected argument: branchA") {
+			t.Logf("Output: %s", out)
+		}
+	})
 }
 
 func verifyBranch(t *testing.T, repoPath, expectedBranch string) {

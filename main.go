@@ -208,6 +208,8 @@ func main() {
 		handleFreeze(subcmdArgs, opts)
 	case "switch":
 		handleSwitch(subcmdArgs, opts)
+	case "status":
+		handleStatus(subcmdArgs, opts)
 	case "print":
 		handlePrint(subcmdArgs, opts)
 	case "version":

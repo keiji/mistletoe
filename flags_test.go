@@ -73,16 +73,16 @@ func TestParseFlagsFlexible(t *testing.T) {
 			},
 		},
 		{
-			name: "flag missing value at end",
-			args: []string{"pos", "-s"},
+			name:        "flag missing value at end",
+			args:        []string{"pos", "-s"},
 			expectError: true,
 			setupFs: func(fs *flag.FlagSet) {
 				fs.String("s", "", "string flag")
 			},
 		},
 		{
-			name: "flag missing value in middle",
-			args: []string{"-s"}, // technically in middle if we consider empty rest? No, just missing value
+			name:        "flag missing value in middle",
+			args:        []string{"-s"}, // technically in middle if we consider empty rest? No, just missing value
 			expectError: true,
 			setupFs: func(fs *flag.FlagSet) {
 				fs.String("s", "", "string flag")
