@@ -91,7 +91,7 @@ func TestInitRevision(t *testing.T) {
 		targetCommit := commits[1] // The middle commit
 		config := Config{
 			Repositories: []Repository{
-				{URL: repoURL, ID: &repoID, Revision: targetCommit},
+				{URL: repoURL, ID: &repoID, Revision: &targetCommit},
 			},
 		}
 		configBytes, _ := json.Marshal(config)
@@ -126,7 +126,7 @@ func TestInitRevision(t *testing.T) {
 		targetBranch := "new-feature"
 		config := Config{
 			Repositories: []Repository{
-				{URL: repoURL, ID: &repoID, Revision: targetCommit, Branch: targetBranch},
+				{URL: repoURL, ID: &repoID, Revision: &targetCommit, Branch: &targetBranch},
 			},
 		}
 		configBytes, _ := json.Marshal(config)
@@ -174,7 +174,7 @@ func TestInitRevision(t *testing.T) {
 		targetCommit := commits[0]
 		config := Config{
 			Repositories: []Repository{
-				{URL: repoURL, ID: &repoID, Revision: targetCommit, Branch: targetBranch},
+				{URL: repoURL, ID: &repoID, Revision: &targetCommit, Branch: &targetBranch},
 			},
 		}
 		configBytes, _ := json.Marshal(config)

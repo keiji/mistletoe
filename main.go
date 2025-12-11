@@ -19,8 +19,8 @@ var commitHash string
 type Repository struct {
 	ID       *string  `json:"id"`
 	URL      string   `json:"url"`
-	Branch   string   `json:"branch,omitempty"`
-	Revision string   `json:"revision,omitempty"`
+	Branch   *string  `json:"branch,omitempty"`
+	Revision *string  `json:"revision,omitempty"`
 	Labels   []string `json:"labels"`
 }
 

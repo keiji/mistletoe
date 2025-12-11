@@ -27,7 +27,7 @@ func TestParseConfig(t *testing.T) {
 				Repositories: []Repository{
 					{
 						URL:    "user/repo",
-						Branch: "main",
+						Branch: func() *string { s := "main"; return &s }(),
 						Labels: []string{"bug", "feature"},
 					},
 				},
@@ -61,7 +61,7 @@ func TestParseConfig(t *testing.T) {
 				Repositories: []Repository{
 					{
 						URL:    "user/repo",
-						Branch: "",
+						Branch: nil,
 						Labels: nil,
 					},
 				},
@@ -84,7 +84,7 @@ func TestParseConfig(t *testing.T) {
 					{
 						ID:     func() *string { s := "repo1"; return &s }(),
 						URL:    "user/repo",
-						Branch: "main",
+						Branch: func() *string { s := "main"; return &s }(),
 						Labels: nil,
 					},
 				},

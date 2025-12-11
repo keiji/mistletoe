@@ -97,11 +97,20 @@ func handleFreeze(args []string, opts GlobalOptions) {
 
 		id := dirName
 		// Construct repository
+		var branchPtr *string
+		if branch != "" {
+			branchPtr = &branch
+		}
+		var revisionPtr *string
+		if revision != "" {
+			revisionPtr = &revision
+		}
+
 		repo := Repository{
 			ID:       &id,
 			URL:      url,
-			Branch:   branch,
-			Revision: revision,
+			Branch:   branchPtr,
+			Revision: revisionPtr,
 			Labels:   []string{},
 		}
 		repos = append(repos, repo)

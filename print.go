@@ -14,7 +14,11 @@ func handlePrint(_ []string, opts GlobalOptions) {
 
 	for _, repo := range config.Repositories {
 		for _, label := range repo.Labels {
-			fmt.Printf("%s,%s, %s\n", repo.URL, repo.Branch, label)
+			branch := ""
+			if repo.Branch != nil {
+				branch = *repo.Branch
+			}
+			fmt.Printf("%s,%s, %s\n", repo.URL, branch, label)
 		}
 	}
 }
