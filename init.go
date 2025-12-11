@@ -9,6 +9,24 @@ import (
 	"strings"
 )
 
+// branchExistsLocallyOrRemotely checks if a branch exists locally or remotely.
+func branchExistsLocallyOrRemotely(gitPath, dir, branch string) (bool, error) {
+	// Check local
+	if err := exec.Command(gitPath, "-C", dir, "show-ref", "--verify", "--quiet", "refs/heads/"+branch).Run(); err == nil {
+		return true, nil
+	}
+
+	// Check remote
+	out, err := exec.Command(gitPath, "-C", dir, "ls-remote", "--heads", "origin", branch).Output()
+	if err != nil {
+		return false, err
+	}
+	if len(strings.TrimSpace(string(out))) > 0 {
+		return true, nil
+	}
+	return false, nil
+}
+
 // validateEnvironment checks if the current directory state is consistent with the configuration.
 func validateEnvironment(repos []Repository, gitPath string) error {
 	for _, repo := range repos {
@@ -38,6 +56,17 @@ func validateEnvironment(repos []Repository, gitPath string) error {
 			currentURL := strings.TrimSpace(string(out))
 			if currentURL != repo.URL {
 				return fmt.Errorf("directory %s exists with different remote origin: %s (expected %s)", targetDir, currentURL, repo.URL)
+			}
+
+			// If Revision is specified and Branch is specified, check if branch already exists.
+			if repo.Revision != "" && repo.Branch != "" {
+				exists, err := branchExistsLocallyOrRemotely(gitPath, targetDir, repo.Branch)
+				if err != nil {
+					return fmt.Errorf("failed to check branch existence for %s: %v", targetDir, err)
+				}
+				if exists {
+					return fmt.Errorf("branch %s already exists in %s (locally or remotely), skipping init", repo.Branch, targetDir)
+				}
 			}
 			// Match -> OK.
 		} else {
@@ -133,9 +162,30 @@ func handleInit(args []string, opts GlobalOptions) {
 			}
 		}
 
-		// 2. Switch Branch
-		// "チェックアウト後、各要素についてbranchで示されたブランチに切り替える。"
-		if repo.Branch != "" {
+		// 2. Switch Branch / Checkout Revision
+		if repo.Revision != "" {
+			// Checkout revision
+			fmt.Printf("Checking out revision %s in %s...\n", repo.Revision, targetDir)
+			cmd := exec.Command(opts.GitPath, "-C", targetDir, "checkout", repo.Revision)
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+			if err := cmd.Run(); err != nil {
+				fmt.Printf("Error checking out revision %s in %s: %v\n", repo.Revision, targetDir, err)
+				continue
+			}
+
+			if repo.Branch != "" {
+				// Create branch
+				fmt.Printf("Creating branch %s at revision %s in %s...\n", repo.Branch, repo.Revision, targetDir)
+				cmd := exec.Command(opts.GitPath, "-C", targetDir, "checkout", "-b", repo.Branch)
+				cmd.Stdout = os.Stdout
+				cmd.Stderr = os.Stderr
+				if err := cmd.Run(); err != nil {
+					fmt.Printf("Error creating branch %s in %s: %v\n", repo.Branch, targetDir, err)
+				}
+			}
+		} else if repo.Branch != "" {
+			// "チェックアウト後、各要素についてbranchで示されたブランチに切り替える。"
 			fmt.Printf("Switching %s to branch %s...\n", targetDir, repo.Branch)
 			checkoutCmd := exec.Command(opts.GitPath, "-C", targetDir, "checkout", repo.Branch)
 			checkoutCmd.Stdout = os.Stdout
