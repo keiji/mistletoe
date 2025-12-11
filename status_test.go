@@ -150,9 +150,6 @@ func TestStatusCmd(t *testing.T) {
 		cmd := exec.Command(binPath, "status", "-f", configFile)
 		cmd.Dir = workDir
 
-		// Set GIT_AUTHOR_NAME etc for the test run if needed, but we already committed
-		// status just reads.
-
 		out, err := cmd.CombinedOutput()
 		if err != nil {
 			t.Fatalf("status command failed: %v\nOutput: %s", err, string(out))
@@ -160,15 +157,10 @@ func TestStatusCmd(t *testing.T) {
 		output := string(out)
 
 		// Check table content
-		// Repo1: Unpushed "No"
-		// Repo2: Unpushed "Yes"
+		// Repo1: Unpushed "-"
+		// Repo2: Unpushed "s" (yellow)
 
-		// We expect output to contain:
-		// | repo1 | ... | No |
-		// | repo2 | ... | Yes |
-
-		// Note: The table might format it nicely.
-		// We check for presence of substrings.
+		coloredS := "\033[33ms\033[0m"
 
 		if !strings.Contains(output, "repo1") {
 			t.Errorf("Output missing repo1")
@@ -177,11 +169,6 @@ func TestStatusCmd(t *testing.T) {
 			t.Errorf("Output missing repo2")
 		}
 
-		// We can't easily parse ASCII table in regex without being loose,
-		// but we can check if "Yes" appears.
-		// Since repo1 is "No" and repo2 is "Yes", both should appear.
-		// However, "No" appears twice? Or just check rough alignment.
-
 		lines := strings.Split(output, "\n")
 		foundRepo1 := false
 		foundRepo2 := false
@@ -189,14 +176,14 @@ func TestStatusCmd(t *testing.T) {
 		for _, line := range lines {
 			if strings.Contains(line, "repo1") {
 				foundRepo1 = true
-				if strings.Contains(line, "Yes") {
-					t.Errorf("repo1 should not have unpushed commits: %s", line)
+				if strings.Contains(line, coloredS) {
+					t.Errorf("repo1 should not have unpushed commits (found colored s): %s", line)
 				}
 			}
 			if strings.Contains(line, "repo2") {
 				foundRepo2 = true
-				if !strings.Contains(line, "Yes") {
-					t.Errorf("repo2 SHOULD have unpushed commits: %s", line)
+				if !strings.Contains(line, coloredS) {
+					t.Errorf("repo2 SHOULD have unpushed commits (colored s): %s", line)
 				}
 			}
 		}
@@ -259,9 +246,10 @@ func TestStatusCmd(t *testing.T) {
 		}
 		output := string(out)
 
-		// Expect "Yes" for unpushed because local has commit C which is not in remote (A-B)
-		if !strings.Contains(output, "Yes") {
-			t.Errorf("Expected Diverged repo to show 'Yes' for unpushed, but got output:\n%s", output)
+		coloredS := "\033[33ms\033[0m"
+		// Expect "s" (yellow) for unpushed
+		if !strings.Contains(output, coloredS) {
+			t.Errorf("Expected Diverged repo to show 's' (yellow) for unpushed, but got output:\n%s", output)
 		}
 	})
 }

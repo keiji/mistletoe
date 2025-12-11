@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/olekukonko/tablewriter"
 )
@@ -35,6 +36,48 @@ func handleStatus(args []string, opts GlobalOptions) {
 		os.Exit(1)
 	}
 
+	// Spinner control
+	spinnerStop := make(chan struct{})
+	spinnerDone := make(chan struct{})
+
+	startSpinner := func() {
+		go func() {
+			defer close(spinnerDone)
+			chars := []string{"/", "-", "\\", "|"}
+			i := 0
+			ticker := time.NewTicker(100 * time.Millisecond)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-spinnerStop:
+					fmt.Print("\r\033[K") // Clear line
+					return
+				case <-ticker.C:
+					fmt.Printf("\rProcessing... %s", chars[i])
+					i = (i + 1) % len(chars)
+				}
+			}
+		}()
+	}
+
+	stopSpinner := func() {
+		// Non-blocking send to stop
+		select {
+		case spinnerStop <- struct{}{}:
+			<-spinnerDone
+		default:
+			// Already stopped or not started
+		}
+	}
+
+	fail := func(format string, a ...interface{}) {
+		stopSpinner()
+		fmt.Printf(format, a...)
+		os.Exit(1)
+	}
+
+	startSpinner()
+
 	// Validation Phase
 	for _, repo := range config.Repositories {
 		targetDir := getRepoDir(repo)
@@ -43,60 +86,40 @@ func handleStatus(args []string, opts GlobalOptions) {
 			continue
 		}
 		if err != nil {
-			fmt.Printf("Error checking directory %s: %v\n", targetDir, err)
-			os.Exit(1)
+			fail("Error checking directory %s: %v\n", targetDir, err)
 		}
 		if !info.IsDir() {
-			fmt.Printf("Error: target %s exists and is not a directory\n", targetDir)
-			os.Exit(1)
+			fail("Error: target %s exists and is not a directory\n", targetDir)
 		}
 
 		// Check if Git repository
 		gitDir := filepath.Join(targetDir, ".git")
 		if _, err := os.Stat(gitDir); err != nil {
-			fmt.Printf("Error: directory %s exists but is not a git repository\n", targetDir)
-			os.Exit(1)
+			fail("Error: directory %s exists but is not a git repository\n", targetDir)
 		}
 
 		// Check remote origin
 		cmd := exec.Command(opts.GitPath, "-C", targetDir, "config", "--get", "remote.origin.url")
 		out, err := cmd.Output()
 		if err != nil {
-			fmt.Printf("Error: directory %s is a git repo but failed to get remote origin: %v\n", targetDir, err)
-			os.Exit(1)
+			fail("Error: directory %s is a git repo but failed to get remote origin: %v\n", targetDir, err)
 		}
 		currentURL := strings.TrimSpace(string(out))
 		if currentURL != repo.URL {
-			fmt.Printf("Error: directory %s exists with different remote origin: %s (expected %s)\n", targetDir, currentURL, repo.URL)
-			os.Exit(1)
+			fail("Error: directory %s exists with different remote origin: %s (expected %s)\n", targetDir, currentURL, repo.URL)
 		}
 	}
 
 	// Output Phase
-	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader([]string{"Repository", "Local Branch/Rev", "Remote Rev", "Local HEAD Rev", "Unpushed?"})
-	table.SetBorders(tablewriter.Border{Left: true, Top: false, Right: true, Bottom: false})
-	table.SetCenterSeparator("|")
-	table.SetColumnSeparator("|")
-	table.SetRowSeparator("-")
-
-	// Tablewriter defaults to ASCII (+---+). For Markdown (|---|) we might need tweaks.
-	// But "ASCIIの表に見えるように整形する" (format to look like ASCII table) AND "markdown table format".
-	// tablewriter.NewWriter(os.Stdout) produces ASCII.
-	// To make it Markdown compatible:
-	table.SetAutoFormatHeaders(false)
-	// Markdown tables:
-	// | H1 | H2 |
-	// |---|---|
-	// | v1 | v2 |
-	// tablewriter doesn't generate the |---|---| line automatically in a way that is strictly markdown compatible usually?
-	// Actually, `table.SetBorders(...)` controls the outer pipes.
-	// Let's rely on standard TableWriter output but configure it to be as close as possible.
-	// User said "Markdown table format", so I should ensure the separator line exists.
-	// Tablewriter prints a separator line between header and body if configured.
-
-	// Let's try to match standard Markdown syntax:
-	table.SetAutoWrapText(false)
+	type RowData struct {
+		Repo      string
+		LocalRef  string
+		RemoteRev string
+		LocalHead string
+		Unpushed  string
+		Color     []int
+	}
+	var rows []RowData
 
 	for _, repo := range config.Repositories {
 		targetDir := getRepoDir(repo)
@@ -105,19 +128,7 @@ func handleStatus(args []string, opts GlobalOptions) {
 			repoName = *repo.ID
 		}
 
-		// If not exists
 		if _, err := os.Stat(targetDir); os.IsNotExist(err) {
-			// Skip or show missing?
-			// The prompt says "For each repository... display info".
-			// If it doesn't exist, we can't display local info.
-			// I'll skip it to match the "If integrity verified... for EACH repo... display"
-			// but if it's missing, it's not verified?
-			// "repositoriesの各要素に対応するディレクトリがあれば...検証する"
-			// "If validated... display".
-			// Maybe show "Not Cloned"?
-			// I will populate with empty strings or "N/A"
-			// table.Append([]string{repoName, "(Not Cloned)", "", "", ""})
-			// Actually, let's stick to existing directories to be safe, or just show "Not Found".
 			continue
 		}
 
@@ -132,22 +143,29 @@ func handleStatus(args []string, opts GlobalOptions) {
 		}
 		if localRef == "HEAD" {
 			isDetached = true
-			// Get full/short sha
+			// Get short sha
 			cmd := exec.Command(opts.GitPath, "-C", targetDir, "rev-parse", "--short", "HEAD")
 			out, _ := cmd.Output()
 			localRef = strings.TrimSpace(string(out))
 		}
 
-		// Local HEAD Rev (Full SHA)
+		// Local HEAD Rev (Full SHA for check, Short for display)
 		cmd = exec.Command(opts.GitPath, "-C", targetDir, "rev-parse", "HEAD")
 		out, err = cmd.Output()
-		localHeadSHA := ""
+		localHeadFull := ""
+		localHeadDisplay := ""
 		if err == nil {
-			localHeadSHA = strings.TrimSpace(string(out))
+			localHeadFull = strings.TrimSpace(string(out))
+			if len(localHeadFull) >= 7 {
+				localHeadDisplay = localHeadFull[:7]
+			} else {
+				localHeadDisplay = localHeadFull
+			}
 		}
 
 		// Remote Rev
-		remoteHeadSHA := ""
+		remoteHeadFull := ""
+		remoteHeadDisplay := ""
 		if !isDetached {
 			// Check if remote branch exists
 			// git ls-remote origin <localRef>
@@ -159,44 +177,71 @@ func handleStatus(args []string, opts GlobalOptions) {
 					// Output format: <SHA>\trefs/heads/<branch>
 					fields := strings.Fields(output)
 					if len(fields) > 0 {
-						remoteHeadSHA = fields[0]
+						remoteHeadFull = fields[0]
+						if len(remoteHeadFull) >= 7 {
+							remoteHeadDisplay = remoteHeadFull[:7]
+						} else {
+							remoteHeadDisplay = remoteHeadFull
+						}
 					}
 				}
 			}
 		}
 
 		// Unpushed?
-		unpushed := ""
-		if remoteHeadSHA != "" && localHeadSHA != "" {
-			if remoteHeadSHA != localHeadSHA {
+		// Logic: if unpushed commits -> s (yellow), else -> -
+		unpushed := "-"
+		hasUnpushed := false
+
+		if remoteHeadFull != "" && localHeadFull != "" {
+			if remoteHeadFull != localHeadFull {
 				// Check if unpushed
-				// git rev-list --count remoteSHA..localSHA
-				// If > 0, local has commits not in remote.
-				// Note: this requires remote objects to be present locally (fetched).
-				// If not present, rev-list might fail, and we mark as "?".
-				cmd = exec.Command(opts.GitPath, "-C", targetDir, "rev-list", "--count", remoteHeadSHA+".."+localHeadSHA)
+				cmd = exec.Command(opts.GitPath, "-C", targetDir, "rev-list", "--count", remoteHeadFull+".."+localHeadFull)
 				out, err := cmd.Output()
 				if err == nil {
 					count := strings.TrimSpace(string(out))
 					if count != "0" {
-						unpushed = "Yes"
-					} else {
-						unpushed = "No"
+						hasUnpushed = true
 					}
-				} else {
-					unpushed = "?"
 				}
-			} else {
-				unpushed = "No"
 			}
-		} else if isDetached {
-			unpushed = "-"
-		} else {
-			// Remote branch doesn't exist?
-			unpushed = "?"
+		} else if !isDetached && remoteHeadFull == "" {
+			// Remote branch doesn't exist? Means all local commits are unpushed
+			hasUnpushed = true
 		}
 
-		table.Append([]string{repoName, localRef, remoteHeadSHA, localHeadSHA, unpushed})
+		var color []int
+		if hasUnpushed {
+			unpushed = "s"
+			color = []int{tablewriter.FgYellowColor}
+		}
+
+		rows = append(rows, RowData{
+			Repo:      repoName,
+			LocalRef:  localRef,
+			RemoteRev: remoteHeadDisplay,
+			LocalHead: localHeadDisplay,
+			Unpushed:  unpushed,
+			Color:     color,
+		})
+	}
+
+	stopSpinner()
+
+	table := tablewriter.NewWriter(os.Stdout)
+	table.SetHeader([]string{"Repository", "Local Branch/Rev", "Remote Rev", "Local HEAD Rev", ""})
+	table.SetBorders(tablewriter.Border{Left: true, Top: false, Right: true, Bottom: false})
+	table.SetCenterSeparator("|")
+	table.SetColumnSeparator("|")
+	table.SetRowSeparator("-")
+	table.SetAutoFormatHeaders(false)
+	table.SetAutoWrapText(false)
+
+	for _, row := range rows {
+		colors := []tablewriter.Colors{
+			{}, {}, {}, {}, tablewriter.Colors(row.Color),
+		}
+		table.Rich([]string{row.Repo, row.LocalRef, row.RemoteRev, row.LocalHead, row.Unpushed}, colors)
 	}
 	table.Render()
 }
