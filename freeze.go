@@ -76,19 +76,33 @@ func handleFreeze(args []string, opts GlobalOptions) {
 		cmdBranch := exec.Command(opts.GitPath, "-C", dirName, "rev-parse", "--abbrev-ref", "HEAD")
 		outBranch, err := cmdBranch.Output()
 		branch := ""
+		revision := ""
 		if err != nil {
 			fmt.Printf("Warning: Could not get current branch for %s.\n", dirName)
 		} else {
 			branch = strings.TrimSpace(string(outBranch))
 		}
 
+		// If branch is "HEAD", it's a detached HEAD state
+		if branch == "HEAD" {
+			branch = ""
+			cmdRev := exec.Command(opts.GitPath, "-C", dirName, "rev-parse", "HEAD")
+			outRev, err := cmdRev.Output()
+			if err != nil {
+				fmt.Printf("Warning: Could not get revision for %s.\n", dirName)
+			} else {
+				revision = strings.TrimSpace(string(outRev))
+			}
+		}
+
 		id := dirName
 		// Construct repository
 		repo := Repository{
-			ID:     &id,
-			URL:    url,
-			Branch: branch,
-			Labels: []string{},
+			ID:       &id,
+			URL:      url,
+			Branch:   branch,
+			Revision: revision,
+			Labels:   []string{},
 		}
 		repos = append(repos, repo)
 	}
