@@ -1,17 +1,20 @@
 package main
 
 import (
+	"bufio"
 	"flag"
 	"fmt"
 	"os"
+	"os/exec"
+	"strings"
 	"time"
 )
 
-func handleStatus(args []string, opts GlobalOptions) {
+func handlePush(args []string, opts GlobalOptions) {
 	var fShort, fLong string
 	var pVal, pValShort int
 
-	fs := flag.NewFlagSet("status", flag.ExitOnError)
+	fs := flag.NewFlagSet("push", flag.ExitOnError)
 	fs.StringVar(&fLong, "file", "", "configuration file")
 	fs.StringVar(&fShort, "f", "", "configuration file (short)")
 	fs.IntVar(&pVal, "parallel", DefaultParallel, "number of parallel processes")
@@ -104,4 +107,36 @@ func handleStatus(args []string, opts GlobalOptions) {
 	stopSpinner()
 
 	RenderStatusTable(rows)
+
+	// Identify repositories to push
+	var pushable []StatusRow
+	for _, row := range rows {
+		if row.HasUnpushed {
+			pushable = append(pushable, row)
+		}
+	}
+
+	if len(pushable) == 0 {
+		fmt.Println("There are no repositories to push.")
+		return
+	}
+
+	fmt.Print("Do you want to push? (y/yes): ")
+	reader := bufio.NewReader(os.Stdin)
+	input, _ := reader.ReadString('\n')
+	fmt.Println()
+	input = strings.TrimSpace(strings.ToLower(input))
+
+	if input == "y" || input == "yes" {
+		for _, row := range pushable {
+			fmt.Printf("Pushing %s (branch: %s)...\n", row.Repo, row.BranchName)
+			// git push origin [branchname]
+			cmd := exec.Command(opts.GitPath, "-C", row.RepoDir, "push", "origin", row.BranchName)
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+			if err := cmd.Run(); err != nil {
+				fmt.Printf("Failed to push %s: %v\n", row.Repo, err)
+			}
+		}
+	}
 }

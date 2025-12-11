@@ -216,6 +216,8 @@ func main() {
 		handleSwitch(subcmdArgs, opts)
 	case "status":
 		handleStatus(subcmdArgs, opts)
+	case "push":
+		handlePush(subcmdArgs, opts)
 	case "print":
 		handlePrint(subcmdArgs, opts)
 	case "version":
