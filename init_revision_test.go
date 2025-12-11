@@ -49,8 +49,12 @@ func TestInitRevision(t *testing.T) {
 		t.Fatalf("failed to init content repo: %v", err)
 	}
 	// Configure git user
-	exec.Command("git", "-C", contentDir, "config", "user.email", "test@example.com").Run()
-	exec.Command("git", "-C", contentDir, "config", "user.name", "Test User").Run()
+	if err := exec.Command("git", "-C", contentDir, "config", "user.email", "test@example.com").Run(); err != nil {
+		t.Fatalf("failed to configure user.email: %v", err)
+	}
+	if err := exec.Command("git", "-C", contentDir, "config", "user.name", "Test User").Run(); err != nil {
+		t.Fatalf("failed to configure user.name: %v", err)
+	}
 
 	if err := exec.Command("git", "-C", contentDir, "remote", "add", "origin", remoteDir).Run(); err != nil {
 		t.Fatalf("failed to add remote origin: %v", err)
@@ -91,7 +95,9 @@ func TestInitRevision(t *testing.T) {
 			},
 		}
 		configBytes, _ := json.Marshal(config)
-		os.WriteFile(configFile, configBytes, 0644)
+		if err := os.WriteFile(configFile, configBytes, 0644); err != nil {
+			t.Fatalf("failed to write config file: %v", err)
+		}
 
 		workDir := t.TempDir()
 		cmd := exec.Command(binPath, "init", "--file", configFile)
@@ -124,7 +130,9 @@ func TestInitRevision(t *testing.T) {
 			},
 		}
 		configBytes, _ := json.Marshal(config)
-		os.WriteFile(configFile, configBytes, 0644)
+		if err := os.WriteFile(configFile, configBytes, 0644); err != nil {
+			t.Fatalf("failed to write config file: %v", err)
+		}
 
 		workDir := t.TempDir()
 		cmd := exec.Command(binPath, "init", "--file", configFile)
@@ -170,7 +178,9 @@ func TestInitRevision(t *testing.T) {
 			},
 		}
 		configBytes, _ := json.Marshal(config)
-		os.WriteFile(configFile, configBytes, 0644)
+		if err := os.WriteFile(configFile, configBytes, 0644); err != nil {
+			t.Fatalf("failed to write config file: %v", err)
+		}
 
 		cmd := exec.Command(binPath, "init", "--file", configFile)
 		cmd.Dir = workDir
