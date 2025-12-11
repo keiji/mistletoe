@@ -73,7 +73,7 @@ func handleInit(args []string, opts GlobalOptions) {
 	fs.StringVar(&fShort, "f", "", "configuration file (short)")
 	fs.IntVar(&depth, "depth", 0, "Create a shallow clone with a history truncated to the specified number of commits")
 
-	if err := fs.Parse(args); err != nil {
+	if err := ParseFlagsFlexible(fs, args); err != nil {
 		fmt.Println("Error parsing flags:", err)
 		os.Exit(1)
 	}
