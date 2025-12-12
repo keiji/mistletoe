@@ -25,11 +25,14 @@ type StatusRow struct {
 	ConfigRef      string
 	LocalBranchRev string
 	RemoteRev      string
-	Status         string
-	Color          int
+	RemoteColor    int
 	BranchName     string
 	HasUnpushed    bool
+	IsPullable     bool
 	RepoDir        string
+	// Deprecated fields kept for compatibility if needed, but unused in new logic
+	Status string
+	Color  int
 }
 
 // ValidateRepositoriesIntegrity checks if repositories exist and are valid.
@@ -158,9 +161,11 @@ func getRepoStatus(repo Repository, gitPath string) *StatusRow {
 		localHeadFull = strings.TrimSpace(string(out))
 	}
 
-	// Remote Rev
+	// Remote Logic
 	remoteHeadFull := ""
-	remoteHeadDisplay := ""
+	remoteDisplay := ""
+	remoteColor := ColorNone
+
 	if !isDetached {
 		// Check if remote branch exists
 		// git ls-remote origin <branchName>
@@ -173,10 +178,28 @@ func getRepoStatus(repo Repository, gitPath string) *StatusRow {
 				fields := strings.Fields(output)
 				if len(fields) > 0 {
 					remoteHeadFull = fields[0]
-					if len(remoteHeadFull) >= 7 {
-						remoteHeadDisplay = remoteHeadFull[:7]
+
+					// Construct display: branchName/shortSHA
+					shortRemote := remoteHeadFull
+					if len(shortRemote) >= 7 {
+						shortRemote = shortRemote[:7]
 					} else {
-						remoteHeadDisplay = remoteHeadFull
+						shortRemote = remoteHeadFull
+					}
+					remoteDisplay = fmt.Sprintf("%s/%s", branchName, shortRemote)
+
+					// Check Pushability (Coloring for Remote Column)
+					// If local..remote is not 0, it implies remote has commits local doesn't (pull needed or diverged)
+					// -> "push impossible" -> Yellow
+					if localHeadFull != "" {
+						cmdCount := exec.Command(gitPath, "-C", targetDir, "rev-list", "--count", localHeadFull+".."+remoteHeadFull)
+						outCount, errCount := cmdCount.Output()
+						if errCount == nil {
+							count := strings.TrimSpace(string(outCount))
+							if count != "0" {
+								remoteColor = ColorYellow
+							}
+						}
 					}
 				}
 			}
@@ -202,7 +225,7 @@ func getRepoStatus(repo Repository, gitPath string) *StatusRow {
 		}
 
 		// Check Pullable (Behind)
-		// Only if current branch matches config branch
+		// Only if current branch matches config branch (Existing logic preserved for Status Symbol)
 		if repo.Branch != nil && *repo.Branch != "" && *repo.Branch == branchName {
 			if remoteHeadFull != localHeadFull {
 				// Check if we have the remote object locally
@@ -230,50 +253,23 @@ func getRepoStatus(repo Repository, gitPath string) *StatusRow {
 		hasUnpushed = true
 	}
 
-	statusVal := ""
-	var color = ColorNone
-
-	if hasUnpushed {
-		statusVal += "*"
-		color = ColorYellow
-	}
-
-	if isPullable {
-		statusVal += "+"
-		if color == ColorNone {
-			color = ColorGreen
-		}
-	}
-
-	if statusVal == "" {
-		statusVal = "-"
-	}
-
 	return &StatusRow{
 		Repo:           repoName,
 		ConfigRef:      configRef,
 		LocalBranchRev: localBranchRev,
-		RemoteRev:      remoteHeadDisplay,
-		Status:         statusVal,
-		Color:          color,
+		RemoteRev:      remoteDisplay,
+		RemoteColor:    remoteColor,
 		BranchName:     branchName,
 		HasUnpushed:    hasUnpushed,
+		IsPullable:     isPullable,
 		RepoDir:        targetDir,
 	}
 }
 
 func RenderStatusTable(rows []StatusRow) {
-	// Replicating v0.0.5 style
-	// SetBorders(tablewriter.Border{Left: true, Top: false, Right: true, Bottom: false})
-	// SetCenterSeparator("|")
-	// SetColumnSeparator("|")
-	// SetRowSeparator("-")
-	// SetAutoFormatHeaders(false)
-	// SetAutoWrapText(false)
-
 	table := tablewriter.NewTable(os.Stdout,
 		tablewriter.WithHeaderAutoFormat(tw.Off),
-		tablewriter.WithRowAutoWrap(tw.WrapNone), // Using WrapNone to mimic false
+		tablewriter.WithRowAutoWrap(tw.WrapNone),
 		tablewriter.WithRendition(tw.Rendition{
 			Borders: tw.Border{Left: tw.On, Top: tw.Off, Right: tw.On, Bottom: tw.Off},
 			Settings: tw.Settings{
@@ -284,27 +280,38 @@ func RenderStatusTable(rows []StatusRow) {
 				WithRow("-").
 				WithCenter("|").
 				WithHeaderMid("-").
-				WithTopMid("-").     // If top border was on, but it is off
-				WithBottomMid("-"), // If bottom border was on, but it is off
+				WithTopMid("-").
+				WithBottomMid("-"),
 		}),
 	)
-	table.Header("Repository", "Branch/Rev", "Local Branch/Rev", "Remote Rev", "Status")
+	table.Header("Repository", "Config", "Local", "Remote", "Status")
 
 	const (
-		Reset   = "\033[0m"
-		FgGreen = "\033[32m"
+		Reset    = "\033[0m"
+		FgGreen  = "\033[32m"
 		FgYellow = "\033[33m"
 	)
 
 	for _, row := range rows {
-		status := row.Status
-		if row.Color == ColorYellow {
-			status = FgYellow + status + Reset
-		} else if row.Color == ColorGreen {
-			status = FgGreen + status + Reset
+		// Status Column
+		statusStr := ""
+		if row.HasUnpushed {
+			statusStr += FgGreen + ">" + Reset
+		}
+		if row.IsPullable {
+			statusStr += FgYellow + "<" + Reset
+		}
+		if statusStr == "" {
+			statusStr = "-"
 		}
 
-		_ = table.Append(row.Repo, row.ConfigRef, row.LocalBranchRev, row.RemoteRev, status)
+		// Remote Column
+		remoteStr := row.RemoteRev
+		if row.RemoteColor == ColorYellow {
+			remoteStr = FgYellow + remoteStr + Reset
+		}
+
+		_ = table.Append(row.Repo, row.ConfigRef, row.LocalBranchRev, remoteStr, statusStr)
 	}
 	if err := table.Render(); err != nil {
 		fmt.Printf("Error rendering table: %v\n", err)

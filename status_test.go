@@ -158,9 +158,9 @@ func TestStatusCmd(t *testing.T) {
 
 		// Check table content
 		// Repo1: Synced "-"
-		// Repo2: Unpushed "*" (yellow)
+		// Repo2: Unpushed ">" (Green)
 
-		coloredStar := "\033[33m*\033[0m"
+		coloredUnpushed := "\033[32m>\033[0m"
 
 		if !strings.Contains(output, "repo1") {
 			t.Errorf("Output missing repo1")
@@ -176,14 +176,14 @@ func TestStatusCmd(t *testing.T) {
 		for _, line := range lines {
 			if strings.Contains(line, "repo1") {
 				foundRepo1 = true
-				if strings.Contains(line, coloredStar) {
-					t.Errorf("repo1 should not have unpushed commits (found colored *): %s", line)
+				if strings.Contains(line, coloredUnpushed) {
+					t.Errorf("repo1 should not have unpushed commits: %s", line)
 				}
 			}
 			if strings.Contains(line, "repo2") {
 				foundRepo2 = true
-				if !strings.Contains(line, coloredStar) {
-					t.Errorf("repo2 SHOULD have unpushed commits (colored *): %s", line)
+				if !strings.Contains(line, coloredUnpushed) {
+					t.Errorf("repo2 SHOULD have unpushed commits (Green >): %s", line)
 				}
 			}
 		}
@@ -245,14 +245,14 @@ func TestStatusCmd(t *testing.T) {
 		}
 		output := string(out)
 
-		coloredStar := "\033[33m*\033[0m"
-		// Expect "*" (yellow) for unpushed
-		// Should NOT expect "+" because Branch is not configured
-		if !strings.Contains(output, coloredStar) {
-			t.Errorf("Expected Diverged repo to show '*' (yellow) for unpushed, but got output:\n%s", output)
+		coloredUnpushed := "\033[32m>\033[0m"
+		coloredPullable := "\033[33m<\033[0m"
+
+		if !strings.Contains(output, coloredUnpushed) {
+			t.Errorf("Expected Diverged repo to show '>' (Green) for unpushed, but got output:\n%s", output)
 		}
-		if strings.Contains(output, "+") {
-			t.Errorf("Did not expect '+' because Branch is not configured")
+		if strings.Contains(output, coloredPullable) {
+			t.Errorf("Did not expect '<' because Branch is not configured")
 		}
 	})
 
@@ -289,10 +289,10 @@ func TestStatusCmd(t *testing.T) {
 		}
 		output := string(out)
 
-		// Expect + (Green)
-		coloredPlus := "\033[32m+\033[0m"
-		if !strings.Contains(output, coloredPlus) {
-			t.Errorf("Expected '+' in green, got:\n%s", output)
+		// Expect < (Yellow)
+		coloredPullable := "\033[33m<\033[0m"
+		if !strings.Contains(output, coloredPullable) {
+			t.Errorf("Expected '<' in yellow, got:\n%s", output)
 		}
 	})
 
@@ -338,13 +338,11 @@ func TestStatusCmd(t *testing.T) {
 		}
 		output := string(out)
 
-		// Expect * (Yellow) and + (Green logic, but color might be yellow due to * precedence)
-		// Result string: "*+"
-		// Result color: Yellow (from *)
-		coloredStarPlus := "\033[33m*+\033[0m"
+		// Expect > (Green) and < (Yellow)
+		coloredDiverged := "\033[32m>\033[0m\033[33m<\033[0m"
 
-		if !strings.Contains(output, coloredStarPlus) {
-             t.Errorf("Expected '*+' in yellow, got:\n%s", output)
+		if !strings.Contains(output, coloredDiverged) {
+             t.Errorf("Expected '><' (Green then Yellow), got:\n%s", output)
 		}
 	})
 }
