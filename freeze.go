@@ -111,7 +111,6 @@ func handleFreeze(args []string, opts GlobalOptions) {
 			URL:      &url,
 			Branch:   branchPtr,
 			Revision: revisionPtr,
-			Labels:   []string{},
 		}
 		repos = append(repos, repo)
 	}

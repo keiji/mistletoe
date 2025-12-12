@@ -20,7 +20,6 @@ type Repository struct {
 	URL      *string  `json:"url"`
 	Branch   *string  `json:"branch,omitempty"`
 	Revision *string  `json:"revision,omitempty"`
-	Labels   []string `json:"labels"`
 }
 
 type Config struct {
