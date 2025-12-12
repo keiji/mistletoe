@@ -10,6 +10,13 @@ import (
 	"sync"
 
 	"github.com/olekukonko/tablewriter"
+	"github.com/olekukonko/tablewriter/tw"
+)
+
+const (
+	ColorNone   = 0
+	ColorYellow = 1
+	ColorGreen  = 2
 )
 
 // StatusRow represents the status of a single repository.
@@ -19,7 +26,7 @@ type StatusRow struct {
 	LocalBranchRev string
 	RemoteRev      string
 	Status         string
-	Color          []int
+	Color          int
 	BranchName     string
 	HasUnpushed    bool
 	RepoDir        string
@@ -224,17 +231,17 @@ func getRepoStatus(repo Repository, gitPath string) *StatusRow {
 	}
 
 	statusVal := ""
-	var color []int
+	var color int = ColorNone
 
 	if hasUnpushed {
 		statusVal += "*"
-		color = []int{tablewriter.FgYellowColor}
+		color = ColorYellow
 	}
 
 	if isPullable {
 		statusVal += "+"
-		if len(color) == 0 {
-			color = []int{tablewriter.FgGreenColor}
+		if color == ColorNone {
+			color = ColorGreen
 		}
 	}
 
@@ -256,20 +263,50 @@ func getRepoStatus(repo Repository, gitPath string) *StatusRow {
 }
 
 func RenderStatusTable(rows []StatusRow) {
-	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader([]string{"Repository", "Branch/Rev", "Local Branch/Rev", "Remote Rev", "Status"})
-	table.SetBorders(tablewriter.Border{Left: true, Top: false, Right: true, Bottom: false})
-	table.SetCenterSeparator("|")
-	table.SetColumnSeparator("|")
-	table.SetRowSeparator("-")
-	table.SetAutoFormatHeaders(false)
-	table.SetAutoWrapText(false)
+	// Replicating v0.0.5 style
+	// SetBorders(tablewriter.Border{Left: true, Top: false, Right: true, Bottom: false})
+	// SetCenterSeparator("|")
+	// SetColumnSeparator("|")
+	// SetRowSeparator("-")
+	// SetAutoFormatHeaders(false)
+	// SetAutoWrapText(false)
+
+	table := tablewriter.NewTable(os.Stdout,
+		tablewriter.WithHeaderAutoFormat(tw.Off),
+		tablewriter.WithRowAutoWrap(tw.WrapNone), // Using WrapNone to mimic false
+		tablewriter.WithRendition(tw.Rendition{
+			Borders: tw.Border{Left: tw.On, Top: tw.Off, Right: tw.On, Bottom: tw.Off},
+			Settings: tw.Settings{
+				Separators: tw.Separators{BetweenColumns: tw.On, BetweenRows: tw.Off},
+			},
+			Symbols: tw.NewSymbolCustom("v0.0.5-like").
+				WithColumn("|").
+				WithRow("-").
+				WithCenter("|").
+				WithHeaderMid("-").
+				WithTopMid("-").     // If top border was on, but it is off
+				WithBottomMid("-"), // If bottom border was on, but it is off
+		}),
+	)
+	table.Header("Repository", "Branch/Rev", "Local Branch/Rev", "Remote Rev", "Status")
+
+	const (
+		Reset   = "\033[0m"
+		FgGreen = "\033[32m"
+		FgYellow = "\033[33m"
+	)
 
 	for _, row := range rows {
-		colors := []tablewriter.Colors{
-			{}, {}, {}, {}, tablewriter.Colors(row.Color),
+		status := row.Status
+		if row.Color == ColorYellow {
+			status = FgYellow + status + Reset
+		} else if row.Color == ColorGreen {
+			status = FgGreen + status + Reset
 		}
-		table.Rich([]string{row.Repo, row.ConfigRef, row.LocalBranchRev, row.RemoteRev, row.Status}, colors)
+
+		table.Append(row.Repo, row.ConfigRef, row.LocalBranchRev, row.RemoteRev, status)
 	}
-	table.Render()
+	if err := table.Render(); err != nil {
+		fmt.Printf("Error rendering table: %v\n", err)
+	}
 }
