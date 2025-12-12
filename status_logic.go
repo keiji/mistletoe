@@ -30,9 +30,6 @@ type StatusRow struct {
 	HasUnpushed    bool
 	IsPullable     bool
 	RepoDir        string
-	// Deprecated fields kept for compatibility if needed, but unused in new logic
-	Status string
-	Color  int
 }
 
 // ValidateRepositoriesIntegrity checks if repositories exist and are valid.
