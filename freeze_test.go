@@ -148,9 +148,6 @@ func TestFreeze(t *testing.T) {
 			}
 			t.Errorf("repo1 branch mismatch: got %s, want %s", got, repo1Branch)
 		}
-		if len(r1.Labels) != 0 {
-			t.Errorf("repo1 labels not empty")
-		}
 	}
 
 	r2, ok := repoMap["repo2"]
