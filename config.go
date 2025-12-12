@@ -61,9 +61,9 @@ func validateRepositories(repos []Repository) error {
 	return nil
 }
 
-// getRepoDir determines the checkout directory name.
+// GetRepoDir determines the checkout directory name.
 // If ID is present and not empty, it is used. Otherwise, it is derived from the URL.
-func getRepoDir(repo Repository) string {
+func GetRepoDir(repo Repository) string {
 	if repo.ID != nil && *repo.ID != "" {
 		return *repo.ID
 	}
@@ -99,4 +99,41 @@ func loadConfig(configFile string) (*Config, error) {
 	}
 
 	return config, nil
+}
+
+// FilterRepositories filters repositories based on provided labels.
+// If labelsStr is empty, returns all repositories.
+// If labelsStr contains comma-separated labels, returns repositories that match at least one label.
+func FilterRepositories(repos []Repository, labelsStr string) []Repository {
+	if labelsStr == "" {
+		return repos
+	}
+
+	targets := strings.Split(labelsStr, ",")
+	targetMap := make(map[string]bool)
+	for _, t := range targets {
+		trimmed := strings.TrimSpace(t)
+		if trimmed != "" {
+			targetMap[trimmed] = true
+		}
+	}
+
+	if len(targetMap) == 0 {
+		return repos
+	}
+
+	var filtered []Repository
+	for _, repo := range repos {
+		matched := false
+		for _, l := range repo.Labels {
+			if targetMap[l] {
+				matched = true
+				break
+			}
+		}
+		if matched {
+			filtered = append(filtered, repo)
+		}
+	}
+	return filtered
 }

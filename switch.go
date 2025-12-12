@@ -17,12 +17,15 @@ func handleSwitch(args []string, opts GlobalOptions) {
 	var fShort, fLong string
 	var createShort, createLong string
 	var pVal, pValShort int
+	var lLong, lShort string
 
 	fs := flag.NewFlagSet("switch", flag.ExitOnError)
 	fs.StringVar(&fLong, "file", "", "configuration file")
 	fs.StringVar(&fShort, "f", "", "configuration file (short)")
 	fs.StringVar(&createLong, "create", "", "create branch if it does not exist")
 	fs.StringVar(&createShort, "c", "", "create branch if it does not exist (short)")
+	fs.StringVar(&lLong, "labels", "", "comma-separated list of labels to filter repositories")
+	fs.StringVar(&lShort, "l", "", "labels (short)")
 	fs.IntVar(&pVal, "parallel", DefaultParallel, "number of parallel processes")
 	fs.IntVar(&pValShort, "p", DefaultParallel, "number of parallel processes (short)")
 
@@ -59,11 +62,25 @@ func handleSwitch(args []string, opts GlobalOptions) {
 		configFile = fShort
 	}
 
+	labels := lLong
+	if lShort != "" {
+		labels = lShort
+	}
+
 	config, err := loadConfig(configFile)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
+
+	// Validate integrity of all repositories first
+	if err := ValidateRepositories(*config.Repositories, opts.GitPath); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	// Filter repositories
+	repos := FilterRepositories(*config.Repositories, labels)
 
 	var branchName string
 	var create bool
@@ -96,14 +113,14 @@ func handleSwitch(args []string, opts GlobalOptions) {
 	sem := make(chan struct{}, parallel)
 
 	// Pre-check phase
-	for _, repo := range *config.Repositories {
+	for _, repo := range repos {
 		wg.Add(1)
 		go func(repo Repository) {
 			defer wg.Done()
 			sem <- struct{}{}
 			defer func() { <-sem }()
 
-			dir := getRepoDir(repo)
+			dir := GetRepoDir(repo)
 
 			// Check if directory exists
 			if _, err := os.Stat(dir); os.IsNotExist(err) {
@@ -122,8 +139,8 @@ func handleSwitch(args []string, opts GlobalOptions) {
 	if !create {
 		// Strict mode: All must exist
 		var missing []string
-		for _, repo := range *config.Repositories {
-			dir := getRepoDir(repo)
+		for _, repo := range repos {
+			dir := GetRepoDir(repo)
 			if !dirExists[dir] {
 				missing = append(missing, *repo.URL+" ("+dir+")")
 			}
@@ -138,14 +155,14 @@ func handleSwitch(args []string, opts GlobalOptions) {
 		}
 
 		// Execute Checkout
-		for _, repo := range *config.Repositories {
+		for _, repo := range repos {
 			wg.Add(1)
 			go func(repo Repository) {
 				defer wg.Done()
 				sem <- struct{}{}
 				defer func() { <-sem }()
 
-				dir := getRepoDir(repo)
+				dir := GetRepoDir(repo)
 				fmt.Printf("Switching %s to branch %s...\n", dir, branchName)
 				cmd := exec.Command(opts.GitPath, "-C", dir, "checkout", branchName)
 				cmd.Stdout = os.Stdout
@@ -159,14 +176,14 @@ func handleSwitch(args []string, opts GlobalOptions) {
 		wg.Wait()
 	} else {
 		// Create mode
-		for _, repo := range *config.Repositories {
+		for _, repo := range repos {
 			wg.Add(1)
 			go func(repo Repository) {
 				defer wg.Done()
 				sem <- struct{}{}
 				defer func() { <-sem }()
 
-				dir := getRepoDir(repo)
+				dir := GetRepoDir(repo)
 				mu.Lock()
 				exists := dirExists[dir]
 				mu.Unlock()

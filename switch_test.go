@@ -74,6 +74,14 @@ func TestHandleSwitch(t *testing.T) {
 	setupRepo(t, repo1)
 	setupRepo(t, repo2)
 
+	// Add remotes to satisfy ValidateRepositories
+	if err := exec.Command("git", "-C", repo1, "remote", "add", "origin", "repo1").Run(); err != nil {
+		t.Fatalf("failed to add remote to repo1: %v", err)
+	}
+	if err := exec.Command("git", "-C", repo2, "remote", "add", "origin", "repo2").Run(); err != nil {
+		t.Fatalf("failed to add remote to repo2: %v", err)
+	}
+
 	// Create a config file
 	configPath := filepath.Join(tmpDir, "gitc.json")
 	config := Config{

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -25,49 +24,14 @@ type StatusRow struct {
 	RepoDir        string
 }
 
-// ValidateRepositoriesIntegrity checks if repositories exist and are valid.
-func ValidateRepositoriesIntegrity(config *Config, gitPath string) error {
-	for _, repo := range *config.Repositories {
-		targetDir := getRepoDir(repo)
-		info, err := os.Stat(targetDir)
-		if os.IsNotExist(err) {
-			continue
-		}
-		if err != nil {
-			return fmt.Errorf("Error checking directory %s: %v", targetDir, err)
-		}
-		if !info.IsDir() {
-			return fmt.Errorf("Error: target %s exists and is not a directory", targetDir)
-		}
-
-		// Check if Git repository
-		gitDir := filepath.Join(targetDir, ".git")
-		if _, err := os.Stat(gitDir); err != nil {
-			return fmt.Errorf("Error: directory %s exists but is not a git repository", targetDir)
-		}
-
-		// Check remote origin
-		cmd := exec.Command(gitPath, "-C", targetDir, "config", "--get", "remote.origin.url")
-		out, err := cmd.Output()
-		if err != nil {
-			return fmt.Errorf("Error: directory %s is a git repo but failed to get remote origin: %v", targetDir, err)
-		}
-		currentURL := strings.TrimSpace(string(out))
-		if currentURL != *repo.URL {
-			return fmt.Errorf("Error: directory %s exists with different remote origin: %s (expected %s)", targetDir, currentURL, *repo.URL)
-		}
-	}
-	return nil
-}
-
 // CollectStatus collects status for all repositories.
-func CollectStatus(config *Config, parallel int, gitPath string) []StatusRow {
+func CollectStatus(repos []Repository, parallel int, gitPath string) []StatusRow {
 	var rows []StatusRow
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, parallel)
 
-	for _, repo := range *config.Repositories {
+	for _, repo := range repos {
 		wg.Add(1)
 		go func(repo Repository) {
 			defer wg.Done()
@@ -92,7 +56,7 @@ func CollectStatus(config *Config, parallel int, gitPath string) []StatusRow {
 }
 
 func getRepoStatus(repo Repository, gitPath string) *StatusRow {
-	targetDir := getRepoDir(repo)
+	targetDir := GetRepoDir(repo)
 	repoName := targetDir
 	if repo.ID != nil && *repo.ID != "" {
 		repoName = *repo.ID

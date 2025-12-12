@@ -122,6 +122,66 @@ func TestLoadConfig(t *testing.T) {
 	}
 }
 
+func TestFilterRepositories(t *testing.T) {
+	repos := []Repository{
+		{ID: strPtr("repo1"), Labels: []string{"java", "server"}},
+		{ID: strPtr("repo2"), Labels: []string{"kotlin", "server"}},
+		{ID: strPtr("repo3"), Labels: []string{"java", "client"}},
+		{ID: strPtr("repo4"), Labels: []string{}},
+	}
+
+	tests := []struct {
+		name   string
+		labels string
+		want   []string // Expected IDs
+	}{
+		{
+			name:   "No filter",
+			labels: "",
+			want:   []string{"repo1", "repo2", "repo3", "repo4"},
+		},
+		{
+			name:   "Single match",
+			labels: "kotlin",
+			want:   []string{"repo2"},
+		},
+		{
+			name:   "Multiple match (intersection)",
+			labels: "java",
+			want:   []string{"repo1", "repo3"},
+		},
+		{
+			name:   "Multi-label filter",
+			labels: "server,client",
+			want:   []string{"repo1", "repo2", "repo3"}, // repo1(server), repo2(server), repo3(client)
+		},
+		{
+			name:   "No match",
+			labels: "ruby",
+			want:   []string{},
+		},
+		{
+			name:   "Empty labels in filter (comma)",
+			labels: ",,",
+			want:   []string{"repo1", "repo2", "repo3", "repo4"}, // logic says empty map -> return all
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := FilterRepositories(repos, tt.labels)
+			if len(got) != len(tt.want) {
+				t.Errorf("FilterRepositories() length = %d, want %d", len(got), len(tt.want))
+			}
+			for i, r := range got {
+				if *r.ID != tt.want[i] {
+					t.Errorf("FilterRepositories()[%d] ID = %s, want %s", i, *r.ID, tt.want[i])
+				}
+			}
+		})
+	}
+}
+
 func strPtr(s string) *string {
 	return &s
 }

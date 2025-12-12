@@ -31,7 +31,7 @@ func branchExistsLocallyOrRemotely(gitPath, dir, branch string) (bool, error) {
 // validateEnvironment checks if the current directory state is consistent with the configuration.
 func validateEnvironment(repos []Repository, gitPath string) error {
 	for _, repo := range repos {
-		targetDir := getRepoDir(repo)
+		targetDir := GetRepoDir(repo)
 		info, err := os.Stat(targetDir)
 		if os.IsNotExist(err) {
 			continue // Directory doesn't exist, safe to clone
@@ -99,10 +99,13 @@ func handleInit(args []string, opts GlobalOptions) {
 	var fShort, fLong string
 	var depth int
 	var pVal, pValShort int
+	var lLong, lShort string
 
 	fs := flag.NewFlagSet("init", flag.ExitOnError)
 	fs.StringVar(&fLong, "file", "", "configuration file")
 	fs.StringVar(&fShort, "f", "", "configuration file (short)")
+	fs.StringVar(&lLong, "labels", "", "comma-separated list of labels to filter repositories")
+	fs.StringVar(&lShort, "l", "", "labels (short)")
 	fs.IntVar(&depth, "depth", 0, "Create a shallow clone with a history truncated to the specified number of commits")
 	fs.IntVar(&pVal, "parallel", DefaultParallel, "number of parallel processes")
 	fs.IntVar(&pValShort, "p", DefaultParallel, "number of parallel processes (short)")
@@ -135,6 +138,11 @@ func handleInit(args []string, opts GlobalOptions) {
 		configFile = fShort
 	}
 
+	labels := lLong
+	if lShort != "" {
+		labels = lShort
+	}
+
 	config, err := loadConfig(configFile)
 	if err != nil {
 		fmt.Println(err)
@@ -146,10 +154,13 @@ func handleInit(args []string, opts GlobalOptions) {
 		os.Exit(1)
 	}
 
+	// Filter Repositories
+	repos := FilterRepositories(*config.Repositories, labels)
+
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, parallel)
 
-	for _, repo := range *config.Repositories {
+	for _, repo := range repos {
 		wg.Add(1)
 		go func(repo Repository) {
 			defer wg.Done()
@@ -164,7 +175,7 @@ func handleInit(args []string, opts GlobalOptions) {
 				gitArgs = append(gitArgs, "--depth", fmt.Sprintf("%d", depth))
 			}
 			gitArgs = append(gitArgs, *repo.URL)
-			targetDir := getRepoDir(repo)
+			targetDir := GetRepoDir(repo)
 
 			// Explicitly pass target directory to avoid ambiguity and to know where to checkout later.
 			gitArgs = append(gitArgs, targetDir)

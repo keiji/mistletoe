@@ -10,10 +10,13 @@ import (
 func handleStatus(args []string, opts GlobalOptions) {
 	var fShort, fLong string
 	var pVal, pValShort int
+	var lLong, lShort string
 
 	fs := flag.NewFlagSet("status", flag.ExitOnError)
 	fs.StringVar(&fLong, "file", "", "configuration file")
 	fs.StringVar(&fShort, "f", "", "configuration file (short)")
+	fs.StringVar(&lLong, "labels", "", "comma-separated list of labels to filter repositories")
+	fs.StringVar(&lShort, "l", "", "labels (short)")
 	fs.IntVar(&pVal, "parallel", DefaultParallel, "number of parallel processes")
 	fs.IntVar(&pValShort, "p", DefaultParallel, "number of parallel processes (short)")
 
@@ -43,6 +46,11 @@ func handleStatus(args []string, opts GlobalOptions) {
 		configFile = fLong
 	} else if fShort != "" {
 		configFile = fShort
+	}
+
+	labels := lLong
+	if lShort != "" {
+		labels = lShort
 	}
 
 	config, err := loadConfig(configFile)
@@ -94,12 +102,15 @@ func handleStatus(args []string, opts GlobalOptions) {
 	startSpinner()
 
 	// Validation Phase
-	if err := ValidateRepositoriesIntegrity(config, opts.GitPath); err != nil {
+	if err := ValidateRepositories(*config.Repositories, opts.GitPath); err != nil {
 		fail("%v\n", err)
 	}
 
+	// Filter
+	repos := FilterRepositories(*config.Repositories, labels)
+
 	// Output Phase
-	rows := CollectStatus(config, parallel, opts.GitPath)
+	rows := CollectStatus(repos, parallel, opts.GitPath)
 
 	stopSpinner()
 

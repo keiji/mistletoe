@@ -11,9 +11,13 @@ import (
 
 func handleFreeze(args []string, opts GlobalOptions) {
 	var fShort, fLong string
+	var lLong, lShort string
+
 	fs := flag.NewFlagSet("freeze", flag.ExitOnError)
 	fs.StringVar(&fLong, "file", "", "configuration file")
 	fs.StringVar(&fShort, "f", "", "configuration file (short)")
+	fs.StringVar(&lLong, "labels", "", "labels filter (ignored for freeze)")
+	fs.StringVar(&lShort, "l", "", "labels filter (ignored for freeze)")
 
 	if err := ParseFlagsFlexible(fs, args); err != nil {
 		fmt.Println("Error parsing flags:", err)
