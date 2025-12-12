@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"os"
 	"reflect"
 	"testing"
@@ -23,10 +24,10 @@ func TestLoadConfig(t *testing.T) {
 	}
 
 	tests := []struct {
-		name       string
-		setup      func() string // Returns filename
-		wantConfig bool          // whether we expect non-nil config
-		wantErrStr string
+		name        string
+		setup       func() string // Returns filename
+		wantConfig  bool          // whether we expect non-nil config
+		wantErr     error         // Expected error target
 	}{
 		{
 			name: "File does not exist",
@@ -34,7 +35,7 @@ func TestLoadConfig(t *testing.T) {
 				return "non_existent_file.json"
 			},
 			wantConfig: false,
-			wantErrStr: "ファイルが見つからない",
+			wantErr:    ErrConfigFileNotFound,
 		},
 		{
 			name: "Valid file",
@@ -42,7 +43,7 @@ func TestLoadConfig(t *testing.T) {
 				return createTempFile(`{"repositories": [{"url": "https://example.com/repo.git"}]}`)
 			},
 			wantConfig: true,
-			wantErrStr: "",
+			wantErr:    nil,
 		},
 		{
 			name: "Invalid JSON",
@@ -50,7 +51,7 @@ func TestLoadConfig(t *testing.T) {
 				return createTempFile(`{ invalid json }`)
 			},
 			wantConfig: false,
-			wantErrStr: "データの形式が正しくありません",
+			wantErr:    ErrInvalidDataFormat,
 		},
 		{
 			name: "Missing repositories key",
@@ -58,7 +59,7 @@ func TestLoadConfig(t *testing.T) {
 				return createTempFile(`{}`)
 			},
 			wantConfig: false,
-			wantErrStr: "データの形式が正しくありません",
+			wantErr:    ErrInvalidDataFormat,
 		},
 		{
 			name: "Repositories key is null",
@@ -66,7 +67,7 @@ func TestLoadConfig(t *testing.T) {
 				return createTempFile(`{"repositories": null}`)
 			},
 			wantConfig: false,
-			wantErrStr: "データの形式が正しくありません",
+			wantErr:    ErrInvalidDataFormat,
 		},
 		{
 			name: "Repositories empty array (valid)",
@@ -74,7 +75,7 @@ func TestLoadConfig(t *testing.T) {
 				return createTempFile(`{"repositories": []}`)
 			},
 			wantConfig: true,
-			wantErrStr: "",
+			wantErr:    nil,
 		},
 		{
 			name: "Repo missing URL",
@@ -82,7 +83,7 @@ func TestLoadConfig(t *testing.T) {
 				return createTempFile(`{"repositories": [{"id": "test"}]}`)
 			},
 			wantConfig: false,
-			wantErrStr: "データの形式が正しくありません",
+			wantErr:    ErrInvalidDataFormat,
 		},
 		{
 			name: "Repo URL is null",
@@ -90,7 +91,7 @@ func TestLoadConfig(t *testing.T) {
 				return createTempFile(`{"repositories": [{"url": null}]}`)
 			},
 			wantConfig: false,
-			wantErrStr: "データの形式が正しくありません",
+			wantErr:    ErrInvalidDataFormat,
 		},
 	}
 
@@ -103,11 +104,11 @@ func TestLoadConfig(t *testing.T) {
 
 			config, err := loadConfig(filename)
 
-			if tt.wantErrStr != "" {
+			if tt.wantErr != nil {
 				if err == nil {
-					t.Errorf("loadConfig() expected error containing %q, got nil", tt.wantErrStr)
-				} else if err.Error() != tt.wantErrStr {
-					t.Errorf("loadConfig() error = %v, want %v", err, tt.wantErrStr)
+					t.Errorf("loadConfig() expected error %v, got nil", tt.wantErr)
+				} else if !errors.Is(err, tt.wantErr) {
+					t.Errorf("loadConfig() error = %v, want %v", err, tt.wantErr)
 				}
 			} else {
 				if err != nil {

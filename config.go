@@ -9,6 +9,12 @@ import (
 	"strings"
 )
 
+var (
+	ErrConfigFileNotFound = errors.New("File not found")
+	ErrInvalidDataFormat  = errors.New("Invalid data format")
+	ErrDuplicateID        = errors.New("Duplicate repository ID")
+)
+
 type Repository struct {
 	ID       *string  `json:"id"`
 	URL      *string  `json:"url"`
@@ -24,16 +30,16 @@ type Config struct {
 func ParseConfig(data []byte) (*Config, error) {
 	var config Config
 	if err := json.Unmarshal(data, &config); err != nil {
-		return nil, errors.New("データの形式が正しくありません")
+		return nil, ErrInvalidDataFormat
 	}
 
 	if config.Repositories == nil {
-		return nil, errors.New("データの形式が正しくありません")
+		return nil, ErrInvalidDataFormat
 	}
 
 	for _, repo := range *config.Repositories {
 		if repo.URL == nil {
-			return nil, errors.New("データの形式が正しくありません")
+			return nil, ErrInvalidDataFormat
 		}
 	}
 
@@ -47,7 +53,7 @@ func validateRepositories(repos []Repository) error {
 	for _, repo := range repos {
 		if repo.ID != nil && *repo.ID != "" {
 			if seenIDs[*repo.ID] {
-				return fmt.Errorf("duplicate repository ID found: %s", *repo.ID)
+				return fmt.Errorf("%w: %s", ErrDuplicateID, *repo.ID)
 			}
 			seenIDs[*repo.ID] = true
 		}
@@ -78,7 +84,7 @@ func loadConfig(configFile string) (*Config, error) {
 	data, err := os.ReadFile(configFile)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, errors.New("ファイルが見つからない")
+			return nil, ErrConfigFileNotFound
 		}
 		return nil, fmt.Errorf("Error reading file: %v", err)
 	}
