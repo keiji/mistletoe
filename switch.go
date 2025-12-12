@@ -4,13 +4,12 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"os/exec"
 	"sync"
 )
 
 func branchExists(dir, branch, gitPath string) bool {
-	cmd := exec.Command(gitPath, "-C", dir, "show-ref", "--verify", "--quiet", "refs/heads/"+branch)
-	return cmd.Run() == nil
+	_, err := RunGit(dir, gitPath, "show-ref", "--verify", "--quiet", "refs/heads/"+branch)
+	return err == nil
 }
 
 func handleSwitch(args []string, opts GlobalOptions) {
@@ -31,32 +30,15 @@ func handleSwitch(args []string, opts GlobalOptions) {
 		os.Exit(1)
 	}
 
-	parallel := DefaultParallel
-	if pVal != DefaultParallel {
-		parallel = pVal
-	} else if pValShort != DefaultParallel {
-		parallel = pValShort
-	}
-
-	if parallel < MinParallel {
-		fmt.Printf("Error: parallel must be at least %d\n", MinParallel)
-		os.Exit(1)
-	}
-	if parallel > MaxParallel {
-		fmt.Printf("Error: parallel must be at most %d\n", MaxParallel)
+	configFile, parallel, err := ResolveCommonValues(fLong, fShort, opts.ConfigFile, pVal, pValShort)
+	if err != nil {
+		fmt.Printf("Error: %v\n", err)
 		os.Exit(1)
 	}
 
 	createBranchName := createLong
 	if createShort != "" {
 		createBranchName = createShort
-	}
-
-	configFile := opts.ConfigFile
-	if fLong != "" {
-		configFile = fLong
-	} else if fShort != "" {
-		configFile = fShort
 	}
 
 	config, err := loadConfig(configFile)
@@ -147,10 +129,7 @@ func handleSwitch(args []string, opts GlobalOptions) {
 
 				dir := getRepoDir(repo)
 				fmt.Printf("Switching %s to branch %s...\n", dir, branchName)
-				cmd := exec.Command(opts.GitPath, "-C", dir, "checkout", branchName)
-				cmd.Stdout = os.Stdout
-				cmd.Stderr = os.Stderr
-				if err := cmd.Run(); err != nil {
+				if err := RunGitInteractive(dir, opts.GitPath, "checkout", branchName); err != nil {
 					fmt.Printf("Error switching branch for %s: %v\n", dir, err)
 					os.Exit(1)
 				}
@@ -173,19 +152,13 @@ func handleSwitch(args []string, opts GlobalOptions) {
 
 				if exists {
 					fmt.Printf("Branch %s exists in %s. Switching...\n", branchName, dir)
-					cmd := exec.Command(opts.GitPath, "-C", dir, "checkout", branchName)
-					cmd.Stdout = os.Stdout
-					cmd.Stderr = os.Stderr
-					if err := cmd.Run(); err != nil {
+					if err := RunGitInteractive(dir, opts.GitPath, "checkout", branchName); err != nil {
 						fmt.Printf("Error switching branch for %s: %v\n", dir, err)
 						os.Exit(1)
 					}
 				} else {
 					fmt.Printf("Creating and switching to branch %s in %s...\n", branchName, dir)
-					cmd := exec.Command(opts.GitPath, "-C", dir, "checkout", "-b", branchName)
-					cmd.Stdout = os.Stdout
-					cmd.Stderr = os.Stderr
-					if err := cmd.Run(); err != nil {
+					if err := RunGitInteractive(dir, opts.GitPath, "checkout", "-b", branchName); err != nil {
 						fmt.Printf("Error creating branch for %s: %v\n", dir, err)
 						os.Exit(1)
 					}

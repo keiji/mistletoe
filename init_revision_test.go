@@ -30,11 +30,7 @@ func getCurrentBranch(t *testing.T, dir string) string {
 
 func TestInitRevision(t *testing.T) {
 	// 1. Build gitc binary
-	binPath := filepath.Join(t.TempDir(), "gitc")
-	buildCmd := exec.Command("go", "build", "-o", binPath, ".")
-	if err := buildCmd.Run(); err != nil {
-		t.Fatalf("failed to build gitc: %v", err)
-	}
+	binPath := buildGitc(t)
 
 	// 2. Setup Remote Repo
 	remoteDir := t.TempDir()

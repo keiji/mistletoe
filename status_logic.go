@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -54,12 +53,10 @@ func ValidateRepositoriesIntegrity(config *Config, gitPath string) error {
 		}
 
 		// Check remote origin
-		cmd := exec.Command(gitPath, "-C", targetDir, "config", "--get", "remote.origin.url")
-		out, err := cmd.Output()
+		currentURL, err := RunGit(targetDir, gitPath, "config", "--get", "remote.origin.url")
 		if err != nil {
 			return fmt.Errorf("Error: directory %s is a git repo but failed to get remote origin: %v", targetDir, err)
 		}
-		currentURL := strings.TrimSpace(string(out))
 		if currentURL != *repo.URL {
 			return fmt.Errorf("Error: directory %s exists with different remote origin: %s (expected %s)", targetDir, currentURL, *repo.URL)
 		}
@@ -110,23 +107,19 @@ func getRepoStatus(repo Repository, gitPath string) *StatusRow {
 	}
 
 	// 1. Get Branch Name (abbrev-ref)
-	cmd := exec.Command(gitPath, "-C", targetDir, "rev-parse", "--abbrev-ref", "HEAD")
-	out, err := cmd.Output()
-	branchName := ""
-	isDetached := false
-	if err == nil {
-		branchName = strings.TrimSpace(string(out))
+	branchName, err := RunGit(targetDir, gitPath, "rev-parse", "--abbrev-ref", "HEAD")
+	if err != nil {
+		branchName = ""
 	}
+	isDetached := false
 	if branchName == "HEAD" {
 		isDetached = true
 	}
 
 	// 2. Get Short SHA
-	cmd = exec.Command(gitPath, "-C", targetDir, "rev-parse", "--short", "HEAD")
-	out, err = cmd.Output()
-	shortSHA := ""
-	if err == nil {
-		shortSHA = strings.TrimSpace(string(out))
+	shortSHA, err := RunGit(targetDir, gitPath, "rev-parse", "--short", "HEAD")
+	if err != nil {
+		shortSHA = ""
 	}
 
 	// 3. Construct LocalBranchRev
@@ -151,11 +144,9 @@ func getRepoStatus(repo Repository, gitPath string) *StatusRow {
 	}
 
 	// Local HEAD Rev (Full SHA for check)
-	cmd = exec.Command(gitPath, "-C", targetDir, "rev-parse", "HEAD")
-	out, err = cmd.Output()
-	localHeadFull := ""
-	if err == nil {
-		localHeadFull = strings.TrimSpace(string(out))
+	localHeadFull, err := RunGit(targetDir, gitPath, "rev-parse", "HEAD")
+	if err != nil {
+		localHeadFull = ""
 	}
 
 	// Remote Logic
@@ -166,37 +157,29 @@ func getRepoStatus(repo Repository, gitPath string) *StatusRow {
 	if !isDetached {
 		// Check if remote branch exists
 		// git ls-remote origin <branchName>
-		cmd = exec.Command(gitPath, "-C", targetDir, "ls-remote", "origin", "refs/heads/"+branchName)
-		out, err = cmd.Output()
-		if err == nil {
-			output := strings.TrimSpace(string(out))
-			if output != "" {
-				// Output format: <SHA>\trefs/heads/<branch>
-				fields := strings.Fields(output)
-				if len(fields) > 0 {
-					remoteHeadFull = fields[0]
+		output, err := RunGit(targetDir, gitPath, "ls-remote", "origin", "refs/heads/"+branchName)
+		if err == nil && output != "" {
+			// Output format: <SHA>\trefs/heads/<branch>
+			fields := strings.Fields(output)
+			if len(fields) > 0 {
+				remoteHeadFull = fields[0]
 
-					// Construct display: branchName/shortSHA
-					shortRemote := remoteHeadFull
-					if len(shortRemote) >= 7 {
-						shortRemote = shortRemote[:7]
-					} else {
-						shortRemote = remoteHeadFull
-					}
-					remoteDisplay = fmt.Sprintf("%s/%s", branchName, shortRemote)
+				// Construct display: branchName/shortSHA
+				shortRemote := remoteHeadFull
+				if len(shortRemote) >= 7 {
+					shortRemote = shortRemote[:7]
+				} else {
+					shortRemote = remoteHeadFull
+				}
+				remoteDisplay = fmt.Sprintf("%s/%s", branchName, shortRemote)
 
-					// Check Pushability (Coloring for Remote Column)
-					// If local..remote is not 0, it implies remote has commits local doesn't (pull needed or diverged)
-					// -> "push impossible" -> Yellow
-					if localHeadFull != "" {
-						cmdCount := exec.Command(gitPath, "-C", targetDir, "rev-list", "--count", localHeadFull+".."+remoteHeadFull)
-						outCount, errCount := cmdCount.Output()
-						if errCount == nil {
-							count := strings.TrimSpace(string(outCount))
-							if count != "0" {
-								remoteColor = ColorYellow
-							}
-						}
+				// Check Pushability (Coloring for Remote Column)
+				// If local..remote is not 0, it implies remote has commits local doesn't (pull needed or diverged)
+				// -> "push impossible" -> Yellow
+				if localHeadFull != "" {
+					count, err := RunGit(targetDir, gitPath, "rev-list", "--count", localHeadFull+".."+remoteHeadFull)
+					if err == nil && count != "0" {
+						remoteColor = ColorYellow
 					}
 				}
 			}
@@ -211,13 +194,9 @@ func getRepoStatus(repo Repository, gitPath string) *StatusRow {
 		// Check Unpushed (Ahead)
 		// git rev-list --count remote..local
 		if remoteHeadFull != localHeadFull {
-			cmd = exec.Command(gitPath, "-C", targetDir, "rev-list", "--count", remoteHeadFull+".."+localHeadFull)
-			out, err := cmd.Output()
-			if err == nil {
-				count := strings.TrimSpace(string(out))
-				if count != "0" {
-					hasUnpushed = true
-				}
+			count, err := RunGit(targetDir, gitPath, "rev-list", "--count", remoteHeadFull+".."+localHeadFull)
+			if err == nil && count != "0" {
+				hasUnpushed = true
 			}
 		}
 
@@ -226,20 +205,19 @@ func getRepoStatus(repo Repository, gitPath string) *StatusRow {
 		if repo.Branch != nil && *repo.Branch != "" && *repo.Branch == branchName {
 			if remoteHeadFull != localHeadFull {
 				// Check if we have the remote object locally
-				cmdObj := exec.Command(gitPath, "-C", targetDir, "cat-file", "-e", remoteHeadFull)
-				if err := cmdObj.Run(); err != nil {
+				// RunGitInteractive is unnecessary here, just checking exit code.
+				// But RunGit returns stdout/err.
+				// We can just use RunGit and ignore output, check err.
+				_, err := RunGit(targetDir, gitPath, "cat-file", "-e", remoteHeadFull)
+				if err != nil {
 					// Object missing locally, so it's likely a new commit on remote (we haven't fetched)
 					isPullable = true
 				} else {
 					// Object exists locally, check ancestry
 					// git rev-list --count local..remote
-					cmd = exec.Command(gitPath, "-C", targetDir, "rev-list", "--count", localHeadFull+".."+remoteHeadFull)
-					out, err := cmd.Output()
-					if err == nil {
-						count := strings.TrimSpace(string(out))
-						if count != "0" {
-							isPullable = true
-						}
+					count, err := RunGit(targetDir, gitPath, "rev-list", "--count", localHeadFull+".."+remoteHeadFull)
+					if err == nil && count != "0" {
+						isPullable = true
 					}
 				}
 			}

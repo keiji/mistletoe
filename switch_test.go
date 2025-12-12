@@ -48,6 +48,10 @@ func TestHandleSwitch(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
+	// Build the gitc binary to test end-to-end (simulating integration test)
+	// We need to build it because handleSwitch calls os.Exit on error, which kills the test runner.
+	binPath := buildGitc(t)
+
 	// Change to tmpDir so that gitc operates relatively if needed (though we use absolute paths in config)
 	cwd, _ := os.Getwd()
 	defer func() {
@@ -57,15 +61,6 @@ func TestHandleSwitch(t *testing.T) {
 	}()
 	if err := os.Chdir(tmpDir); err != nil {
 		t.Fatalf("failed to chdir: %v", err)
-	}
-
-	// Build the gitc binary to test end-to-end (simulating integration test)
-	// We need to build it because handleSwitch calls os.Exit on error, which kills the test runner.
-	binPath := filepath.Join(tmpDir, "gitc")
-	buildCmd := exec.Command("go", "build", "-o", binPath, ".")
-	buildCmd.Dir = cwd // Build from the source root
-	if out, err := buildCmd.CombinedOutput(); err != nil {
-		t.Fatalf("failed to build gitc: %v\nOutput: %s", err, out)
 	}
 
 	// Create 2 dummy repos

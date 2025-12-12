@@ -11,11 +11,7 @@ import (
 
 func TestGitExecPath(t *testing.T) {
 	// Build the binary first
-	exe := filepath.Join(t.TempDir(), "gitc")
-	buildCmd := exec.Command("go", "build", "-o", exe, ".")
-	if err := buildCmd.Run(); err != nil {
-		t.Fatalf("Failed to build gitc: %v", err)
-	}
+	exe := buildGitc(t)
 
 	// 1. Test Valid GIT_EXEC_PATH
 	t.Run("Valid GIT_EXEC_PATH", func(t *testing.T) {
