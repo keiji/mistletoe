@@ -231,7 +231,7 @@ func getRepoStatus(repo Repository, gitPath string) *StatusRow {
 	}
 
 	statusVal := ""
-	var color int = ColorNone
+	var color = ColorNone
 
 	if hasUnpushed {
 		statusVal += "*"
@@ -304,7 +304,7 @@ func RenderStatusTable(rows []StatusRow) {
 			status = FgGreen + status + Reset
 		}
 
-		table.Append(row.Repo, row.ConfigRef, row.LocalBranchRev, row.RemoteRev, status)
+		_ = table.Append(row.Repo, row.ConfigRef, row.LocalBranchRev, row.RemoteRev, status)
 	}
 	if err := table.Render(); err != nil {
 		fmt.Printf("Error rendering table: %v\n", err)
