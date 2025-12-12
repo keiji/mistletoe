@@ -176,13 +176,14 @@ func getRepoStatus(repo Repository, gitPath string) *StatusRow {
 		}
 	}
 
-	// Status (Unpushed?)
-	statusVal := "-"
+	// Status Logic
 	hasUnpushed := false
+	isPullable := false
 
 	if remoteHeadFull != "" && localHeadFull != "" {
+		// Check Unpushed (Ahead)
+		// git rev-list --count remote..local
 		if remoteHeadFull != localHeadFull {
-			// Check if unpushed
 			cmd = exec.Command(gitPath, "-C", targetDir, "rev-list", "--count", remoteHeadFull+".."+localHeadFull)
 			out, err := cmd.Output()
 			if err == nil {
@@ -192,15 +193,53 @@ func getRepoStatus(repo Repository, gitPath string) *StatusRow {
 				}
 			}
 		}
+
+		// Check Pullable (Behind)
+		// Only if current branch matches config branch
+		if repo.Branch != nil && *repo.Branch != "" && *repo.Branch == branchName {
+			if remoteHeadFull != localHeadFull {
+				// Check if we have the remote object locally
+				cmdObj := exec.Command(gitPath, "-C", targetDir, "cat-file", "-e", remoteHeadFull)
+				if err := cmdObj.Run(); err != nil {
+					// Object missing locally, so it's likely a new commit on remote (we haven't fetched)
+					isPullable = true
+				} else {
+					// Object exists locally, check ancestry
+					// git rev-list --count local..remote
+					cmd = exec.Command(gitPath, "-C", targetDir, "rev-list", "--count", localHeadFull+".."+remoteHeadFull)
+					out, err := cmd.Output()
+					if err == nil {
+						count := strings.TrimSpace(string(out))
+						if count != "0" {
+							isPullable = true
+						}
+					}
+				}
+			}
+		}
+
 	} else if !isDetached && remoteHeadFull == "" {
 		// Remote branch doesn't exist? Means all local commits are unpushed
 		hasUnpushed = true
 	}
 
+	statusVal := ""
 	var color []int
+
 	if hasUnpushed {
-		statusVal = "s"
+		statusVal += "*"
 		color = []int{tablewriter.FgYellowColor}
+	}
+
+	if isPullable {
+		statusVal += "+"
+		if len(color) == 0 {
+			color = []int{tablewriter.FgGreenColor}
+		}
+	}
+
+	if statusVal == "" {
+		statusVal = "-"
 	}
 
 	return &StatusRow{
