@@ -90,8 +90,8 @@ func TestStatusCmd(t *testing.T) {
 
 		// Config expects correct URL
 		config := Config{
-			Repositories: []Repository{
-				{ID: &repoID, URL: "https://example.com/correct.git"},
+			Repositories: &[]Repository{
+				{ID: &repoID, URL: strPtr("https://example.com/correct.git")},
 			},
 		}
 		configFile := filepath.Join(workDir, "repos.json")
@@ -138,9 +138,9 @@ func TestStatusCmd(t *testing.T) {
 
 		// Config
 		config := Config{
-			Repositories: []Repository{
-				{ID: &id1, URL: remote1},
-				{ID: &id2, URL: remote2},
+			Repositories: &[]Repository{
+				{ID: &id1, URL: &remote1},
+				{ID: &id2, URL: &remote2},
 			},
 		}
 		configFile := filepath.Join(workDir, "repos.json")
@@ -229,8 +229,8 @@ func TestStatusCmd(t *testing.T) {
 
 		// Config
 		config := Config{
-			Repositories: []Repository{
-				{ID: &repoID, URL: remoteDir},
+			Repositories: &[]Repository{
+				{ID: &repoID, URL: &remoteDir},
 			},
 		}
 		configFile := filepath.Join(workDir, "repos.json")

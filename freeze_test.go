@@ -118,12 +118,12 @@ func TestFreeze(t *testing.T) {
 		t.Fatalf("failed to parse output json: %v", err)
 	}
 
-	if len(config.Repositories) != 2 {
-		t.Errorf("expected 2 repos, got %d", len(config.Repositories))
+	if len(*config.Repositories) != 2 {
+		t.Errorf("expected 2 repos, got %d", len(*config.Repositories))
 	}
 
 	repoMap := make(map[string]Repository)
-	for _, r := range config.Repositories {
+	for _, r := range *config.Repositories {
 		if r.ID == nil {
 			t.Error("repo ID is nil")
 			continue
@@ -138,8 +138,8 @@ func TestFreeze(t *testing.T) {
 	if !ok {
 		t.Errorf("repo1 not found in %v", repoMap)
 	} else {
-		if r1.URL != repo1URL {
-			t.Errorf("repo1 URL mismatch: got %s, want %s", r1.URL, repo1URL)
+		if *r1.URL != repo1URL {
+			t.Errorf("repo1 URL mismatch: got %s, want %s", *r1.URL, repo1URL)
 		}
 		if r1.Branch == nil || *r1.Branch != repo1Branch {
 			got := "<nil>"
@@ -157,8 +157,8 @@ func TestFreeze(t *testing.T) {
 	if !ok {
 		t.Errorf("repo2 not found")
 	} else {
-		if r2.URL != repo2URL {
-			t.Errorf("repo2 URL mismatch: got %s, want %s", r2.URL, repo2URL)
+		if *r2.URL != repo2URL {
+			t.Errorf("repo2 URL mismatch: got %s, want %s", *r2.URL, repo2URL)
 		}
 		if r2.Branch == nil || *r2.Branch != repo2Branch {
 			got := "<nil>"

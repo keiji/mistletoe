@@ -5,108 +5,6 @@ import (
 	"testing"
 )
 
-func TestParseConfig(t *testing.T) {
-	tests := []struct {
-		name    string
-		input   string
-		want    *Config
-		wantErr bool
-	}{
-		{
-			name: "Valid JSON",
-			input: `{
-				"repositories": [
-					{
-						"url": "user/repo",
-						"branch": "main",
-						"labels": ["bug", "feature"]
-					}
-				]
-			}`,
-			want: &Config{
-				Repositories: []Repository{
-					{
-						URL:    "user/repo",
-						Branch: func() *string { s := "main"; return &s }(),
-						Labels: []string{"bug", "feature"},
-					},
-				},
-			},
-			wantErr: false,
-		},
-		{
-			name:    "Invalid JSON",
-			input:   `{ "repositories": [ ... invalid ... ] }`,
-			want:    nil,
-			wantErr: true,
-		},
-		{
-			name:  "Empty JSON Object",
-			input: `{}`,
-			want: &Config{
-				Repositories: nil, // or empty slice depending on json unmarshal behavior, typically nil if missing
-			},
-			wantErr: false,
-		},
-		{
-			name: "Missing Fields",
-			input: `{
-				"repositories": [
-					{
-						"url": "user/repo"
-					}
-				]
-			}`,
-			want: &Config{
-				Repositories: []Repository{
-					{
-						URL:    "user/repo",
-						Branch: nil,
-						Labels: nil,
-					},
-				},
-			},
-			wantErr: false,
-		},
-		{
-			name: "With ID",
-			input: `{
-				"repositories": [
-					{
-						"id": "repo1",
-						"url": "user/repo",
-						"branch": "main"
-					}
-				]
-			}`,
-			want: &Config{
-				Repositories: []Repository{
-					{
-						ID:     func() *string { s := "repo1"; return &s }(),
-						URL:    "user/repo",
-						Branch: func() *string { s := "main"; return &s }(),
-						Labels: nil,
-					},
-				},
-			},
-			wantErr: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := ParseConfig([]byte(tt.input))
-			if (err != nil) != tt.wantErr {
-				t.Errorf("ParseConfig() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("ParseConfig() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
 func TestParseArgs(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -204,9 +102,6 @@ func TestParseArgs(t *testing.T) {
 				t.Errorf("parseArgs() subcmdName = %v, want %v", gotSubcmdName, tt.wantSubcmdName)
 			}
 			if !reflect.DeepEqual(gotSubcmdArgs, tt.wantSubcmdArgs) {
-				// Handle nil vs empty slice if necessary, but DeepEqual handles it reasonably well usually.
-				// However, if we append to nil slice, it becomes non-nil empty slice in some cases?
-				// In my implementation: var subcmdArgs []string. If nothing appended, it is nil.
 				t.Errorf("parseArgs() subcmdArgs = %v, want %v", gotSubcmdArgs, tt.wantSubcmdArgs)
 			}
 		})

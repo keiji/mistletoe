@@ -27,8 +27,8 @@ func TestPushCmd(t *testing.T) {
 		exec.Command("git", "clone", remote1, filepath.Join(workDir, id1)).Run()
 
 		config := Config{
-			Repositories: []Repository{
-				{ID: &id1, URL: remote1},
+			Repositories: &[]Repository{
+				{ID: &id1, URL: &remote1},
 			},
 		}
 		configFile := filepath.Join(workDir, "repos.json")
@@ -62,8 +62,8 @@ func TestPushCmd(t *testing.T) {
 		exec.Command("git", "-C", repoPath, "commit", "-m", "unpushed").Run()
 
 		config := Config{
-			Repositories: []Repository{
-				{ID: &id1, URL: remote1},
+			Repositories: &[]Repository{
+				{ID: &id1, URL: &remote1},
 			},
 		}
 		configFile := filepath.Join(workDir, "repos.json")
@@ -101,7 +101,7 @@ func TestPushCmd(t *testing.T) {
 		}
 	})
 
-    t.Run("Push Needed - User No", func(t *testing.T) {
+	t.Run("Push Needed - User No", func(t *testing.T) {
 		workDir := t.TempDir()
 		remote1, _ := setupRemoteAndContent(t, 2)
 		id1 := "repo1"
@@ -115,14 +115,14 @@ func TestPushCmd(t *testing.T) {
 		exec.Command("git", "-C", repoPath, "add", ".").Run()
 		exec.Command("git", "-C", repoPath, "commit", "-m", "unpushed").Run()
 
-        // Capture SHA before push attempt
-        cmdLocal := exec.Command("git", "-C", repoPath, "rev-parse", "HEAD")
+		// Capture SHA before push attempt
+		cmdLocal := exec.Command("git", "-C", repoPath, "rev-parse", "HEAD")
 		outLocal, _ := cmdLocal.Output()
 		localSHA := strings.TrimSpace(string(outLocal))
 
 		config := Config{
-			Repositories: []Repository{
-				{ID: &id1, URL: remote1},
+			Repositories: &[]Repository{
+				{ID: &id1, URL: &remote1},
 			},
 		}
 		configFile := filepath.Join(workDir, "repos.json")

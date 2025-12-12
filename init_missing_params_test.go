@@ -82,8 +82,8 @@ func TestInit_MissingBranchAndRevision(t *testing.T) {
 		// We use Repository struct but set fields to defaults
 		// When marshaled, omitempty will remove them
 		config := Config{
-			Repositories: []Repository{
-				{URL: repoURL, ID: &repoID}, // Branch and Revision are ""
+			Repositories: &[]Repository{
+				{URL: &repoURL, ID: &repoID}, // Branch and Revision are ""
 			},
 		}
 
