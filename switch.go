@@ -96,7 +96,7 @@ func handleSwitch(args []string, opts GlobalOptions) {
 	sem := make(chan struct{}, parallel)
 
 	// Pre-check phase
-	for _, repo := range config.Repositories {
+	for _, repo := range *config.Repositories {
 		wg.Add(1)
 		go func(repo Repository) {
 			defer wg.Done()
@@ -122,10 +122,10 @@ func handleSwitch(args []string, opts GlobalOptions) {
 	if !create {
 		// Strict mode: All must exist
 		var missing []string
-		for _, repo := range config.Repositories {
+		for _, repo := range *config.Repositories {
 			dir := getRepoDir(repo)
 			if !dirExists[dir] {
-				missing = append(missing, repo.URL+" ("+dir+")")
+				missing = append(missing, *repo.URL+" ("+dir+")")
 			}
 		}
 
@@ -138,7 +138,7 @@ func handleSwitch(args []string, opts GlobalOptions) {
 		}
 
 		// Execute Checkout
-		for _, repo := range config.Repositories {
+		for _, repo := range *config.Repositories {
 			wg.Add(1)
 			go func(repo Repository) {
 				defer wg.Done()
@@ -159,7 +159,7 @@ func handleSwitch(args []string, opts GlobalOptions) {
 		wg.Wait()
 	} else {
 		// Create mode
-		for _, repo := range config.Repositories {
+		for _, repo := range *config.Repositories {
 			wg.Add(1)
 			go func(repo Repository) {
 				defer wg.Done()

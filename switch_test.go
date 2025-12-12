@@ -77,9 +77,9 @@ func TestHandleSwitch(t *testing.T) {
 	// Create a config file
 	configPath := filepath.Join(tmpDir, "gitc.json")
 	config := Config{
-		Repositories: []Repository{
-			{URL: "repo1", ID: &repo1}, // Using local path as ID to force directory name
-			{URL: "repo2", ID: &repo2},
+		Repositories: &[]Repository{
+			{URL: strPtr("repo1"), ID: &repo1}, // Using local path as ID to force directory name
+			{URL: strPtr("repo2"), ID: &repo2},
 		},
 	}
 	configData, _ := json.Marshal(config)

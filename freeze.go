@@ -108,7 +108,7 @@ func handleFreeze(args []string, opts GlobalOptions) {
 
 		repo := Repository{
 			ID:       &id,
-			URL:      url,
+			URL:      &url,
 			Branch:   branchPtr,
 			Revision: revisionPtr,
 			Labels:   []string{},
@@ -117,7 +117,7 @@ func handleFreeze(args []string, opts GlobalOptions) {
 	}
 
 	config := Config{
-		Repositories: repos,
+		Repositories: &repos,
 	}
 
 	data, err := json.MarshalIndent(config, "", "  ")

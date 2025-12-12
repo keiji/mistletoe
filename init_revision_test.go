@@ -90,8 +90,8 @@ func TestInitRevision(t *testing.T) {
 		configFile := filepath.Join(t.TempDir(), "repos.json")
 		targetCommit := commits[1] // The middle commit
 		config := Config{
-			Repositories: []Repository{
-				{URL: repoURL, ID: &repoID, Revision: &targetCommit},
+			Repositories: &[]Repository{
+				{URL: &repoURL, ID: &repoID, Revision: &targetCommit},
 			},
 		}
 		configBytes, _ := json.Marshal(config)
@@ -125,8 +125,8 @@ func TestInitRevision(t *testing.T) {
 		targetCommit := commits[0] // The first commit
 		targetBranch := "new-feature"
 		config := Config{
-			Repositories: []Repository{
-				{URL: repoURL, ID: &repoID, Revision: &targetCommit, Branch: &targetBranch},
+			Repositories: &[]Repository{
+				{URL: &repoURL, ID: &repoID, Revision: &targetCommit, Branch: &targetBranch},
 			},
 		}
 		configBytes, _ := json.Marshal(config)
@@ -173,8 +173,8 @@ func TestInitRevision(t *testing.T) {
 		configFile := filepath.Join(t.TempDir(), "repos.json")
 		targetCommit := commits[0]
 		config := Config{
-			Repositories: []Repository{
-				{URL: repoURL, ID: &repoID, Revision: &targetCommit, Branch: &targetBranch},
+			Repositories: &[]Repository{
+				{URL: &repoURL, ID: &repoID, Revision: &targetCommit, Branch: &targetBranch},
 			},
 		}
 		configBytes, _ := json.Marshal(config)

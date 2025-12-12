@@ -27,7 +27,7 @@ type StatusRow struct {
 
 // ValidateRepositoriesIntegrity checks if repositories exist and are valid.
 func ValidateRepositoriesIntegrity(config *Config, gitPath string) error {
-	for _, repo := range config.Repositories {
+	for _, repo := range *config.Repositories {
 		targetDir := getRepoDir(repo)
 		info, err := os.Stat(targetDir)
 		if os.IsNotExist(err) {
@@ -53,8 +53,8 @@ func ValidateRepositoriesIntegrity(config *Config, gitPath string) error {
 			return fmt.Errorf("Error: directory %s is a git repo but failed to get remote origin: %v", targetDir, err)
 		}
 		currentURL := strings.TrimSpace(string(out))
-		if currentURL != repo.URL {
-			return fmt.Errorf("Error: directory %s exists with different remote origin: %s (expected %s)", targetDir, currentURL, repo.URL)
+		if currentURL != *repo.URL {
+			return fmt.Errorf("Error: directory %s exists with different remote origin: %s (expected %s)", targetDir, currentURL, *repo.URL)
 		}
 	}
 	return nil
@@ -67,7 +67,7 @@ func CollectStatus(config *Config, parallel int, gitPath string) []StatusRow {
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, parallel)
 
-	for _, repo := range config.Repositories {
+	for _, repo := range *config.Repositories {
 		wg.Add(1)
 		go func(repo Repository) {
 			defer wg.Done()

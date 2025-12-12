@@ -55,8 +55,8 @@ func validateEnvironment(repos []Repository, gitPath string) error {
 				return fmt.Errorf("directory %s is a git repo but failed to get remote origin: %v", targetDir, err)
 			}
 			currentURL := strings.TrimSpace(string(out))
-			if currentURL != repo.URL {
-				return fmt.Errorf("directory %s exists with different remote origin: %s (expected %s)", targetDir, currentURL, repo.URL)
+			if currentURL != *repo.URL {
+				return fmt.Errorf("directory %s exists with different remote origin: %s (expected %s)", targetDir, currentURL, *repo.URL)
 			}
 
 			// If Revision is specified and Branch is specified, check if branch already exists.
@@ -141,7 +141,7 @@ func handleInit(args []string, opts GlobalOptions) {
 		os.Exit(1)
 	}
 
-	if err := validateEnvironment(config.Repositories, opts.GitPath); err != nil {
+	if err := validateEnvironment(*config.Repositories, opts.GitPath); err != nil {
 		fmt.Println("Error validating environment:", err)
 		os.Exit(1)
 	}
@@ -149,7 +149,7 @@ func handleInit(args []string, opts GlobalOptions) {
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, parallel)
 
-	for _, repo := range config.Repositories {
+	for _, repo := range *config.Repositories {
 		wg.Add(1)
 		go func(repo Repository) {
 			defer wg.Done()
@@ -163,7 +163,7 @@ func handleInit(args []string, opts GlobalOptions) {
 			if depth > 0 {
 				gitArgs = append(gitArgs, "--depth", fmt.Sprintf("%d", depth))
 			}
-			gitArgs = append(gitArgs, repo.URL)
+			gitArgs = append(gitArgs, *repo.URL)
 			targetDir := getRepoDir(repo)
 
 			// Explicitly pass target directory to avoid ambiguity and to know where to checkout later.
@@ -181,12 +181,12 @@ func handleInit(args []string, opts GlobalOptions) {
 			}
 
 			if shouldClone {
-				fmt.Printf("Cloning %s into %s...\n", repo.URL, targetDir)
+				fmt.Printf("Cloning %s into %s...\n", *repo.URL, targetDir)
 				cmd := exec.Command(opts.GitPath, gitArgs...)
 				cmd.Stdout = os.Stdout
 				cmd.Stderr = os.Stderr
 				if err := cmd.Run(); err != nil {
-					fmt.Printf("Error cloning %s: %v\n", repo.URL, err)
+					fmt.Printf("Error cloning %s: %v\n", *repo.URL, err)
 					// Skip checkout if clone failed
 					return
 				}

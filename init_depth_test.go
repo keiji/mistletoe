@@ -81,8 +81,8 @@ func TestHandleInitDepth(t *testing.T) {
 	configFile := filepath.Join(t.TempDir(), "repos.json")
 	master := "master"
 	config := Config{
-		Repositories: []Repository{
-			{URL: repoURL, ID: &repoID, Branch: &master},
+		Repositories: &[]Repository{
+			{URL: &repoURL, ID: &repoID, Branch: &master},
 		},
 	}
 	configBytes, _ := json.Marshal(config)

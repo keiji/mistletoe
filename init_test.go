@@ -62,7 +62,7 @@ func TestValidateEnvironment(t *testing.T) {
 				// No setup needed, dir shouldn't exist
 			},
 			repos: []Repository{
-				{URL: repoURL, ID: &repoID},
+				{URL: &repoURL, ID: &repoID},
 			},
 			wantErr: false,
 		},
@@ -74,7 +74,7 @@ func TestValidateEnvironment(t *testing.T) {
 				}
 			},
 			repos: []Repository{
-				{URL: repoURL, ID: &repoID},
+				{URL: &repoURL, ID: &repoID},
 			},
 			wantErr: false,
 		},
@@ -89,7 +89,7 @@ func TestValidateEnvironment(t *testing.T) {
 				}
 			},
 			repos: []Repository{
-				{URL: repoURL, ID: &repoID},
+				{URL: &repoURL, ID: &repoID},
 			},
 			wantErr: true,
 		},
@@ -99,7 +99,7 @@ func TestValidateEnvironment(t *testing.T) {
 				createDummyGitRepo(t, repoID, repoURL)
 			},
 			repos: []Repository{
-				{URL: repoURL, ID: &repoID},
+				{URL: &repoURL, ID: &repoID},
 			},
 			wantErr: false,
 		},
@@ -109,7 +109,7 @@ func TestValidateEnvironment(t *testing.T) {
 				createDummyGitRepo(t, repoID, "https://github.com/other/repo.git")
 			},
 			repos: []Repository{
-				{URL: repoURL, ID: &repoID},
+				{URL: &repoURL, ID: &repoID},
 			},
 			wantErr: true,
 		},
@@ -121,7 +121,7 @@ func TestValidateEnvironment(t *testing.T) {
 				}
 			},
 			repos: []Repository{
-				{URL: repoURL, ID: &repoID},
+				{URL: &repoURL, ID: &repoID},
 			},
 			wantErr: true,
 		},
@@ -155,33 +155,33 @@ func TestValidateRepositories_Duplicates(t *testing.T) {
 		{
 			name: "No duplicates",
 			repos: []Repository{
-				{ID: &id1, URL: "http://example.com/1.git"},
-				{ID: &id2, URL: "http://example.com/2.git"},
+				{ID: &id1, URL: strPtr("http://example.com/1.git")},
+				{ID: &id2, URL: strPtr("http://example.com/2.git")},
 			},
 			wantErr: false,
 		},
 		{
 			name: "Duplicates",
 			repos: []Repository{
-				{ID: &id1, URL: "http://example.com/1.git"},
-				{ID: &id1, URL: "http://example.com/2.git"},
+				{ID: &id1, URL: strPtr("http://example.com/1.git")},
+				{ID: &id1, URL: strPtr("http://example.com/2.git")},
 			},
 			wantErr: true,
 		},
 		{
 			name: "Nil IDs (ignored)",
 			repos: []Repository{
-				{ID: nil, URL: "http://example.com/1.git"},
-				{ID: nil, URL: "http://example.com/2.git"},
-				{ID: &id1, URL: "http://example.com/3.git"},
+				{ID: nil, URL: strPtr("http://example.com/1.git")},
+				{ID: nil, URL: strPtr("http://example.com/2.git")},
+				{ID: &id1, URL: strPtr("http://example.com/3.git")},
 			},
 			wantErr: false,
 		},
 		{
 			name: "Nil ID and matching string ID (no collision)",
 			repos: []Repository{
-				{ID: nil, URL: "http://example.com/1.git"},
-				{ID: &id1, URL: "http://example.com/2.git"},
+				{ID: nil, URL: strPtr("http://example.com/1.git")},
+				{ID: &id1, URL: strPtr("http://example.com/2.git")},
 			},
 			wantErr: false,
 		},
@@ -205,22 +205,22 @@ func TestGetRepoDir(t *testing.T) {
 	}{
 		{
 			name:     "With ID",
-			repo:     Repository{ID: &id, URL: "https://github.com/foo/bar.git"},
+			repo:     Repository{ID: &id, URL: strPtr("https://github.com/foo/bar.git")},
 			expected: "custom-dir",
 		},
 		{
 			name:     "Without ID, standard git",
-			repo:     Repository{ID: nil, URL: "https://github.com/foo/bar.git"},
+			repo:     Repository{ID: nil, URL: strPtr("https://github.com/foo/bar.git")},
 			expected: "bar",
 		},
 		{
 			name:     "Without ID, no .git",
-			repo:     Repository{ID: nil, URL: "https://github.com/foo/baz"},
+			repo:     Repository{ID: nil, URL: strPtr("https://github.com/foo/baz")},
 			expected: "baz",
 		},
 		{
 			name:     "Without ID, trailing slash",
-			repo:     Repository{ID: nil, URL: "https://github.com/foo/qux/"},
+			repo:     Repository{ID: nil, URL: strPtr("https://github.com/foo/qux/")},
 			expected: "qux",
 		},
 	}
