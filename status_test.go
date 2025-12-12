@@ -157,10 +157,10 @@ func TestStatusCmd(t *testing.T) {
 		output := string(out)
 
 		// Check table content
-		// Repo1: Unpushed "-"
-		// Repo2: Unpushed "s" (yellow)
+		// Repo1: Synced "-"
+		// Repo2: Unpushed "*" (yellow)
 
-		coloredS := "\033[33ms\033[0m"
+		coloredStar := "\033[33m*\033[0m"
 
 		if !strings.Contains(output, "repo1") {
 			t.Errorf("Output missing repo1")
@@ -176,14 +176,14 @@ func TestStatusCmd(t *testing.T) {
 		for _, line := range lines {
 			if strings.Contains(line, "repo1") {
 				foundRepo1 = true
-				if strings.Contains(line, coloredS) {
-					t.Errorf("repo1 should not have unpushed commits (found colored s): %s", line)
+				if strings.Contains(line, coloredStar) {
+					t.Errorf("repo1 should not have unpushed commits (found colored *): %s", line)
 				}
 			}
 			if strings.Contains(line, "repo2") {
 				foundRepo2 = true
-				if !strings.Contains(line, coloredS) {
-					t.Errorf("repo2 SHOULD have unpushed commits (colored s): %s", line)
+				if !strings.Contains(line, coloredStar) {
+					t.Errorf("repo2 SHOULD have unpushed commits (colored *): %s", line)
 				}
 			}
 		}
@@ -196,7 +196,7 @@ func TestStatusCmd(t *testing.T) {
 		}
 	})
 
-	t.Run("Status Success - Diverged", func(t *testing.T) {
+	t.Run("Status Success - Diverged (No Branch Config)", func(t *testing.T) {
 		workDir := t.TempDir()
 		remoteDir, _ := setupRemoteAndContent(t, 1) // Remote has commit A
 
@@ -207,7 +207,6 @@ func TestStatusCmd(t *testing.T) {
 
 		// Create divergence
 		// 1. Update remote separately
-		// We can do this by cloning to another temp dir, committing, and pushing
 		otherClone := t.TempDir()
 		exec.Command("git", "clone", remoteDir, otherClone).Run()
 		configureGitUser(t, otherClone)
@@ -227,7 +226,7 @@ func TestStatusCmd(t *testing.T) {
 		// Important: Fetch so local has remote objects (B)
 		exec.Command("git", "-C", localRepoPath, "fetch").Run()
 
-		// Config
+		// Config (No Branch specified)
 		config := Config{
 			Repositories: &[]Repository{
 				{ID: &repoID, URL: &remoteDir},
@@ -246,10 +245,106 @@ func TestStatusCmd(t *testing.T) {
 		}
 		output := string(out)
 
-		coloredS := "\033[33ms\033[0m"
-		// Expect "s" (yellow) for unpushed
-		if !strings.Contains(output, coloredS) {
-			t.Errorf("Expected Diverged repo to show 's' (yellow) for unpushed, but got output:\n%s", output)
+		coloredStar := "\033[33m*\033[0m"
+		// Expect "*" (yellow) for unpushed
+		// Should NOT expect "+" because Branch is not configured
+		if !strings.Contains(output, coloredStar) {
+			t.Errorf("Expected Diverged repo to show '*' (yellow) for unpushed, but got output:\n%s", output)
+		}
+		if strings.Contains(output, "+") {
+			t.Errorf("Did not expect '+' because Branch is not configured")
+		}
+	})
+
+	t.Run("Status Success - Pullable Only", func(t *testing.T) {
+		workDir := t.TempDir()
+		remoteDir, _ := setupRemoteAndContent(t, 1)
+
+		repoID := "pull-repo"
+		localRepoPath := filepath.Join(workDir, repoID)
+		exec.Command("git", "clone", remoteDir, localRepoPath).Run()
+
+		// Remote gets B
+		otherClone := t.TempDir()
+		exec.Command("git", "clone", remoteDir, otherClone).Run()
+		configureGitUser(t, otherClone)
+		exec.Command("git", "-C", otherClone, "commit", "--allow-empty", "-m", "Remote B").Run()
+		exec.Command("git", "-C", otherClone, "push").Run()
+
+		master := "master"
+		config := Config{
+			Repositories: &[]Repository{
+				{ID: &repoID, URL: &remoteDir, Branch: &master},
+			},
+		}
+		configFile := filepath.Join(workDir, "repos.json")
+		data, _ := json.Marshal(config)
+		os.WriteFile(configFile, data, 0644)
+
+		cmd := exec.Command(binPath, "status", "-f", configFile)
+		cmd.Dir = workDir
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("status failed: %v", err)
+		}
+		output := string(out)
+
+		// Expect + (Green)
+		coloredPlus := "\033[32m+\033[0m"
+		if !strings.Contains(output, coloredPlus) {
+			t.Errorf("Expected '+' in green, got:\n%s", output)
+		}
+	})
+
+	t.Run("Status Success - Diverged with Config", func(t *testing.T) {
+		workDir := t.TempDir()
+		remoteDir, _ := setupRemoteAndContent(t, 1) // Remote commit A
+
+		// Setup local
+		repoID := "pd-repo"
+		localRepoPath := filepath.Join(workDir, repoID)
+		exec.Command("git", "clone", remoteDir, localRepoPath).Run()
+
+		// Diverge
+		// Remote gets B
+		otherClone := t.TempDir()
+		exec.Command("git", "clone", remoteDir, otherClone).Run()
+		configureGitUser(t, otherClone)
+		exec.Command("git", "-C", otherClone, "commit", "--allow-empty", "-m", "Remote B").Run()
+		exec.Command("git", "-C", otherClone, "push").Run()
+
+		// Local gets C
+		configureGitUser(t, localRepoPath)
+		exec.Command("git", "-C", localRepoPath, "commit", "--allow-empty", "-m", "Local C").Run()
+
+		// Fetch so Unpushed check works
+		exec.Command("git", "-C", localRepoPath, "fetch").Run()
+
+		master := "master"
+		config := Config{
+			Repositories: &[]Repository{
+				{ID: &repoID, URL: &remoteDir, Branch: &master},
+			},
+		}
+		configFile := filepath.Join(workDir, "repos.json")
+		data, _ := json.Marshal(config)
+		os.WriteFile(configFile, data, 0644)
+
+		cmd := exec.Command(binPath, "status", "-f", configFile)
+		cmd.Dir = workDir
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("status failed: %v %s", err, string(out))
+		}
+		output := string(out)
+
+		// Expect * (Yellow) and + (Green logic, but color might be yellow due to * precedence)
+		// Result string: "*+"
+		// Result color: Yellow (from *)
+		coloredStarPlus := "\033[33m*+\033[0m"
+
+		if !strings.Contains(output, coloredStarPlus) {
+             t.Errorf("Expected '*+' in yellow, got:\n%s", output)
 		}
 	})
 }
