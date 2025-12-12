@@ -2,7 +2,7 @@ module gitc
 
 go 1.24.3
 
-require github.com/olekukonko/tablewriter v0.0.5
+require github.com/olekukonko/tablewriter v1.1.2
 
 require (
 	github.com/clipperhouse/displaywidth v0.6.0 // indirect
