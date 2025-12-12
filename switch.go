@@ -80,7 +80,8 @@ func handleSwitch(args []string, opts GlobalOptions) {
 	}
 
 	// Filter repositories
-	repos := FilterRepositories(*config.Repositories, labels)
+	targetLabels := ParseLabels(labels)
+	repos := FilterRepositories(*config.Repositories, targetLabels)
 
 	var branchName string
 	var create bool

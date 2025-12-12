@@ -110,7 +110,8 @@ func handlePush(args []string, opts GlobalOptions) {
 	}
 
 	// Filter Repositories
-	repos := FilterRepositories(*config.Repositories, labels)
+	targetLabels := ParseLabels(labels)
+	repos := FilterRepositories(*config.Repositories, targetLabels)
 
 	// Output Phase
 	rows := CollectStatus(repos, parallel, opts.GitPath)

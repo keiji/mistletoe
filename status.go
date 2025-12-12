@@ -107,7 +107,8 @@ func handleStatus(args []string, opts GlobalOptions) {
 	}
 
 	// Filter
-	repos := FilterRepositories(*config.Repositories, labels)
+	targetLabels := ParseLabels(labels)
+	repos := FilterRepositories(*config.Repositories, targetLabels)
 
 	// Output Phase
 	rows := CollectStatus(repos, parallel, opts.GitPath)

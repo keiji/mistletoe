@@ -101,25 +101,33 @@ func loadConfig(configFile string) (*Config, error) {
 	return config, nil
 }
 
-// FilterRepositories filters repositories based on provided labels.
-// If labelsStr is empty, returns all repositories.
-// If labelsStr contains comma-separated labels, returns repositories that match at least one label.
-func FilterRepositories(repos []Repository, labelsStr string) []Repository {
+// ParseLabels parses a comma-separated string into a slice of labels.
+func ParseLabels(labelsStr string) []string {
+	var labels []string
 	if labelsStr == "" {
-		return repos
+		return labels
 	}
-
-	targets := strings.Split(labelsStr, ",")
-	targetMap := make(map[string]bool)
-	for _, t := range targets {
-		trimmed := strings.TrimSpace(t)
+	parts := strings.Split(labelsStr, ",")
+	for _, p := range parts {
+		trimmed := strings.TrimSpace(p)
 		if trimmed != "" {
-			targetMap[trimmed] = true
+			labels = append(labels, trimmed)
 		}
 	}
+	return labels
+}
 
-	if len(targetMap) == 0 {
+// FilterRepositories filters repositories based on provided labels.
+// If labels is empty, returns all repositories.
+// If labels is not empty, returns repositories that match at least one label.
+func FilterRepositories(repos []Repository, labels []string) []Repository {
+	if len(labels) == 0 {
 		return repos
+	}
+
+	targetMap := make(map[string]bool)
+	for _, l := range labels {
+		targetMap[l] = true
 	}
 
 	var filtered []Repository

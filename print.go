@@ -39,7 +39,8 @@ func handlePrint(args []string, opts GlobalOptions) {
 		os.Exit(1)
 	}
 
-	repos := FilterRepositories(*config.Repositories, labels)
+	targetLabels := ParseLabels(labels)
+	repos := FilterRepositories(*config.Repositories, targetLabels)
 
 	for _, repo := range repos {
 		for _, label := range repo.Labels {

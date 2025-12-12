@@ -155,7 +155,8 @@ func handleInit(args []string, opts GlobalOptions) {
 	}
 
 	// Filter Repositories
-	repos := FilterRepositories(*config.Repositories, labels)
+	targetLabels := ParseLabels(labels)
+	repos := FilterRepositories(*config.Repositories, targetLabels)
 
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, parallel)

@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"reflect"
 	"testing"
@@ -122,6 +123,29 @@ func TestLoadConfig(t *testing.T) {
 	}
 }
 
+func TestParseLabels(t *testing.T) {
+	tests := []struct {
+		input string
+		want  []string
+	}{
+		{"", nil},
+		{"a", []string{"a"}},
+		{"a,b", []string{"a", "b"}},
+		{" a , b ", []string{"a", "b"}},
+		{",,", nil},
+		{"a,,b", []string{"a", "b"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(fmt.Sprintf("Input:%q", tt.input), func(t *testing.T) {
+			got := ParseLabels(tt.input)
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("ParseLabels(%q) = %v, want %v", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestFilterRepositories(t *testing.T) {
 	repos := []Repository{
 		{ID: strPtr("repo1"), Labels: []string{"java", "server"}},
@@ -132,38 +156,38 @@ func TestFilterRepositories(t *testing.T) {
 
 	tests := []struct {
 		name   string
-		labels string
+		labels []string
 		want   []string // Expected IDs
 	}{
 		{
-			name:   "No filter",
-			labels: "",
+			name:   "No filter (nil)",
+			labels: nil,
+			want:   []string{"repo1", "repo2", "repo3", "repo4"},
+		},
+		{
+			name:   "No filter (empty)",
+			labels: []string{},
 			want:   []string{"repo1", "repo2", "repo3", "repo4"},
 		},
 		{
 			name:   "Single match",
-			labels: "kotlin",
+			labels: []string{"kotlin"},
 			want:   []string{"repo2"},
 		},
 		{
 			name:   "Multiple match (intersection)",
-			labels: "java",
+			labels: []string{"java"},
 			want:   []string{"repo1", "repo3"},
 		},
 		{
 			name:   "Multi-label filter",
-			labels: "server,client",
-			want:   []string{"repo1", "repo2", "repo3"}, // repo1(server), repo2(server), repo3(client)
+			labels: []string{"server", "client"},
+			want:   []string{"repo1", "repo2", "repo3"},
 		},
 		{
 			name:   "No match",
-			labels: "ruby",
+			labels: []string{"ruby"},
 			want:   []string{},
-		},
-		{
-			name:   "Empty labels in filter (comma)",
-			labels: ",,",
-			want:   []string{"repo1", "repo2", "repo3", "repo4"}, // logic says empty map -> return all
 		},
 	}
 
