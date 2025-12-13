@@ -137,7 +137,7 @@ mstl version
 
 The configuration file is a JSON file containing a list of repositories.
 
-**Example `mstl.json`:**
+**Example `repos.json`:**
 
 ```json
 {
