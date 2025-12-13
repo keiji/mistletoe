@@ -108,17 +108,14 @@ mstl freeze -f <output_file>
 **Options:**
 *   `-f, --file <path>`: Path for the output configuration file. **(Required)**
 
-### `print`
+### `help`
 
-Prints a simple list of configured repository URLs and their target branches.
+Shows usage information and the list of available commands.
 
 **Usage:**
 ```bash
-mstl print -f <config_file>
+mstl help
 ```
-
-**Options:**
-*   `-f, --file <path>`: Configuration file.
 
 ### `version`
 
