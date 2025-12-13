@@ -2,6 +2,16 @@
 
 `mstl` is a command-line tool for managing multiple Git repositories using a central JSON configuration file. It simplifies operations like cloning, switching branches, status checking, and syncing across multiple projects concurrently.
 
+## How to build
+
+This project requires **Go 1.24.3** or higher.
+
+To build the project, run:
+
+```bash
+go build -v ./...
+```
+
 ## Usage
 
 ```bash
