@@ -43,7 +43,7 @@ func handleVersion(opts GlobalOptions) {
 	fmt.Printf("mstl version %s\n", v)
 
 	// In handleVersion, we check existence again or assume the one passed in GlobalOptions
-	// If the startup validation failed for print/version, opts.GitPath is still set to what was attempted.
+	// If the startup validation failed for help/version, opts.GitPath is still set to what was attempted.
 
 	if err := validateGit(opts.GitPath); err != nil {
 		fmt.Println("Git binary not found")
@@ -93,8 +93,8 @@ func main() {
 	gitPath := getGitPath()
 	gitErr := validateGit(gitPath)
 
-	// If git is not found/valid, we error out unless the command is print or version (or default/empty which is print)
-	isPermissive := subcmdName == "print" || subcmdName == "version" || subcmdName == ""
+	// If git is not found/valid, we error out unless the command is help or version (or default/empty which is help)
+	isPermissive := subcmdName == "help" || subcmdName == "version" || subcmdName == ""
 
 	if gitErr != nil && !isPermissive {
 		fmt.Printf("Error: Git is not callable at '%s'. (%v)\n", gitPath, gitErr)
@@ -118,13 +118,13 @@ func main() {
 		handleSync(subcmdArgs, opts)
 	case "push":
 		handlePush(subcmdArgs, opts)
-	case "print":
-		handlePrint(subcmdArgs, opts)
+	case "help":
+		handleHelp(subcmdArgs, opts)
 	case "version":
 		handleVersion(opts)
 	case "":
-		// Default to print if no command provided
-		handlePrint(subcmdArgs, opts)
+		// Default to help if no command provided
+		handleHelp(subcmdArgs, opts)
 	default:
 		fmt.Printf("Unknown subcommand: %s.\n", subcmdName)
 		os.Exit(1)
