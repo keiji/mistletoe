@@ -10,17 +10,20 @@ import (
 
 func handleSync(args []string, opts GlobalOptions) {
 	var fShort, fLong string
+	var pVal, pValShort int
 
 	fs := flag.NewFlagSet("sync", flag.ExitOnError)
 	fs.StringVar(&fLong, "file", "", "configuration file")
 	fs.StringVar(&fShort, "f", "", "configuration file (short)")
+	fs.IntVar(&pVal, "parallel", DefaultParallel, "number of parallel processes")
+	fs.IntVar(&pValShort, "p", DefaultParallel, "number of parallel processes (short)")
 
 	if err := ParseFlagsFlexible(fs, args); err != nil {
 		fmt.Println("Error parsing flags:", err)
 		os.Exit(1)
 	}
 
-	configFile, _, err := ResolveCommonValues(fLong, fShort, opts.ConfigFile, DefaultParallel, DefaultParallel)
+	configFile, parallel, err := ResolveCommonValues(fLong, fShort, opts.ConfigFile, pVal, pValShort)
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
 		os.Exit(1)
@@ -48,8 +51,7 @@ func handleSync(args []string, opts GlobalOptions) {
 	}
 
 	// Status Phase
-	// Using default parallel (1) as sync doesn't specify parallelism
-	rows := CollectStatus(config, 1, opts.GitPath)
+	rows := CollectStatus(config, parallel, opts.GitPath)
 
 	spinner.Stop()
 

@@ -44,8 +44,10 @@ func TestHandleSync(t *testing.T) {
 	os.WriteFile(configPath, data, 0644)
 
 	// Helper to run sync with input
-	runSync := func(input string) (string, error) {
-		cmd := exec.Command(binPath, "sync", "--file", configPath)
+	runSync := func(input string, extraArgs ...string) (string, error) {
+		args := []string{"sync", "--file", configPath}
+		args = append(args, extraArgs...)
+		cmd := exec.Command(binPath, args...)
 		if input != "" {
 			cmd.Stdin = strings.NewReader(input + "\n")
 		}
@@ -65,6 +67,18 @@ func TestHandleSync(t *testing.T) {
 		}
 		if !strings.Contains(out, fmt.Sprintf("Syncing %s...", repo2)) {
 			t.Errorf("Expected Syncing repo2 output. Got: %s", out)
+		}
+	})
+
+	// Scenario 1b: Clean Sync with Parallel (Check flag parsing)
+	t.Run("CleanSyncParallel", func(t *testing.T) {
+		out, err := runSync("", "-p", "2")
+		if err != nil {
+			t.Fatalf("sync failed: %v, out: %s", err, out)
+		}
+		// Output should be similar
+		if !strings.Contains(out, fmt.Sprintf("Syncing %s...", repo1)) {
+			t.Errorf("Expected Syncing repo1 output. Got: %s", out)
 		}
 	})
 
