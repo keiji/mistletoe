@@ -5,13 +5,8 @@
 ## Usage
 
 ```bash
-mstl [global options] <command> [command options] [arguments]
+mstl <command> [options] [arguments]
 ```
-
-## Global Options
-
-*   `-f, --file <path>`: Specifies the path to the configuration file. This is required for most commands unless specified as a subcommand option.
-*   `-v, --version`: Prints the version information and exits.
 
 ## Commands
 
@@ -21,11 +16,11 @@ Initializes repositories defined in the configuration file. It clones repositori
 
 **Usage:**
 ```bash
-mstl init [options]
+mstl init -f <config_file> [options]
 ```
 
 **Options:**
-*   `-f, --file <path>`: Configuration file (overrides global option).
+*   `-f, --file <path>`: Configuration file.
 *   `-p, --parallel <int>`: Number of parallel processes to use (default: 1).
 *   `--depth <int>`: Create a shallow clone with a history truncated to the specified number of commits.
 
@@ -35,11 +30,11 @@ Displays a status table for all configured repositories, showing the current bra
 
 **Usage:**
 ```bash
-mstl status [options]
+mstl status -f <config_file> [options]
 ```
 
 **Options:**
-*   `-f, --file <path>`: Configuration file (overrides global option).
+*   `-f, --file <path>`: Configuration file.
 *   `-p, --parallel <int>`: Number of parallel processes (default: 1).
 
 **Status Indicators:**
@@ -61,11 +56,11 @@ Checks for unpushed commits in all repositories and pushes them to the remote `o
 
 **Usage:**
 ```bash
-mstl push [options]
+mstl push -f <config_file> [options]
 ```
 
 **Options:**
-*   `-f, --file <path>`: Configuration file (overrides global option).
+*   `-f, --file <path>`: Configuration file.
 *   `-p, --parallel <int>`: Number of parallel processes (default: 1).
 
 ### `sync`
@@ -76,11 +71,11 @@ Updates repositories by pulling changes from the remote `origin`.
 
 **Usage:**
 ```bash
-mstl sync [options]
+mstl sync -f <config_file> [options]
 ```
 
 **Options:**
-*   `-f, --file <path>`: Configuration file (overrides global option).
+*   `-f, --file <path>`: Configuration file.
 *   `-p, --parallel <int>`: Number of parallel processes (default: 1).
 
 ### `switch`
@@ -90,14 +85,14 @@ Switches the active branch for all configured repositories. It verifies that the
 **Usage:**
 ```bash
 # Switch to an existing branch
-mstl switch [options] <branch_name>
+mstl switch -f <config_file> [options] <branch_name>
 
 # Create and switch to a new branch
-mstl switch [options] -c <branch_name>
+mstl switch -f <config_file> -c <branch_name>
 ```
 
 **Options:**
-*   `-f, --file <path>`: Configuration file (overrides global option).
+*   `-f, --file <path>`: Configuration file.
 *   `-p, --parallel <int>`: Number of parallel processes (default: 1).
 *   `-c, --create <branch_name>`: Create a new branch with the specified name and switch to it.
 
@@ -119,10 +114,11 @@ Prints a simple list of configured repository URLs and their target branches.
 
 **Usage:**
 ```bash
-mstl -f <config_file> print
+mstl print -f <config_file>
 ```
 
-*Note: The `print` command relies on the global `-f` flag.*
+**Options:**
+*   `-f, --file <path>`: Configuration file.
 
 ### `version`
 
