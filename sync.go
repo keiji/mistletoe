@@ -56,22 +56,13 @@ func handleSync(args []string, opts GlobalOptions) {
 	spinner.Stop()
 
 	// Analyze Status
-	hasConflict := false
 	needsPull := false
 
 	for _, row := range rows {
-		if row.HasConflict {
-			hasConflict = true
-		}
-		if row.IsPullable {
+		// Only consider pullable if there is no conflict
+		if row.IsPullable && !row.HasConflict {
 			needsPull = true
 		}
-	}
-
-	if hasConflict {
-		RenderStatusTable(rows)
-		fmt.Println("Conflicts detected. Aborting sync.")
-		os.Exit(1)
 	}
 
 	argsPull := []string{"pull"}
@@ -103,6 +94,11 @@ func handleSync(args []string, opts GlobalOptions) {
 
 	// Execute Pull
 	for _, row := range rows {
+		if row.HasConflict {
+			fmt.Printf("Skipping %s due to detected conflict.\n", row.Repo)
+			continue
+		}
+
 		fmt.Printf("Syncing %s...\n", row.Repo)
 		if err := RunGitInteractive(row.RepoDir, opts.GitPath, argsPull...); err != nil {
 			fmt.Printf("Error pulling %s: %v\n", row.Repo, err)
