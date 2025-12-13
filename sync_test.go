@@ -132,12 +132,18 @@ func TestHandleSync(t *testing.T) {
 		exec.Command("git", "-C", repo1, "commit", "-m", "Conflict B").Run()
 
 		// Run sync
-		out, err := runSync("merge") // Input shouldn't matter as it aborts before asking
-		if err == nil {
-			t.Fatal("expected error due to conflict")
+		// Expect success (no abort), repo1 skipped, repo2 synced (it is clean behind)
+		out, err := runSync("merge")
+		if err != nil {
+			t.Fatalf("sync failed: %v, out: %s", err, out)
 		}
-		if !strings.Contains(out, "Conflicts detected. Aborting sync.") {
-			t.Error("Expected conflict message")
+
+		if !strings.Contains(out, fmt.Sprintf("Skipping %s due to detected conflict.", repo1)) {
+			t.Errorf("Expected skipping message for repo1. Got: %s", out)
+		}
+
+		if !strings.Contains(out, fmt.Sprintf("Syncing %s...", repo2)) {
+			t.Errorf("Expected Syncing message for repo2. Got: %s", out)
 		}
 	})
 }
