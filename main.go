@@ -2,7 +2,6 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -21,47 +20,19 @@ const (
 var commitHash string
 
 type GlobalOptions struct {
-	ConfigFile string
-	GitPath    string
+	GitPath string
 }
 
-func parseArgs(args []string) (string, string, []string, error) {
-	var configFile string
-	var subcmdArgs []string
-	parsingGlobalOptions := true
-
+func parseArgs(args []string) (string, []string, error) {
 	// Skip the first argument as it is the program name
-	for i := 1; i < len(args); i++ {
-		arg := args[i]
-
-		if parsingGlobalOptions {
-			if arg == "--version" || arg == "-v" {
-				return "", "version", nil, nil
-			} else if arg == "--file" || arg == "-f" {
-				if i+1 < len(args) {
-					configFile = args[i+1]
-					i++
-				} else {
-					return "", "", nil, errors.New("Error: --file argument missing")
-				}
-				continue
-			} else if strings.HasPrefix(arg, "--file=") {
-				configFile = strings.TrimPrefix(arg, "--file=")
-				continue
-			} else if strings.HasPrefix(arg, "-f=") {
-				configFile = strings.TrimPrefix(arg, "-f=")
-				continue
-			}
-		}
-
-		parsingGlobalOptions = false
-		subcmdArgs = append(subcmdArgs, arg)
+	if len(args) < 2 {
+		return "", nil, nil
 	}
 
-	if len(subcmdArgs) == 0 {
-		return configFile, "", nil, nil
-	}
-	return configFile, subcmdArgs[0], subcmdArgs[1:], nil
+	subcmdName := args[1]
+	subcmdArgs := args[2:]
+
+	return subcmdName, subcmdArgs, nil
 }
 
 func handleVersion(opts GlobalOptions) {
@@ -113,7 +84,7 @@ func validateGit(gitPath string) error {
 }
 
 func main() {
-	configFile, subcmdName, subcmdArgs, err := parseArgs(os.Args)
+	subcmdName, subcmdArgs, err := parseArgs(os.Args)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -131,8 +102,7 @@ func main() {
 	}
 
 	opts := GlobalOptions{
-		ConfigFile: configFile,
-		GitPath:    gitPath,
+		GitPath: gitPath,
 	}
 
 	switch subcmdName {
