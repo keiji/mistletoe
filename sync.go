@@ -70,15 +70,15 @@ func handleSync(args []string, opts GlobalOptions) {
 
 	if hasConflict {
 		RenderStatusTable(rows)
-		fmt.Println("There are repositories that need to be pulled, but the process is aborted because there are conflicts.")
+		fmt.Println("Conflicts detected. Aborting sync.")
 		os.Exit(1)
 	}
 
 	argsPull := []string{"pull"}
 
 	if needsPull {
-		fmt.Println("There are repositories that need to be pulled.")
-		fmt.Print("Do you want to merge, rebase, or abort? [merge/rebase/abort]: ")
+		fmt.Println("Updates available.")
+		fmt.Print("Merge, rebase, or abort? [merge/rebase/abort]: ")
 
 		scanner := bufio.NewScanner(os.Stdin)
 		if scanner.Scan() {

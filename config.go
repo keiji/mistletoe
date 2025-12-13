@@ -77,7 +77,7 @@ func getRepoDir(repo Repository) string {
 
 func loadConfig(configFile string) (*Config, error) {
 	if configFile == "" {
-		return nil, errors.New("Error: Please specify a configuration file using --file or -f")
+		return nil, errors.New("Error: Specify configuration file using --file or -f.")
 	}
 
 	data, err := os.ReadFile(configFile)
@@ -85,7 +85,7 @@ func loadConfig(configFile string) (*Config, error) {
 		if os.IsNotExist(err) {
 			return nil, ErrConfigFileNotFound
 		}
-		return nil, fmt.Errorf("Error reading file: %v", err)
+		return nil, fmt.Errorf("Error reading file: %v.", err)
 	}
 
 	config, err := ParseConfig(data)
@@ -94,7 +94,7 @@ func loadConfig(configFile string) (*Config, error) {
 	}
 
 	if err := validateRepositories(*config.Repositories); err != nil {
-		return nil, fmt.Errorf("Error validating configuration: %v", err)
+		return nil, fmt.Errorf("Error validating configuration: %v.", err)
 	}
 
 	return config, nil

@@ -49,10 +49,10 @@ func ResolveCommonValues(fLong, fShort string, pVal, pValShort int) (string, int
 	}
 
 	if parallel < MinParallel {
-		return "", 0, fmt.Errorf("parallel must be at least %d", MinParallel)
+		return "", 0, fmt.Errorf("Parallel must be at least %d.", MinParallel)
 	}
 	if parallel > MaxParallel {
-		return "", 0, fmt.Errorf("parallel must be at most %d", MaxParallel)
+		return "", 0, fmt.Errorf("Parallel must be at most %d.", MaxParallel)
 	}
 
 	// Config File

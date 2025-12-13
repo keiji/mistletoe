@@ -59,13 +59,13 @@ func handlePush(args []string, opts GlobalOptions) {
 
 	for _, row := range rows {
 		if row.HasConflict {
-			fail("Cannot push because of conflicts.\n")
+			fail("Conflicts detected. Cannot push.\n")
 		}
 	}
 
 	for _, row := range rows {
 		if row.IsPullable {
-			fail("Please sync first.\n")
+			fail("Sync required.\n")
 		}
 	}
 
@@ -78,11 +78,11 @@ func handlePush(args []string, opts GlobalOptions) {
 	}
 
 	if len(pushable) == 0 {
-		fmt.Println("There are no repositories to push.")
+		fmt.Println("No repositories to push.")
 		return
 	}
 
-	fmt.Print("Do you want to push? (yes/no): ")
+	fmt.Print("Push updates? (yes/no): ")
 	reader := bufio.NewReader(os.Stdin)
 	input, _ := reader.ReadString('\n')
 	fmt.Println()
@@ -93,7 +93,7 @@ func handlePush(args []string, opts GlobalOptions) {
 			fmt.Printf("Pushing %s (branch: %s)...\n", row.Repo, row.BranchName)
 			// git push origin [branchname]
 			if err := RunGitInteractive(row.RepoDir, opts.GitPath, "push", "origin", row.BranchName); err != nil {
-				fmt.Printf("Failed to push %s: %v\n", row.Repo, err)
+				fmt.Printf("Failed to push %s: %v.\n", row.Repo, err)
 			}
 		}
 	}

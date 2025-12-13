@@ -51,7 +51,7 @@ func ParseFlagsFlexible(fs *flag.FlagSet, args []string) error {
 						i++
 					} else {
 						// Flag requires argument but none found
-						return errors.New("flag needs an argument: " + arg)
+						return errors.New("Flag needs an argument: " + arg)
 					}
 				}
 				continue

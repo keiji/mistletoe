@@ -154,7 +154,7 @@ func handleInit(args []string, opts GlobalOptions) {
 			if info, err := os.Stat(targetDir); err == nil && info.IsDir() {
 				gitDir := filepath.Join(targetDir, ".git")
 				if _, err := os.Stat(gitDir); err == nil {
-					fmt.Printf("Repository %s already exists. Skipping clone.\n", targetDir)
+					fmt.Printf("Repository %s exists. Skipping clone.\n", targetDir)
 					shouldClone = false
 				}
 			}
@@ -188,7 +188,7 @@ func handleInit(args []string, opts GlobalOptions) {
 				// "チェックアウト後、各要素についてbranchで示されたブランチに切り替える。"
 				fmt.Printf("Switching %s to branch %s...\n", targetDir, *repo.Branch)
 				if err := RunGitInteractive(targetDir, opts.GitPath, "checkout", *repo.Branch); err != nil {
-					fmt.Printf("Error switching branch for %s: %v\n", targetDir, err)
+					fmt.Printf("Error switching branch for %s: %v.\n", targetDir, err)
 				}
 			}
 		}(repo)

@@ -35,8 +35,8 @@ func TestPushCmd(t *testing.T) {
 			t.Fatalf("push command failed: %v", err)
 		}
 		output := string(out)
-		if !strings.Contains(output, "There are no repositories to push") {
-			t.Errorf("Expected 'There are no repositories to push', got: %s", output)
+		if !strings.Contains(output, "No repositories to push.") {
+			t.Errorf("Expected 'No repositories to push.', got: %s", output)
 		}
 	})
 
