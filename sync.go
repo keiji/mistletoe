@@ -83,7 +83,7 @@ func handleSync(args []string, opts GlobalOptions) {
 			input := strings.ToLower(strings.TrimSpace(scanner.Text()))
 			switch input {
 			case "merge", "m":
-				// Default argsPull is good
+				argsPull = append(argsPull, "--no-rebase")
 			case "rebase", "r":
 				argsPull = append(argsPull, "--rebase")
 			case "abort", "a", "q":
