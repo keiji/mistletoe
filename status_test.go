@@ -282,4 +282,60 @@ func TestStatusCmd(t *testing.T) {
              t.Errorf("Expected '><' (Green then Yellow), got:\n%s", output)
 		}
 	})
+
+	t.Run("Status Success - Pullable with Conflict", func(t *testing.T) {
+		workDir := t.TempDir()
+		remoteDir, _ := setupRemoteAndContent(t, 1) // Remote commit A (file-0.txt)
+
+		// Setup local
+		repoID := "conflict-repo"
+		localRepoPath := filepath.Join(workDir, repoID)
+		exec.Command("git", "clone", remoteDir, localRepoPath).Run()
+
+		// Diverge and Conflict
+		// 1. Remote gets modification to file-0.txt
+		otherClone := t.TempDir()
+		exec.Command("git", "clone", remoteDir, otherClone).Run()
+		configureGitUser(t, otherClone)
+		file := filepath.Join(otherClone, "file-0.txt")
+		os.WriteFile(file, []byte("Remote Change"), 0644)
+		exec.Command("git", "-C", otherClone, "commit", "-am", "Remote Change").Run()
+		exec.Command("git", "-C", otherClone, "push").Run()
+
+		// 2. Local gets modification to file-0.txt (Conflict)
+		configureGitUser(t, localRepoPath)
+		fileLocal := filepath.Join(localRepoPath, "file-0.txt")
+		os.WriteFile(fileLocal, []byte("Local Change"), 0644)
+		exec.Command("git", "-C", localRepoPath, "commit", "-am", "Local Change").Run()
+
+		// Config
+		master := "master"
+		config := Config{
+			Repositories: &[]Repository{
+				{ID: &repoID, URL: &remoteDir, Branch: &master},
+			},
+		}
+		configFile := filepath.Join(workDir, "repos.json")
+		data, _ := json.Marshal(config)
+		os.WriteFile(configFile, data, 0644)
+
+		cmd := exec.Command(binPath, "status", "-f", configFile)
+		cmd.Dir = workDir
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("status failed: %v %s", err, string(out))
+		}
+		output := string(out)
+
+		// Expect x (Red) and > (Green)
+		coloredConflict := "\033[31mx\033[0m"
+		coloredUnpushed := "\033[32m>\033[0m"
+
+		if !strings.Contains(output, coloredConflict) {
+			t.Errorf("Expected 'x' (Red), got:\n%s", output)
+		}
+		if !strings.Contains(output, coloredUnpushed) {
+			t.Errorf("Expected '>' (Green), got:\n%s", output)
+		}
+	})
 }
