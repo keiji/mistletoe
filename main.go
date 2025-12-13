@@ -144,6 +144,8 @@ func main() {
 		handleSwitch(subcmdArgs, opts)
 	case "status":
 		handleStatus(subcmdArgs, opts)
+	case "sync":
+		handleSync(subcmdArgs, opts)
 	case "push":
 		handlePush(subcmdArgs, opts)
 	case "print":
