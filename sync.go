@@ -57,38 +57,46 @@ func handleSync(args []string, opts GlobalOptions) {
 
 	// Analyze Status
 	needsPull := false
+	needsStrategy := false
 
 	for _, row := range rows {
 		// Only consider pullable if there is no conflict
 		if row.IsPullable {
 			needsPull = true
+			if row.HasUnpushed {
+				needsStrategy = true
+			}
 		}
 	}
 
 	argsPull := []string{"pull"}
 
 	if needsPull {
-		fmt.Println("Updates available.")
-		fmt.Print("Merge, rebase, or abort? [merge/rebase/abort]: ")
+		if needsStrategy {
+			fmt.Println("Updates available.")
+			fmt.Print("Merge, rebase, or abort? [merge/rebase/abort]: ")
 
-		scanner := bufio.NewScanner(os.Stdin)
-		if scanner.Scan() {
-			input := strings.ToLower(strings.TrimSpace(scanner.Text()))
-			switch input {
-			case "merge", "m":
-				argsPull = append(argsPull, "--no-rebase")
-			case "rebase", "r":
-				argsPull = append(argsPull, "--rebase")
-			case "abort", "a", "q":
-				fmt.Println("Aborted.")
-				os.Exit(0)
-			default:
-				fmt.Println("Invalid input. Aborted.")
+			scanner := bufio.NewScanner(os.Stdin)
+			if scanner.Scan() {
+				input := strings.ToLower(strings.TrimSpace(scanner.Text()))
+				switch input {
+				case "merge", "m":
+					argsPull = append(argsPull, "--no-rebase")
+				case "rebase", "r":
+					argsPull = append(argsPull, "--rebase")
+				case "abort", "a", "q":
+					fmt.Println("Aborted.")
+					os.Exit(0)
+				default:
+					fmt.Println("Invalid input. Aborted.")
+					os.Exit(1)
+				}
+			} else {
+				// EOF or error
 				os.Exit(1)
 			}
 		} else {
-			// EOF or error
-			os.Exit(1)
+			fmt.Println("Updates available. Pulling...")
 		}
 	}
 
