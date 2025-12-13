@@ -102,6 +102,11 @@ func handleSync(args []string, opts GlobalOptions) {
 
 	// Execute Pull
 	for _, row := range rows {
+		if row.RemoteRev == "" {
+			fmt.Printf("Skipping %s: Remote branch not found.\n", row.Repo)
+			continue
+		}
+
 		fmt.Printf("Syncing %s...\n", row.Repo)
 		if err := RunGitInteractive(row.RepoDir, opts.GitPath, argsPull...); err != nil {
 			fmt.Printf("Error pulling %s: %v\n", row.Repo, err)
