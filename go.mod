@@ -1,4 +1,4 @@
-module gitc
+module mistletoe
 
 go 1.24.3
 

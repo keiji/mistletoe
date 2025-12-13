@@ -14,16 +14,16 @@ func strPtr(s string) *string {
 	return &s
 }
 
-// buildGitc builds the gitc binary and returns its path.
-func buildGitc(t *testing.T) string {
-	binPath := filepath.Join(t.TempDir(), "gitc")
+// buildMstl builds the mstl binary and returns its path.
+func buildMstl(t *testing.T) string {
+	binPath := filepath.Join(t.TempDir(), "mstl")
 	if runtime.GOOS == "windows" {
 		binPath += ".exe"
 	}
 	// Build from current directory
 	buildCmd := exec.Command("go", "build", "-o", binPath, ".")
 	if err := buildCmd.Run(); err != nil {
-		t.Fatalf("failed to build gitc: %v", err)
+		t.Fatalf("failed to build mstl: %v", err)
 	}
 	return binPath
 }

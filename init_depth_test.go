@@ -28,8 +28,8 @@ func checkCommitCount(t *testing.T, dir string, expected int) {
 // we will integration test it by building the binary and running it.
 // This is cleaner than refactoring handleInit to be testable in the short term.
 func TestHandleInitDepth(t *testing.T) {
-	// 1. Build gitc binary
-	binPath := buildGitc(t)
+	// 1. Build mstl binary
+	binPath := buildMstl(t)
 
 	// 2. Setup Remote Repo
 	repoURL, _ := setupRemoteAndContent(t, 5)
@@ -49,7 +49,7 @@ func TestHandleInitDepth(t *testing.T) {
 		t.Fatalf("failed to write config file: %v", err)
 	}
 
-	// 4. Run gitc init --depth 2
+	// 4. Run mstl init --depth 2
 	workDir := t.TempDir()
 	cmd := exec.Command(binPath, "init", "--file", configFile, "--depth", "2")
 	cmd.Dir = workDir
@@ -57,7 +57,7 @@ func TestHandleInitDepth(t *testing.T) {
 	cmd.Stderr = os.Stderr
 
 	if err := cmd.Run(); err != nil {
-		t.Fatalf("gitc init failed: %v", err)
+		t.Fatalf("mstl init failed: %v", err)
 	}
 
 	// 5. Verify Depth

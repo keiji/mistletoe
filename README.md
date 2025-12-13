@@ -1,11 +1,11 @@
-# gitc
+# mistletoe
 
-`gitc` is a command-line tool for managing multiple Git repositories using a central JSON configuration file. It simplifies operations like cloning, switching branches, status checking, and syncing across multiple projects concurrently.
+`mstl` is a command-line tool for managing multiple Git repositories using a central JSON configuration file. It simplifies operations like cloning, switching branches, status checking, and syncing across multiple projects concurrently.
 
 ## Usage
 
 ```bash
-gitc [global options] <command> [command options] [arguments]
+mstl [global options] <command> [command options] [arguments]
 ```
 
 ## Global Options
@@ -21,7 +21,7 @@ Initializes repositories defined in the configuration file. It clones repositori
 
 **Usage:**
 ```bash
-gitc init [options]
+mstl init [options]
 ```
 
 **Options:**
@@ -35,7 +35,7 @@ Displays a status table for all configured repositories, showing the current bra
 
 **Usage:**
 ```bash
-gitc status [options]
+mstl status [options]
 ```
 
 **Options:**
@@ -61,7 +61,7 @@ Checks for unpushed commits in all repositories and pushes them to the remote `o
 
 **Usage:**
 ```bash
-gitc push [options]
+mstl push [options]
 ```
 
 **Options:**
@@ -76,7 +76,7 @@ Updates repositories by pulling changes from the remote `origin`.
 
 **Usage:**
 ```bash
-gitc sync [options]
+mstl sync [options]
 ```
 
 **Options:**
@@ -90,10 +90,10 @@ Switches the active branch for all configured repositories. It verifies that the
 **Usage:**
 ```bash
 # Switch to an existing branch
-gitc switch [options] <branch_name>
+mstl switch [options] <branch_name>
 
 # Create and switch to a new branch
-gitc switch [options] -c <branch_name>
+mstl switch [options] -c <branch_name>
 ```
 
 **Options:**
@@ -107,7 +107,7 @@ Scans the current directory for subdirectories that are Git repositories and gen
 
 **Usage:**
 ```bash
-gitc freeze -f <output_file>
+mstl freeze -f <output_file>
 ```
 
 **Options:**
@@ -119,25 +119,25 @@ Prints a simple list of configured repository URLs and their target branches.
 
 **Usage:**
 ```bash
-gitc -f <config_file> print
+mstl -f <config_file> print
 ```
 
 *Note: The `print` command relies on the global `-f` flag.*
 
 ### `version`
 
-Prints the version of `gitc` and the path to the git executable being used.
+Prints the version of `mstl` and the path to the git executable being used.
 
 **Usage:**
 ```bash
-gitc version
+mstl version
 ```
 
 ## Configuration File Format
 
 The configuration file is a JSON file containing a list of repositories.
 
-**Example `gitc.json`:**
+**Example `mstl.json`:**
 
 ```json
 {

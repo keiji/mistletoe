@@ -11,7 +11,7 @@ import (
 
 func TestGitExecPath(t *testing.T) {
 	// Build the binary first
-	exe := buildGitc(t)
+	exe := buildMstl(t)
 
 	// 1. Test Valid GIT_EXEC_PATH
 	t.Run("Valid GIT_EXEC_PATH", func(t *testing.T) {
@@ -41,8 +41,8 @@ func TestGitExecPath(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to run version with valid GIT_EXEC_PATH: %v, out: %s", err, out)
 		}
-		if !bytes.Contains(out, []byte("gitc version")) {
-			t.Errorf("Expected output to contain 'gitc version', got: %s", out)
+		if !bytes.Contains(out, []byte("mstl version")) {
+			t.Errorf("Expected output to contain 'mstl version', got: %s", out)
 		}
 		// The output should show the path we resolved.
 		// Since we used real git, it should work.

@@ -1,4 +1,4 @@
-// Package main is the entry point for the gitc tool.
+// Package main is the entry point for the mstl tool.
 package main
 
 import (
@@ -69,7 +69,7 @@ func handleVersion(opts GlobalOptions) {
 	if commitHash != "" {
 		v = fmt.Sprintf("%s-%s", appVersion, commitHash)
 	}
-	fmt.Printf("gitc version %s\n", v)
+	fmt.Printf("mstl version %s\n", v)
 
 	// In handleVersion, we check existence again or assume the one passed in GlobalOptions
 	// If the startup validation failed for print/version, opts.GitPath is still set to what was attempted.

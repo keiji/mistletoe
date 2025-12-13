@@ -42,17 +42,17 @@ func setupRepo(t *testing.T, path string) {
 
 func TestHandleSwitch(t *testing.T) {
 	// Create a temporary directory for the test
-	tmpDir, err := os.MkdirTemp("", "gitc-switch-test")
+	tmpDir, err := os.MkdirTemp("", "mstl-switch-test")
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
 
-	// Build the gitc binary to test end-to-end (simulating integration test)
+	// Build the mstl binary to test end-to-end (simulating integration test)
 	// We need to build it because handleSwitch calls os.Exit on error, which kills the test runner.
-	binPath := buildGitc(t)
+	binPath := buildMstl(t)
 
-	// Change to tmpDir so that gitc operates relatively if needed (though we use absolute paths in config)
+	// Change to tmpDir so that mstl operates relatively if needed (though we use absolute paths in config)
 	cwd, _ := os.Getwd()
 	defer func() {
 		if err := os.Chdir(cwd); err != nil {
@@ -70,7 +70,7 @@ func TestHandleSwitch(t *testing.T) {
 	setupRepo(t, repo2)
 
 	// Create a config file
-	configPath := filepath.Join(tmpDir, "gitc.json")
+	configPath := filepath.Join(tmpDir, "mstl.json")
 	config := Config{
 		Repositories: &[]Repository{
 			{URL: strPtr("repo1"), ID: &repo1}, // Using local path as ID to force directory name
@@ -82,9 +82,9 @@ func TestHandleSwitch(t *testing.T) {
 		t.Fatalf("failed to write config: %v", err)
 	}
 
-	// Helper to run gitc
+	// Helper to run mstl
 	// Returns output and error
-	runGitc := func(args ...string) (string, error) {
+	runMstl := func(args ...string) (string, error) {
 		// Default to including --file configPath unless explicitly overridden in args?
 		// But args parsing is flexible now. We can just prepend it if not present.
 		// For simplicity, let's just append it always, assuming args doesn't conflict.
@@ -100,7 +100,7 @@ func TestHandleSwitch(t *testing.T) {
 	// Scenario 1: Switch to non-existent branch (fail)
 	// args: switch feature-branch --file ...
 	t.Run("Switch NonExistent Strict", func(t *testing.T) {
-		_, err := runGitc("switch", "feature-branch", "--file", configPath)
+		_, err := runMstl("switch", "feature-branch", "--file", configPath)
 		if err == nil {
 			t.Fatal("expected error for non-existent branch in strict mode, but got nil")
 		}
@@ -109,7 +109,7 @@ func TestHandleSwitch(t *testing.T) {
 	// Scenario 2: Create branch (success)
 	// args: switch -c feature-branch --file ...
 	t.Run("Switch Create Success", func(t *testing.T) {
-		if _, err := runGitc("switch", "-c", "feature-branch", "--file", configPath); err != nil {
+		if _, err := runMstl("switch", "-c", "feature-branch", "--file", configPath); err != nil {
 			t.Fatalf("failed to create branch: %v", err)
 		}
 		// Verify
@@ -120,7 +120,7 @@ func TestHandleSwitch(t *testing.T) {
 	// Scenario 3: Flexible ordering
 	// args: switch --file ... -c feature-branch-2
 	t.Run("Switch Flexible Ordering", func(t *testing.T) {
-		if _, err := runGitc("switch", "--file", configPath, "-c", "feature-branch-2"); err != nil {
+		if _, err := runMstl("switch", "--file", configPath, "-c", "feature-branch-2"); err != nil {
 			t.Fatalf("failed to create branch with flexible ordering: %v", err)
 		}
 		verifyBranch(t, repo1, "feature-branch-2")
@@ -129,7 +129,7 @@ func TestHandleSwitch(t *testing.T) {
 
 	// Scenario 4: Error - switch branch -c (Ambiguous / Invalid flag usage)
 	t.Run("Switch Invalid Flag Position", func(t *testing.T) {
-		out, err := runGitc("switch", "abranch", "-c", "--file", configPath)
+		out, err := runMstl("switch", "abranch", "-c", "--file", configPath)
 		if err == nil {
 			t.Fatal("expected error for 'switch abranch -c', got success")
 		}
@@ -155,7 +155,7 @@ func TestHandleSwitch(t *testing.T) {
 
 			// Test "switch abranch -c" assuming config loaded or fail early?
 			// Let's try the isolated case where -c is at the very end.
-			_, err := runGitc("switch", "--file", configPath, "abranch", "-c")
+			_, err := runMstl("switch", "--file", configPath, "abranch", "-c")
 			if err == nil {
 				t.Fatal("expected error for flag at end")
 			}
@@ -170,7 +170,7 @@ func TestHandleSwitch(t *testing.T) {
 
 	// Scenario 5: Error - switch -c branch extra
 	t.Run("Switch Extra Args", func(t *testing.T) {
-		out, err := runGitc("switch", "-c", "branch3", "extra", "--file", configPath)
+		out, err := runMstl("switch", "-c", "branch3", "extra", "--file", configPath)
 		if err == nil {
 			t.Fatal("expected error for extra args")
 		}
@@ -185,7 +185,7 @@ func TestHandleSwitch(t *testing.T) {
 	// result: createBranchName=branch2, args=[branch].
 	// Error: Unexpected argument: branch.
 	t.Run("Switch Ambiguous Mixed", func(t *testing.T) {
-		out, err := runGitc("switch", "branchA", "-c", "branchB", "--file", configPath)
+		out, err := runMstl("switch", "branchA", "-c", "branchB", "--file", configPath)
 		if err == nil {
 			t.Fatal("expected error for ambiguous mixed args")
 		}
