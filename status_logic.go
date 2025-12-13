@@ -28,6 +28,7 @@ type StatusRow struct {
 	BranchName     string
 	HasUnpushed    bool
 	IsPullable     bool
+	HasConflict    bool
 	RepoDir        string
 }
 
@@ -189,11 +190,29 @@ func getRepoStatus(repo Repository, gitPath string) *StatusRow {
 	// Status Logic
 	hasUnpushed := false
 	isPullable := false
+	hasConflict := false
 
 	if remoteHeadFull != "" && localHeadFull != "" {
+		// Check if we have the remote object locally
+		_, err := RunGit(targetDir, gitPath, "cat-file", "-e", remoteHeadFull)
+		objectMissing := (err != nil)
+
+		if objectMissing {
+			// Fetch to ensure we can calculate status accurately
+			_, err := RunGit(targetDir, gitPath, "fetch", "origin", branchName)
+			if err == nil {
+				// Check if object exists now
+				_, err = RunGit(targetDir, gitPath, "cat-file", "-e", remoteHeadFull)
+				if err == nil {
+					objectMissing = false
+				}
+			}
+		}
+
 		// Check Unpushed (Ahead)
 		// git rev-list --count remote..local
 		if remoteHeadFull != localHeadFull {
+			// If object is still missing, this will fail and return err, hasUnpushed remains false.
 			count, err := RunGit(targetDir, gitPath, "rev-list", "--count", remoteHeadFull+".."+localHeadFull)
 			if err == nil && count != "0" {
 				hasUnpushed = true
@@ -204,13 +223,8 @@ func getRepoStatus(repo Repository, gitPath string) *StatusRow {
 		// Only if current branch matches config branch (Existing logic preserved for Status Symbol)
 		if repo.Branch != nil && *repo.Branch != "" && *repo.Branch == branchName {
 			if remoteHeadFull != localHeadFull {
-				// Check if we have the remote object locally
-				// RunGitInteractive is unnecessary here, just checking exit code.
-				// But RunGit returns stdout/err.
-				// We can just use RunGit and ignore output, check err.
-				_, err := RunGit(targetDir, gitPath, "cat-file", "-e", remoteHeadFull)
-				if err != nil {
-					// Object missing locally, so it's likely a new commit on remote (we haven't fetched)
+				if objectMissing {
+					// Still missing after fetch attempt? Then we can't really tell, but usually means it's pullable (remote has something we don't have).
 					isPullable = true
 				} else {
 					// Object exists locally, check ancestry
@@ -218,6 +232,22 @@ func getRepoStatus(repo Repository, gitPath string) *StatusRow {
 					count, err := RunGit(targetDir, gitPath, "rev-list", "--count", localHeadFull+".."+remoteHeadFull)
 					if err == nil && count != "0" {
 						isPullable = true
+					}
+				}
+
+				if isPullable && !objectMissing {
+					// Check for conflicts
+					// 2. Merge Base
+					base, err := RunGit(targetDir, gitPath, "merge-base", localHeadFull, remoteHeadFull)
+					if err == nil && base != "" {
+						base = strings.TrimSpace(base)
+						// 3. Merge Tree
+						output, err := RunGit(targetDir, gitPath, "merge-tree", base, localHeadFull, remoteHeadFull)
+						if err == nil {
+							if strings.Contains(output, "<<<<<<<") {
+								hasConflict = true
+							}
+						}
 					}
 				}
 			}
@@ -237,6 +267,7 @@ func getRepoStatus(repo Repository, gitPath string) *StatusRow {
 		BranchName:     branchName,
 		HasUnpushed:    hasUnpushed,
 		IsPullable:     isPullable,
+		HasConflict:    hasConflict,
 		RepoDir:        targetDir,
 	}
 }
@@ -263,6 +294,7 @@ func RenderStatusTable(rows []StatusRow) {
 
 	const (
 		Reset    = "\033[0m"
+		FgRed    = "\033[31m"
 		FgGreen  = "\033[32m"
 		FgYellow = "\033[33m"
 	)
@@ -274,7 +306,11 @@ func RenderStatusTable(rows []StatusRow) {
 			statusStr += FgGreen + ">" + Reset
 		}
 		if row.IsPullable {
-			statusStr += FgYellow + "<" + Reset
+			if row.HasConflict {
+				statusStr += FgRed + "x" + Reset
+			} else {
+				statusStr += FgYellow + "<" + Reset
+			}
 		}
 		if statusStr == "" {
 			statusStr = "-"
