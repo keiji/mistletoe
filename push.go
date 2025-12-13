@@ -57,6 +57,18 @@ func handlePush(args []string, opts GlobalOptions) {
 
 	RenderStatusTable(rows)
 
+	for _, row := range rows {
+		if row.HasConflict {
+			fail("Cannot push because of conflicts.\n")
+		}
+	}
+
+	for _, row := range rows {
+		if row.IsPullable {
+			fail("Please sync first.\n")
+		}
+	}
+
 	// Identify repositories to push
 	var pushable []StatusRow
 	for _, row := range rows {
@@ -70,7 +82,7 @@ func handlePush(args []string, opts GlobalOptions) {
 		return
 	}
 
-	fmt.Print("Do you want to push? (y/yes): ")
+	fmt.Print("Do you want to push? (yes/no): ")
 	reader := bufio.NewReader(os.Stdin)
 	input, _ := reader.ReadString('\n')
 	fmt.Println()
