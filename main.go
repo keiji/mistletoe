@@ -46,7 +46,7 @@ func handleVersion(opts GlobalOptions) {
 	// If the startup validation failed for print/version, opts.GitPath is still set to what was attempted.
 
 	if err := validateGit(opts.GitPath); err != nil {
-		fmt.Println("git binary is not found")
+		fmt.Println("Git binary not found")
 		return
 	}
 
@@ -61,7 +61,7 @@ func handleVersion(opts GlobalOptions) {
 
 	out, err := exec.Command(opts.GitPath, "--version").Output()
 	if err != nil {
-		fmt.Println("git version: error getting version")
+		fmt.Println("Error getting git version")
 		return
 	}
 	// git --version output typically includes a newline. We only want the first line.
@@ -97,7 +97,7 @@ func main() {
 	isPermissive := subcmdName == "print" || subcmdName == "version" || subcmdName == ""
 
 	if gitErr != nil && !isPermissive {
-		fmt.Printf("Error: git is not callable at '%s'. (%v)\n", gitPath, gitErr)
+		fmt.Printf("Error: Git is not callable at '%s'. (%v)\n", gitPath, gitErr)
 		os.Exit(1)
 	}
 
@@ -126,7 +126,7 @@ func main() {
 		// Default to print if no command provided
 		handlePrint(subcmdArgs, opts)
 	default:
-		fmt.Printf("Unknown subcommand: %s\n", subcmdName)
+		fmt.Printf("Unknown subcommand: %s.\n", subcmdName)
 		os.Exit(1)
 	}
 }

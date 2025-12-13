@@ -52,7 +52,7 @@ func handleSwitch(args []string, opts GlobalOptions) {
 
 	if createBranchName != "" {
 		if len(fs.Args()) > 0 {
-			fmt.Printf("Error: Unexpected argument: %s\n", fs.Args()[0])
+			fmt.Printf("Error: Unexpected argument: %s.\n", fs.Args()[0])
 			os.Exit(1)
 		}
 		branchName = createBranchName
@@ -60,10 +60,10 @@ func handleSwitch(args []string, opts GlobalOptions) {
 	} else {
 		// If create flag not set, look for positional argument
 		if len(fs.Args()) == 0 {
-			fmt.Println("Error: branch name required")
+			fmt.Println("Error: Branch name required.")
 			os.Exit(1)
 		} else if len(fs.Args()) > 1 {
-			fmt.Printf("Error: Too many arguments: %v\n", fs.Args())
+			fmt.Printf("Error: Too many arguments: %v.\n", fs.Args())
 			os.Exit(1)
 		}
 		branchName = fs.Args()[0]
@@ -89,7 +89,7 @@ func handleSwitch(args []string, opts GlobalOptions) {
 
 			// Check if directory exists
 			if _, err := os.Stat(dir); os.IsNotExist(err) {
-				fmt.Printf("Error: repository directory %s does not exist\n", dir)
+				fmt.Printf("Error: Repository directory %s does not exist.\n", dir)
 				os.Exit(1)
 			}
 
@@ -112,7 +112,7 @@ func handleSwitch(args []string, opts GlobalOptions) {
 		}
 
 		if len(missing) > 0 {
-			fmt.Printf("Error: branch '%s' does not exist in the following repositories:\n", branchName)
+			fmt.Printf("Error: Branch '%s' missing in repositories:\n", branchName)
 			for _, item := range missing {
 				fmt.Println(" - " + item)
 			}
@@ -130,7 +130,7 @@ func handleSwitch(args []string, opts GlobalOptions) {
 				dir := getRepoDir(repo)
 				fmt.Printf("Switching %s to branch %s...\n", dir, branchName)
 				if err := RunGitInteractive(dir, opts.GitPath, "checkout", branchName); err != nil {
-					fmt.Printf("Error switching branch for %s: %v\n", dir, err)
+					fmt.Printf("Error switching branch for %s: %v.\n", dir, err)
 					os.Exit(1)
 				}
 			}(repo)
@@ -153,13 +153,13 @@ func handleSwitch(args []string, opts GlobalOptions) {
 				if exists {
 					fmt.Printf("Branch %s exists in %s. Switching...\n", branchName, dir)
 					if err := RunGitInteractive(dir, opts.GitPath, "checkout", branchName); err != nil {
-						fmt.Printf("Error switching branch for %s: %v\n", dir, err)
+						fmt.Printf("Error switching branch for %s: %v.\n", dir, err)
 						os.Exit(1)
 					}
 				} else {
 					fmt.Printf("Creating and switching to branch %s in %s...\n", branchName, dir)
 					if err := RunGitInteractive(dir, opts.GitPath, "checkout", "-b", branchName); err != nil {
-						fmt.Printf("Error creating branch for %s: %v\n", dir, err)
+						fmt.Printf("Error creating branch for %s: %v.\n", dir, err)
 						os.Exit(1)
 					}
 				}

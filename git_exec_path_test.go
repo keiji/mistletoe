@@ -61,8 +61,8 @@ func TestGitExecPath(t *testing.T) {
 			t.Logf("Command exited with error: %v (output: %s)", err, out)
 		}
 
-		if !bytes.Contains(out, []byte("git binary is not found")) {
-			t.Errorf("Expected 'git binary is not found' message, got: %s", out)
+		if !bytes.Contains(out, []byte("Git binary not found")) {
+			t.Errorf("Expected 'Git binary not found' message, got: %s", out)
 		}
 	})
 
@@ -83,7 +83,7 @@ func TestGitExecPath(t *testing.T) {
 		if err == nil {
 			t.Error("Expected init to fail with invalid GIT_EXEC_PATH, but it succeeded")
 		}
-		if !bytes.Contains(out, []byte("Error: git is not callable")) {
+		if !bytes.Contains(out, []byte("Error: Git is not callable")) {
 			t.Errorf("Expected error message about git not callable, got: %s", out)
 		}
 	})

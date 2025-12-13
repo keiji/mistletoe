@@ -24,18 +24,18 @@ func handleFreeze(args []string, opts GlobalOptions) {
 	}
 
 	if outputFile == "" {
-		fmt.Println("Error: Please specify an output file using --file or -f")
+		fmt.Println("Error: Specify output file using --file or -f.")
 		os.Exit(1)
 	}
 
 	if _, err := os.Stat(outputFile); err == nil {
-		fmt.Printf("Error: Output file '%s' already exists.\n", outputFile)
+		fmt.Printf("Error: Output file '%s' exists.\n", outputFile)
 		os.Exit(1)
 	}
 
 	entries, err := os.ReadDir(".")
 	if err != nil {
-		fmt.Printf("Error reading current directory: %v\n", err)
+		fmt.Printf("Error reading current directory: %v.\n", err)
 		os.Exit(1)
 	}
 
@@ -60,7 +60,7 @@ func handleFreeze(args []string, opts GlobalOptions) {
 			// Try getting it via config if get-url fails (older git versions or odd setups)
 			url, err = RunGit(dirName, opts.GitPath, "config", "--get", "remote.origin.url")
 			if err != nil {
-				fmt.Printf("Warning: Could not get remote origin for %s, skipping.\n", dirName)
+				fmt.Printf("Warning: Could not get remote origin for %s. Skipping.\n", dirName)
 				continue
 			}
 		}
@@ -110,12 +110,12 @@ func handleFreeze(args []string, opts GlobalOptions) {
 
 	data, err := json.MarshalIndent(config, "", "  ")
 	if err != nil {
-		fmt.Printf("Error generating JSON: %v\n", err)
+		fmt.Printf("Error generating JSON: %v.\n", err)
 		os.Exit(1)
 	}
 
 	if err := os.WriteFile(outputFile, data, 0644); err != nil {
-		fmt.Printf("Error writing to file '%s': %v\n", outputFile, err)
+		fmt.Printf("Error writing to file '%s': %v.\n", outputFile, err)
 		os.Exit(1)
 	}
 }
