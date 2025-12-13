@@ -29,54 +29,13 @@ func checkCommitCount(t *testing.T, dir string, expected int) {
 // This is cleaner than refactoring handleInit to be testable in the short term.
 func TestHandleInitDepth(t *testing.T) {
 	// 1. Build gitc binary
-	binPath := filepath.Join(t.TempDir(), "gitc")
-	buildCmd := exec.Command("go", "build", "-o", binPath, ".")
-	if err := buildCmd.Run(); err != nil {
-		t.Fatalf("failed to build gitc: %v", err)
-	}
+	binPath := buildGitc(t)
 
 	// 2. Setup Remote Repo
-	remoteDir := t.TempDir()
-	gitInit := exec.Command("git", "init", "--bare", remoteDir)
-	if err := gitInit.Run(); err != nil {
-		t.Fatalf("failed to init bare repo: %v", err)
-	}
-
-	// Create content repo to push to remote
-	contentDir := t.TempDir()
-	if err := exec.Command("git", "init", contentDir).Run(); err != nil {
-		t.Fatalf("failed to init content repo: %v", err)
-	}
-	if err := exec.Command("git", "-C", contentDir, "config", "user.email", "test@example.com").Run(); err != nil {
-		t.Fatalf("failed to configure user.email: %v", err)
-	}
-	if err := exec.Command("git", "-C", contentDir, "config", "user.name", "Test User").Run(); err != nil {
-		t.Fatalf("failed to configure user.name: %v", err)
-	}
-	if err := exec.Command("git", "-C", contentDir, "remote", "add", "origin", remoteDir).Run(); err != nil {
-		t.Fatalf("failed to add remote origin: %v", err)
-	}
-
-	// Create 5 commits
-	for i := 0; i < 5; i++ {
-		fname := filepath.Join(contentDir, "file.txt")
-		if err := os.WriteFile(fname, []byte(fmt.Sprintf("commit %d", i)), 0644); err != nil {
-			t.Fatalf("failed to write file: %v", err)
-		}
-		if err := exec.Command("git", "-C", contentDir, "add", "file.txt").Run(); err != nil {
-			t.Fatalf("failed to add file: %v", err)
-		}
-		if err := exec.Command("git", "-C", contentDir, "commit", "-m", fmt.Sprintf("commit %d", i)).Run(); err != nil {
-			t.Fatalf("failed to commit: %v", err)
-		}
-	}
-	if err := exec.Command("git", "-C", contentDir, "push", "origin", "master").Run(); err != nil {
-		t.Fatalf("failed to push to remote: %v", err)
-	}
+	repoURL, _ := setupRemoteAndContent(t, 5)
 
 	// 3. Setup Config
 	// Use file:// protocol for --depth to work locally
-	repoURL := "file://" + remoteDir
 	repoID := "shallow-repo"
 	configFile := filepath.Join(t.TempDir(), "repos.json")
 	master := "master"

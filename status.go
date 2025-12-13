@@ -4,7 +4,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"time"
 )
 
 func handleStatus(args []string, opts GlobalOptions) {
@@ -22,27 +21,10 @@ func handleStatus(args []string, opts GlobalOptions) {
 		os.Exit(1)
 	}
 
-	parallel := DefaultParallel
-	if pVal != DefaultParallel {
-		parallel = pVal
-	} else if pValShort != DefaultParallel {
-		parallel = pValShort
-	}
-
-	if parallel < MinParallel {
-		fmt.Printf("Error: parallel must be at least %d\n", MinParallel)
+	configFile, parallel, err := ResolveCommonValues(fLong, fShort, opts.ConfigFile, pVal, pValShort)
+	if err != nil {
+		fmt.Printf("Error: %v\n", err)
 		os.Exit(1)
-	}
-	if parallel > MaxParallel {
-		fmt.Printf("Error: parallel must be at most %d\n", MaxParallel)
-		os.Exit(1)
-	}
-
-	configFile := opts.ConfigFile
-	if fLong != "" {
-		configFile = fLong
-	} else if fShort != "" {
-		configFile = fShort
 	}
 
 	config, err := loadConfig(configFile)
@@ -51,47 +33,15 @@ func handleStatus(args []string, opts GlobalOptions) {
 		os.Exit(1)
 	}
 
-	// Spinner control
-	spinnerStop := make(chan struct{})
-	spinnerDone := make(chan struct{})
-
-	startSpinner := func() {
-		go func() {
-			defer close(spinnerDone)
-			chars := []string{"/", "-", "\\", "|"}
-			i := 0
-			ticker := time.NewTicker(100 * time.Millisecond)
-			defer ticker.Stop()
-			for {
-				select {
-				case <-spinnerStop:
-					fmt.Print("\r\033[K") // Clear line
-					return
-				case <-ticker.C:
-					fmt.Printf("\rProcessing... %s", chars[i])
-					i = (i + 1) % len(chars)
-				}
-			}
-		}()
-	}
-
-	stopSpinner := func() {
-		// Non-blocking send to stop
-		select {
-		case spinnerStop <- struct{}{}:
-			<-spinnerDone
-		default:
-			// Already stopped or not started
-		}
-	}
+	spinner := NewSpinner()
 
 	fail := func(format string, a ...interface{}) {
-		stopSpinner()
+		spinner.Stop()
 		fmt.Printf(format, a...)
 		os.Exit(1)
 	}
 
-	startSpinner()
+	spinner.Start()
 
 	// Validation Phase
 	if err := ValidateRepositoriesIntegrity(config, opts.GitPath); err != nil {
@@ -101,7 +51,7 @@ func handleStatus(args []string, opts GlobalOptions) {
 	// Output Phase
 	rows := CollectStatus(config, parallel, opts.GitPath)
 
-	stopSpinner()
+	spinner.Stop()
 
 	RenderStatusTable(rows)
 }

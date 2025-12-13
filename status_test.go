@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -10,71 +9,9 @@ import (
 	"testing"
 )
 
-// Helper to init a bare repo and a content repo, returns remote URL (file://)
-func setupRemoteAndContent(t *testing.T, commitCount int) (string, string) {
-	remoteDir := t.TempDir()
-	if err := exec.Command("git", "init", "--bare", remoteDir).Run(); err != nil {
-		t.Fatalf("failed to init bare repo: %v", err)
-	}
-
-	contentDir := t.TempDir()
-	if err := exec.Command("git", "init", contentDir).Run(); err != nil {
-		t.Fatalf("failed to init content repo: %v", err)
-	}
-	if err := exec.Command("git", "-C", contentDir, "config", "user.email", "test@example.com").Run(); err != nil {
-		t.Fatalf("failed to configure user.email: %v", err)
-	}
-	if err := exec.Command("git", "-C", contentDir, "config", "user.name", "Test User").Run(); err != nil {
-		t.Fatalf("failed to configure user.name: %v", err)
-	}
-
-	// Normalize path for Windows compatibility if needed, though usually / is fine in git URLs
-	// But file:// URL needs absolute path
-	remoteURL := "file://" + filepath.ToSlash(remoteDir)
-
-	if err := exec.Command("git", "-C", contentDir, "remote", "add", "origin", remoteURL).Run(); err != nil {
-		t.Fatalf("failed to add remote origin: %v", err)
-	}
-
-	for i := 0; i < commitCount; i++ {
-		fname := filepath.Join(contentDir, fmt.Sprintf("file-%d.txt", i))
-		if err := os.WriteFile(fname, []byte("content"), 0644); err != nil {
-			t.Fatalf("failed to write file: %v", err)
-		}
-		exec.Command("git", "-C", contentDir, "add", ".").Run()
-		exec.Command("git", "-C", contentDir, "commit", "-m", fmt.Sprintf("commit %d", i)).Run()
-	}
-
-	if commitCount > 0 {
-		if err := exec.Command("git", "-C", contentDir, "push", "origin", "master").Run(); err != nil {
-			t.Fatalf("failed to push: %v", err)
-		}
-	}
-
-	return remoteURL, contentDir
-}
-
-func configureGitUser(t *testing.T, dir string) {
-	if err := exec.Command("git", "-C", dir, "config", "user.email", "test@example.com").Run(); err != nil {
-		t.Fatalf("failed to config user.email in %s: %v", dir, err)
-	}
-	if err := exec.Command("git", "-C", dir, "config", "user.name", "Test User").Run(); err != nil {
-		t.Fatalf("failed to config user.name in %s: %v", dir, err)
-	}
-}
-
 func TestStatusCmd(t *testing.T) {
 	// 1. Build gitc binary
-	binPath := filepath.Join(t.TempDir(), "gitc")
-	// On Windows usually ends with .exe, but go build handles output name.
-	if os.PathSeparator == '\\' {
-		binPath += ".exe"
-	}
-
-	buildCmd := exec.Command("go", "build", "-o", binPath, ".")
-	if err := buildCmd.Run(); err != nil {
-		t.Fatalf("failed to build gitc: %v", err)
-	}
+	binPath := buildGitc(t)
 
 	t.Run("Validation Error - Wrong Remote", func(t *testing.T) {
 		workDir := t.TempDir()

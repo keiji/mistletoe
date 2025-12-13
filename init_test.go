@@ -2,30 +2,9 @@ package main
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"testing"
 )
-
-// Helper to create a dummy git repo with a remote
-func createDummyGitRepo(t *testing.T, dir, remoteURL string) {
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		t.Fatalf("failed to create dir %s: %v", dir, err)
-	}
-
-	cmds := [][]string{
-		{"init"},
-		{"remote", "add", "origin", remoteURL},
-	}
-
-	for _, args := range cmds {
-		cmd := exec.Command("git", args...)
-		cmd.Dir = dir
-		if err := cmd.Run(); err != nil {
-			t.Fatalf("failed to run git %v in %s: %v", args, dir, err)
-		}
-	}
-}
 
 func TestValidateEnvironment(t *testing.T) {
 	// Create a temporary directory for the test workspace

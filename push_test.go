@@ -11,14 +11,7 @@ import (
 
 func TestPushCmd(t *testing.T) {
 	// Build gitc binary
-	binPath := filepath.Join(t.TempDir(), "gitc")
-	if os.PathSeparator == '\\' {
-		binPath += ".exe"
-	}
-	buildCmd := exec.Command("go", "build", "-o", binPath, ".")
-	if err := buildCmd.Run(); err != nil {
-		t.Fatalf("failed to build gitc: %v", err)
-	}
+	binPath := buildGitc(t)
 
 	t.Run("No Push Needed", func(t *testing.T) {
 		workDir := t.TempDir()

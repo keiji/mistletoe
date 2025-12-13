@@ -122,10 +122,6 @@ func TestLoadConfig(t *testing.T) {
 	}
 }
 
-func strPtr(s string) *string {
-	return &s
-}
-
 func TestParseConfig(t *testing.T) {
 	tests := []struct {
 		name    string

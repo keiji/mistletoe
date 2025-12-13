@@ -5,8 +5,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"os/exec"
-	"strings"
 )
 
 func handleFreeze(args []string, opts GlobalOptions) {
@@ -59,39 +57,32 @@ func handleFreeze(args []string, opts GlobalOptions) {
 		}
 
 		// Get remote origin URL
-		cmdURL := exec.Command(opts.GitPath, "-C", dirName, "remote", "get-url", "origin")
-		outURL, err := cmdURL.Output()
+		url, err := RunGit(dirName, opts.GitPath, "remote", "get-url", "origin")
 		if err != nil {
 			// Try getting it via config if get-url fails (older git versions or odd setups)
-			cmdURL = exec.Command(opts.GitPath, "-C", dirName, "config", "--get", "remote.origin.url")
-			outURL, err = cmdURL.Output()
+			url, err = RunGit(dirName, opts.GitPath, "config", "--get", "remote.origin.url")
 			if err != nil {
 				fmt.Printf("Warning: Could not get remote origin for %s, skipping.\n", dirName)
 				continue
 			}
 		}
-		url := strings.TrimSpace(string(outURL))
+		// RunGit already trims
 
 		// Get current branch
-		cmdBranch := exec.Command(opts.GitPath, "-C", dirName, "rev-parse", "--abbrev-ref", "HEAD")
-		outBranch, err := cmdBranch.Output()
-		branch := ""
-		revision := ""
+		branch, err := RunGit(dirName, opts.GitPath, "rev-parse", "--abbrev-ref", "HEAD")
 		if err != nil {
 			fmt.Printf("Warning: Could not get current branch for %s.\n", dirName)
-		} else {
-			branch = strings.TrimSpace(string(outBranch))
+			branch = ""
 		}
 
+		revision := ""
 		// If branch is "HEAD", it's a detached HEAD state
 		if branch == "HEAD" {
 			branch = ""
-			cmdRev := exec.Command(opts.GitPath, "-C", dirName, "rev-parse", "HEAD")
-			outRev, err := cmdRev.Output()
+			revision, err = RunGit(dirName, opts.GitPath, "rev-parse", "HEAD")
 			if err != nil {
 				fmt.Printf("Warning: Could not get revision for %s.\n", dirName)
-			} else {
-				revision = strings.TrimSpace(string(outRev))
+				revision = ""
 			}
 		}
 
