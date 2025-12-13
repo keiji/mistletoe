@@ -6,7 +6,7 @@ import (
 	"os"
 )
 
-func handlePrint(args []string, opts GlobalOptions) {
+func handlePrint(args []string, _ GlobalOptions) {
 	var fShort, fLong string
 	fs := flag.NewFlagSet("print", flag.ExitOnError)
 	fs.StringVar(&fLong, "file", "", "configuration file")
