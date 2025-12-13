@@ -82,7 +82,7 @@ func TestHandleSync(t *testing.T) {
 		}
 	})
 
-	// Scenario 2: Pull Needed (No conflict)
+	// Scenario 2: Pull Needed (No conflict, Fast Forward)
 	t.Run("PullNeeded", func(t *testing.T) {
 		// Push a new commit from contentDir (origin)
 		// contentDir is the "local" repo used to populate remote.
@@ -97,8 +97,8 @@ func TestHandleSync(t *testing.T) {
 		exec.Command("git", "-C", contentDir, "push", "origin", "master").Run() // Assuming master
 
 		// Now repo1 and repo2 are behind.
-		// Run sync with "merge" input
-		out, err := runSync("merge")
+		// Run sync with empty input (expecting no prompt for fast-forward)
+		out, err := runSync("")
 		if err != nil {
 			t.Fatalf("sync failed: %v, out: %s", err, out)
 		}
@@ -115,7 +115,35 @@ func TestHandleSync(t *testing.T) {
 		}
 	})
 
-	// Scenario 3: Conflict
+	// Scenario 3: Diverged (Merge Needed)
+	t.Run("Diverged", func(t *testing.T) {
+		// Create a diverged state.
+		// Remote has new commit.
+		divergeFile := filepath.Join(contentDir, "file-diverge.txt")
+		os.WriteFile(divergeFile, []byte("remote change"), 0644)
+		exec.Command("git", "-C", contentDir, "add", ".").Run()
+		exec.Command("git", "-C", contentDir, "commit", "-m", "Remote Diverge").Run()
+		exec.Command("git", "-C", contentDir, "push", "origin", "master").Run()
+
+		// Local repo1 has new commit (different)
+		localDiverge := filepath.Join(repo1, "file-local.txt")
+		os.WriteFile(localDiverge, []byte("local change"), 0644)
+		exec.Command("git", "-C", repo1, "add", ".").Run()
+		exec.Command("git", "-C", repo1, "commit", "-m", "Local Diverge").Run()
+
+		// Run sync with "merge" input (it should prompt)
+		out, err := runSync("merge")
+		if err != nil {
+			t.Fatalf("sync failed: %v, out: %s", err, out)
+		}
+
+		// Verify it pulled and merged
+		if _, err := os.Stat(filepath.Join(repo1, "file-diverge.txt")); os.IsNotExist(err) {
+			t.Error("repo1 did not pull remote file")
+		}
+	})
+
+	// Scenario 4: Conflict
 	t.Run("Conflict", func(t *testing.T) {
 		// Create conflicting changes.
 		// Push from contentDir
