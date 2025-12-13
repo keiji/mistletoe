@@ -306,12 +306,11 @@ func RenderStatusTable(rows []StatusRow) {
 			statusStr += FgGreen + ">" + Reset
 		}
 		if row.IsPullable {
-			if row.HasConflict {
-				statusStr += FgRed + "x" + Reset
-			} else {
-				statusStr += FgYellow + "<" + Reset
-			}
+			statusStr += FgYellow + "<" + Reset
+		} else if row.HasConflict {
+			statusStr += FgRed + "x" + Reset
 		}
+
 		if statusStr == "" {
 			statusStr = "-"
 		}
@@ -327,4 +326,5 @@ func RenderStatusTable(rows []StatusRow) {
 	if err := table.Render(); err != nil {
 		fmt.Printf("Error rendering table: %v\n", err)
 	}
+	fmt.Println("Status Legend: < Pullable, > Unpushed, x Conflict")
 }
