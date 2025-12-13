@@ -68,15 +68,15 @@ func handleSync(args []string, opts GlobalOptions) {
 
 	if hasConflict {
 		RenderStatusTable(rows)
-		fmt.Println("pullが必要なリポジトリがあるがコンフリクトしているので処理を中止する")
+		fmt.Println("There are repositories that need to be pulled, but the process is aborted because there are conflicts.")
 		os.Exit(1)
 	}
 
 	argsPull := []string{"pull"}
 
 	if needsPull {
-		fmt.Println("pullが必要なリポジトリがある。")
-		fmt.Print("originのコミットをmergeするか、rebaseするか、処理を中止（abort）するか？ [merge/rebase/abort]: ")
+		fmt.Println("There are repositories that need to be pulled.")
+		fmt.Print("Do you want to merge, rebase, or abort? [merge/rebase/abort]: ")
 
 		scanner := bufio.NewScanner(os.Stdin)
 		if scanner.Scan() {
@@ -87,10 +87,10 @@ func handleSync(args []string, opts GlobalOptions) {
 			case "rebase", "r":
 				argsPull = append(argsPull, "--rebase")
 			case "abort", "a", "q":
-				fmt.Println("中止します。")
+				fmt.Println("Aborted.")
 				os.Exit(0)
 			default:
-				fmt.Println("不明な入力です。中止します。")
+				fmt.Println("Invalid input. Aborted.")
 				os.Exit(1)
 			}
 		} else {

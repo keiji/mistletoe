@@ -88,7 +88,7 @@ func TestHandleSync(t *testing.T) {
 		if err != nil {
 			t.Fatalf("sync failed: %v, out: %s", err, out)
 		}
-		if !strings.Contains(out, "pullが必要なリポジトリがある") {
+		if !strings.Contains(out, "There are repositories that need to be pulled.") {
 			t.Error("Expected pull needed message")
 		}
 
@@ -122,7 +122,7 @@ func TestHandleSync(t *testing.T) {
 		if err == nil {
 			t.Fatal("expected error due to conflict")
 		}
-		if !strings.Contains(out, "コンフリクトしているので処理を中止する") {
+		if !strings.Contains(out, "There are repositories that need to be pulled, but the process is aborted because there are conflicts.") {
 			t.Error("Expected conflict message")
 		}
 	})
