@@ -179,3 +179,57 @@ func TestHandleSync(t *testing.T) {
 		}
 	})
 }
+
+func TestSync_SkipMissingRemoteBranch(t *testing.T) {
+	// 1. Setup Remote and Initial Content
+	remoteURL, _ := setupRemoteAndContent(t, 1) // creates master branch on remote
+
+	// 2. Setup Local Repo (Target for mstl)
+	rootDir := t.TempDir()
+	repoDir := filepath.Join(rootDir, "repo1")
+	// Clone from remote
+	if err := exec.Command("git", "clone", remoteURL, repoDir).Run(); err != nil {
+		t.Fatalf("failed to clone: %v", err)
+	}
+	configureGitUser(t, repoDir)
+
+	// 3. Create a local branch that DOES NOT exist on remote
+	if err := exec.Command("git", "-C", repoDir, "checkout", "-b", "local-only").Run(); err != nil {
+		t.Fatalf("failed to checkout new branch: %v", err)
+	}
+
+	// 4. Create Config
+	configFile := filepath.Join(rootDir, "repos.json")
+	config := Config{
+		Repositories: &[]Repository{
+			{
+				URL: strPtr(remoteURL), // mstl verifies origin URL
+				ID:  strPtr("repo1"),
+			},
+		},
+	}
+	data, _ := json.Marshal(config)
+	if err := os.WriteFile(configFile, data, 0644); err != nil {
+		t.Fatalf("failed to write config: %v", err)
+	}
+
+	// 5. Build mstl
+	binPath := buildMstl(t)
+
+	// 6. Run sync
+	// Use -p 1 to ensure deterministic output if multiple repos (here only 1)
+	cmd := exec.Command(binPath, "sync", "-f", configFile)
+	cmd.Dir = rootDir
+	output, err := cmd.CombinedOutput()
+
+	// 7. Verify
+	if err != nil {
+		t.Fatalf("mstl sync failed: %v\nOutput:\n%s", err, output)
+	}
+
+	outStr := string(output)
+	expectedMsg := "Skipping repo1: Remote branch not found."
+	if !strings.Contains(outStr, expectedMsg) {
+		t.Errorf("Expected output to contain %q, got:\n%s", expectedMsg, outStr)
+	}
+}
