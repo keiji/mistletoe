@@ -8,7 +8,7 @@ import (
 
 func TestValidateEnvironment(t *testing.T) {
 	// Create a temporary directory for the test workspace
-	tmpDir, err := os.MkdirTemp("", "gitc-test-env")
+	tmpDir, err := os.MkdirTemp("", "mstl-test-env")
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}

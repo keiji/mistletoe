@@ -10,8 +10,8 @@ import (
 )
 
 func TestStatusCmd(t *testing.T) {
-	// 1. Build gitc binary
-	binPath := buildGitc(t)
+	// 1. Build mstl binary
+	binPath := buildMstl(t)
 
 	t.Run("Validation Error - Wrong Remote", func(t *testing.T) {
 		workDir := t.TempDir()

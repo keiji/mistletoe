@@ -11,7 +11,7 @@ import (
 
 func TestFreeze_DetachedHead(t *testing.T) {
 	// Create temp dir
-	tmpDir, err := os.MkdirTemp("", "gitc-freeze-detached-test")
+	tmpDir, err := os.MkdirTemp("", "mstl-freeze-detached-test")
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}

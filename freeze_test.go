@@ -14,9 +14,9 @@ var binaryPath string
 func TestMain(m *testing.M) {
 	// Build the binary
 	if runtime.GOOS == "windows" {
-		binaryPath = filepath.Join(os.TempDir(), "gitc-test.exe")
+		binaryPath = filepath.Join(os.TempDir(), "mstl-test.exe")
 	} else {
-		binaryPath = filepath.Join(os.TempDir(), "gitc-test")
+		binaryPath = filepath.Join(os.TempDir(), "mstl-test")
 	}
 
 	// Build command
@@ -69,7 +69,7 @@ func setupDummyRepo(t *testing.T, dir, remoteURL, branchName string) {
 
 func TestFreeze(t *testing.T) {
 	// Create temp dir
-	tmpDir, err := os.MkdirTemp("", "gitc-freeze-test")
+	tmpDir, err := os.MkdirTemp("", "mstl-freeze-test")
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
@@ -169,7 +169,7 @@ func TestFreeze(t *testing.T) {
 
 func TestFreeze_FileExists(t *testing.T) {
 	// Create temp dir
-	tmpDir, err := os.MkdirTemp("", "gitc-freeze-fail")
+	tmpDir, err := os.MkdirTemp("", "mstl-freeze-fail")
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}

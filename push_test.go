@@ -10,8 +10,8 @@ import (
 )
 
 func TestPushCmd(t *testing.T) {
-	// Build gitc binary
-	binPath := buildGitc(t)
+	// Build mstl binary
+	binPath := buildMstl(t)
 
 	t.Run("No Push Needed", func(t *testing.T) {
 		workDir := t.TempDir()

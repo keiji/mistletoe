@@ -16,7 +16,7 @@ func TestParseArgs(t *testing.T) {
 	}{
 		{
 			name:           "Init command with file flag at end",
-			args:           []string{"gitc", "init", ".", "--file", "repos.json"},
+			args:           []string{"mstl", "init", ".", "--file", "repos.json"},
 			wantConfigFile: "",
 			wantSubcmdName: "init",
 			wantSubcmdArgs: []string{".", "--file", "repos.json"},
@@ -24,7 +24,7 @@ func TestParseArgs(t *testing.T) {
 		},
 		{
 			name:           "Init command with short file flag",
-			args:           []string{"gitc", "init", ".", "-f", "repos.json"},
+			args:           []string{"mstl", "init", ".", "-f", "repos.json"},
 			wantConfigFile: "",
 			wantSubcmdName: "init",
 			wantSubcmdArgs: []string{".", "-f", "repos.json"},
@@ -32,7 +32,7 @@ func TestParseArgs(t *testing.T) {
 		},
 		{
 			name:           "File flag at beginning",
-			args:           []string{"gitc", "--file", "repos.json", "init", "."},
+			args:           []string{"mstl", "--file", "repos.json", "init", "."},
 			wantConfigFile: "repos.json",
 			wantSubcmdName: "init",
 			wantSubcmdArgs: []string{"."},
@@ -40,7 +40,7 @@ func TestParseArgs(t *testing.T) {
 		},
 		{
 			name:           "File flag with equal sign",
-			args:           []string{"gitc", "--file=repos.json", "init", "."},
+			args:           []string{"mstl", "--file=repos.json", "init", "."},
 			wantConfigFile: "repos.json",
 			wantSubcmdName: "init",
 			wantSubcmdArgs: []string{"."},
@@ -48,7 +48,7 @@ func TestParseArgs(t *testing.T) {
 		},
 		{
 			name:           "Short file flag with equal sign",
-			args:           []string{"gitc", "-f=repos.json", "init", "."},
+			args:           []string{"mstl", "-f=repos.json", "init", "."},
 			wantConfigFile: "repos.json",
 			wantSubcmdName: "init",
 			wantSubcmdArgs: []string{"."},
@@ -56,7 +56,7 @@ func TestParseArgs(t *testing.T) {
 		},
 		{
 			name:           "No command (legacy)",
-			args:           []string{"gitc", "--file", "repos.json"},
+			args:           []string{"mstl", "--file", "repos.json"},
 			wantConfigFile: "repos.json",
 			wantSubcmdName: "",
 			wantSubcmdArgs: nil,
@@ -64,7 +64,7 @@ func TestParseArgs(t *testing.T) {
 		},
 		{
 			name:           "Missing file argument value after subcommand",
-			args:           []string{"gitc", "init", ".", "--file"},
+			args:           []string{"mstl", "init", ".", "--file"},
 			wantConfigFile: "",
 			wantSubcmdName: "init",
 			wantSubcmdArgs: []string{".", "--file"},
@@ -72,7 +72,7 @@ func TestParseArgs(t *testing.T) {
 		},
 		{
 			name:           "Mixed flags and args",
-			args:           []string{"gitc", "command", "-f", "conf.json", "arg1", "--flag2"},
+			args:           []string{"mstl", "command", "-f", "conf.json", "arg1", "--flag2"},
 			wantConfigFile: "",
 			wantSubcmdName: "command",
 			wantSubcmdArgs: []string{"-f", "conf.json", "arg1", "--flag2"},
@@ -80,7 +80,7 @@ func TestParseArgs(t *testing.T) {
 		},
 		{
 			name:           "Subcommand flag treated as argument",
-			args:           []string{"gitc", "init", "-f", "repos.json"},
+			args:           []string{"mstl", "init", "-f", "repos.json"},
 			wantConfigFile: "",
 			wantSubcmdName: "init",
 			wantSubcmdArgs: []string{"-f", "repos.json"},

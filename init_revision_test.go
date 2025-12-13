@@ -29,8 +29,8 @@ func getCurrentBranch(t *testing.T, dir string) string {
 }
 
 func TestInitRevision(t *testing.T) {
-	// 1. Build gitc binary
-	binPath := buildGitc(t)
+	// 1. Build mstl binary
+	binPath := buildMstl(t)
 
 	// 2. Setup Remote Repo
 	remoteDir := t.TempDir()
@@ -99,7 +99,7 @@ func TestInitRevision(t *testing.T) {
 		cmd := exec.Command(binPath, "init", "--file", configFile)
 		cmd.Dir = workDir
 		if out, err := cmd.CombinedOutput(); err != nil {
-			t.Fatalf("gitc init failed: %v, output: %s", err, out)
+			t.Fatalf("mstl init failed: %v, output: %s", err, out)
 		}
 
 		targetRepo := filepath.Join(workDir, repoID)
@@ -134,7 +134,7 @@ func TestInitRevision(t *testing.T) {
 		cmd := exec.Command(binPath, "init", "--file", configFile)
 		cmd.Dir = workDir
 		if out, err := cmd.CombinedOutput(); err != nil {
-			t.Fatalf("gitc init failed: %v, output: %s", err, out)
+			t.Fatalf("mstl init failed: %v, output: %s", err, out)
 		}
 
 		targetRepo := filepath.Join(workDir, repoID)
@@ -183,7 +183,7 @@ func TestInitRevision(t *testing.T) {
 
 		// Expect failure
 		if err := cmd.Run(); err == nil {
-			t.Fatal("expected gitc init to fail due to existing branch, but it succeeded")
+			t.Fatal("expected mstl init to fail due to existing branch, but it succeeded")
 		}
 	})
 }

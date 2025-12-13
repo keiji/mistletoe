@@ -12,7 +12,7 @@ import (
 
 func TestHandleSync(t *testing.T) {
 	// Setup binary
-	binPath := buildGitc(t)
+	binPath := buildMstl(t)
 
 	// Create temp dir
 	tmpDir := t.TempDir()
@@ -39,7 +39,7 @@ func TestHandleSync(t *testing.T) {
 			{URL: strPtr(remoteURL), ID: &repo2, Branch: &master},
 		},
 	}
-	configPath := filepath.Join(tmpDir, "gitc.json")
+	configPath := filepath.Join(tmpDir, "mstl.json")
 	data, _ := json.Marshal(config)
 	os.WriteFile(configPath, data, 0644)
 
