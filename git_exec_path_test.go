@@ -35,7 +35,7 @@ func TestGitExecPath(t *testing.T) {
 			fakeBinDir = filepath.Dir(systemGit)
 		}
 
-		cmd := exec.Command(exe, "--version")
+		cmd := exec.Command(exe, "version")
 		cmd.Env = append(os.Environ(), fmt.Sprintf("GIT_EXEC_PATH=%s", fakeBinDir))
 		out, err := cmd.CombinedOutput()
 		if err != nil {
@@ -48,10 +48,10 @@ func TestGitExecPath(t *testing.T) {
 		// Since we used real git, it should work.
 	})
 
-	// 2. Test Invalid GIT_EXEC_PATH with --version (Should pass but show error)
+	// 2. Test Invalid GIT_EXEC_PATH with version (Should pass but show error)
 	t.Run("Invalid GIT_EXEC_PATH version", func(t *testing.T) {
 		emptyDir := t.TempDir()
-		cmd := exec.Command(exe, "--version")
+		cmd := exec.Command(exe, "version")
 		cmd.Env = append(os.Environ(), fmt.Sprintf("GIT_EXEC_PATH=%s", emptyDir))
 		out, err := cmd.CombinedOutput()
 		// We expect err to be nil as version command is permissive.

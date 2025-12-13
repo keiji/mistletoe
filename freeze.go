@@ -18,10 +18,8 @@ func handleFreeze(args []string, opts GlobalOptions) {
 		os.Exit(1)
 	}
 
-	outputFile := opts.ConfigFile
-	if fLong != "" {
-		outputFile = fLong
-	} else if fShort != "" {
+	outputFile := fLong
+	if outputFile == "" {
 		outputFile = fShort
 	}
 
