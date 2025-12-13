@@ -23,7 +23,7 @@ func handlePush(args []string, opts GlobalOptions) {
 		os.Exit(1)
 	}
 
-	configFile, parallel, err := ResolveCommonValues(fLong, fShort, opts.ConfigFile, pVal, pValShort)
+	configFile, parallel, err := ResolveCommonValues(fLong, fShort, pVal, pValShort)
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
 		os.Exit(1)

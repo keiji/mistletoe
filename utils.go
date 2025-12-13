@@ -39,7 +39,7 @@ func RunGitInteractive(dir string, gitPath string, args ...string) error {
 
 // ResolveCommonValues resolves the configuration file path and parallel count
 // from the various flag inputs and global options.
-func ResolveCommonValues(fLong, fShort, globalConfig string, pVal, pValShort int) (string, int, error) {
+func ResolveCommonValues(fLong, fShort string, pVal, pValShort int) (string, int, error) {
 	// Parallel
 	parallel := DefaultParallel
 	if pVal != DefaultParallel {
@@ -56,7 +56,7 @@ func ResolveCommonValues(fLong, fShort, globalConfig string, pVal, pValShort int
 	}
 
 	// Config File
-	configFile := globalConfig
+	var configFile string
 	if fLong != "" {
 		configFile = fLong
 	} else if fShort != "" {
