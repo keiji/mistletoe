@@ -11,6 +11,25 @@ import (
 
 var binaryPath string
 
+func getModuleRootForTestMain() string {
+	dir, err := os.Getwd()
+	if err != nil {
+		fmt.Printf("failed to get current dir: %v\n", err)
+		os.Exit(1)
+	}
+	for {
+		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
+			return dir
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			fmt.Printf("go.mod not found\n")
+			os.Exit(1)
+		}
+		dir = parent
+	}
+}
+
 func TestMain(m *testing.M) {
 	// Build the binary
 	if runtime.GOOS == "windows" {
@@ -20,8 +39,8 @@ func TestMain(m *testing.M) {
 	}
 
 	// Build command
-	// We are running this from internal/app, so we need to point to cmd/mstl
-	cmdPath := "../../cmd/mstl"
+	rootDir := getModuleRootForTestMain()
+	cmdPath := filepath.Join(rootDir, "cmd", "mstl")
 	cmd := exec.Command("go", "build", "-o", binaryPath, cmdPath)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		fmt.Printf("Failed to build binary: %v\nOutput: %s\n", err, out)

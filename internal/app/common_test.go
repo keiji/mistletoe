@@ -14,15 +14,33 @@ func strPtr(s string) *string {
 	return &s
 }
 
+func getModuleRoot(t *testing.T) string {
+	dir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("failed to get current dir: %v", err)
+	}
+	for {
+		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
+			return dir
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			t.Fatalf("go.mod not found")
+		}
+		dir = parent
+	}
+}
+
 // buildMstl builds the mstl binary and returns its path.
 func buildMstl(t *testing.T) string {
 	binPath := filepath.Join(t.TempDir(), "mstl")
 	if runtime.GOOS == "windows" {
 		binPath += ".exe"
 	}
-	// Build from cmd/mstl
-	// Since tests run in internal/app, we need to go up two levels to find cmd/mstl
-	cmdPath := "../../cmd/mstl"
+
+	rootDir := getModuleRoot(t)
+	cmdPath := filepath.Join(rootDir, "cmd", "mstl")
+
 	buildCmd := exec.Command("go", "build", "-o", binPath, cmdPath)
 	if out, err := buildCmd.CombinedOutput(); err != nil {
 		t.Fatalf("failed to build mstl: %v\nOutput: %s", err, out)
