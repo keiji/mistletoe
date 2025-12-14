@@ -53,7 +53,7 @@ mstl-gh pr create [options]
 6.  **スナップショット生成**:
     *   設定ファイルに含まれ、かつローカルディスクに存在するすべてのリポジトリの現在の状態 (URL, Branch, Revision) を収集します。
     *   各リポジトリのRevisionをID順に連結してSHA-256ハッシュを計算し、識別子 (Identifier) とします。
-    *   `mistletoe-[Identifier].json` という名前でスナップショットJSONファイルをローカルに保存します。
+    *   `mistletoe-snapshot-[Identifier].json` という名前でスナップショットJSONファイルをローカルに保存します。
     *   JSONファイルの内容を `<details>` ブロックで囲み、PR本文への追加用テキストとして準備します。
 7.  **実行 (Execution)**:
     *   以下の処理を並列実行します。
@@ -128,7 +128,7 @@ flowchart TD
 
 ### 依存関係
 
-*   `internal/app/snapshot.go`: スナップショット生成ロジック
+*   `internal/app/pr_create_snapshot.go`: スナップショット生成ロジック
 *   `internal/app/status_logic.go`: ステータス収集ロジックを再利用
 *   `internal/app/utils.go`: Git実行、並列制御
 *   `os/exec`: `gh` コマンドの実行
