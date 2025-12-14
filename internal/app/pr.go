@@ -1,6 +1,7 @@
 package app
 
 import (
+	"bufio"
 	"errors"
 	"flag"
 	"fmt"
@@ -81,12 +82,14 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 	rows := CollectStatus(config, parallel, opts.GitPath)
 	RenderStatusTable(rows)
 
-	// 5. Check Pushability
+	// 5. Check Pushability & Detached HEAD
 	// "If there are repositories that cannot be pushed, terminate with error."
 	// Cannot push if:
 	// - Behind remote (IsPullable)
 	// - Conflict (HasConflict)
-	// - (Ideally we also check if we are ahead, but prompting says "check if pushable (no unpulled commits)")
+	// - Detached HEAD (BranchName == "HEAD") -> Prompt user
+	var detachedRepos []string
+
 	for _, row := range rows {
 		if row.IsPullable {
 			fmt.Printf("Error: Repository '%s' has unpulled commits (sync required). Cannot proceed.\n", row.Repo)
@@ -96,18 +99,61 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 			fmt.Printf("Error: Repository '%s' has conflicts. Cannot proceed.\n", row.Repo)
 			os.Exit(1)
 		}
+		// Check for detached HEAD
+		// CollectStatus sets BranchName to "HEAD" if detached (based on rev-parse --abbrev-ref HEAD returning HEAD, see status_logic.go:114)
+		if row.BranchName == "HEAD" {
+			detachedRepos = append(detachedRepos, row.Repo)
+		}
+	}
+
+	// Handle Detached HEADs
+	ignoredRepos := make(map[string]bool)
+	if len(detachedRepos) > 0 {
+		fmt.Printf("Warning: The following repositories are in a detached HEAD state and cannot participate in PR creation:\n")
+		for _, r := range detachedRepos {
+			fmt.Printf(" - %s\n", r)
+		}
+
+		fmt.Print("Do you want to continue processing other repositories? (yes/no): ")
+		reader := bufio.NewReader(os.Stdin)
+		input, _ := reader.ReadString('\n')
+		input = strings.TrimSpace(strings.ToLower(input))
+		if input != "y" && input != "yes" {
+			fmt.Println("Aborted.")
+			os.Exit(1)
+		}
+		for _, r := range detachedRepos {
+			ignoredRepos[r] = true
+		}
+	}
+
+	// Confirmation Prompt
+	fmt.Print("Proceed with Push and Pull Request creation? (yes/no): ")
+	reader := bufio.NewReader(os.Stdin)
+	input, _ := reader.ReadString('\n')
+	input = strings.TrimSpace(strings.ToLower(input))
+	if input != "y" && input != "yes" {
+		fmt.Println("Aborted.")
+		os.Exit(1)
 	}
 
 	// 6. Check GitHub Management & Permissions
+	// Filter out ignored repos
+	activeRepos := filterRepositories(config, ignoredRepos)
+	if len(activeRepos) == 0 {
+		fmt.Println("No repositories to process.")
+		return
+	}
+
 	fmt.Println("Verifying GitHub permissions...")
-	if err := verifyGithubRequirements(config, parallel); err != nil {
+	if err := verifyGithubRequirements(activeRepos, parallel); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
 
 	// 7. Execution: Push & Create PR
 	fmt.Println("Pushing changes and creating Pull Requests...")
-	prURLs, err := executePrCreation(config, parallel, opts.GitPath)
+	prURLs, err := executePrCreation(activeRepos, parallel, opts.GitPath)
 	if err != nil {
 		fmt.Printf("Error during execution: %v\n", err)
 		os.Exit(1)
@@ -121,6 +167,17 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 	}
 
 	fmt.Println("Done.")
+}
+
+func filterRepositories(config *Config, ignoredRepos map[string]bool) []Repository {
+	var filtered []Repository
+	for _, repo := range *config.Repositories {
+		name := getRepoName(repo)
+		if !ignoredRepos[name] {
+			filtered = append(filtered, repo)
+		}
+	}
+	return filtered
 }
 
 func checkGhAvailability() error {
@@ -138,13 +195,13 @@ func checkGhAvailability() error {
 	return nil
 }
 
-func verifyGithubRequirements(config *Config, parallel int) error {
+func verifyGithubRequirements(repos []Repository, parallel int) error {
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, parallel)
 	var errs []string
 
-	for _, repo := range *config.Repositories {
+	for _, repo := range repos {
 		wg.Add(1)
 		go func(r Repository) {
 			defer wg.Done()
@@ -188,14 +245,14 @@ func verifyGithubRequirements(config *Config, parallel int) error {
 	return nil
 }
 
-func executePrCreation(config *Config, parallel int, gitPath string) ([]string, error) {
+func executePrCreation(repos []Repository, parallel int, gitPath string) ([]string, error) {
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, parallel)
 	var errs []string
 	var prURLs []string
 
-	for _, repo := range *config.Repositories {
+	for _, repo := range repos {
 		wg.Add(1)
 		go func(r Repository) {
 			defer wg.Done()
@@ -215,9 +272,6 @@ func executePrCreation(config *Config, parallel int, gitPath string) ([]string, 
 				return
 			}
 
-			// Check if we actually need to push?
-			// The prompt says "Push repositories". We can force push or just push.
-			// Ideally we assume standard push.
 			fmt.Printf("[%s] Pushing to origin/%s...\n", getRepoName(r), branchName)
 			if _, err := RunGit(repoDir, gitPath, "push", "origin", branchName); err != nil {
 				mu.Lock()
@@ -227,15 +281,7 @@ func executePrCreation(config *Config, parallel int, gitPath string) ([]string, 
 			}
 
 			// 2. Create PR
-			// gh pr create --fill --repo <url> --head <branch>
-			// We should run this command inside the repo dir or specify repo?
-			// Specifying --repo is safer.
-			// "gh" command is not handled by RunGit, so we use exec.Command.
-			// NOTE: gh pr create might fail if PR already exists.
-			// If it exists, we should probably get the URL.
-			// "gh pr list --head <branch> --json url -q .[0].url"
-
-			// First, check if PR exists
+			// Check if PR exists
 			checkCmd := exec.Command("gh", "pr", "list", "--repo", *r.URL, "--head", branchName, "--json", "url", "-q", ".[0].url")
 			out, err := checkCmd.Output()
 			prURL := strings.TrimSpace(string(out))
@@ -243,7 +289,16 @@ func executePrCreation(config *Config, parallel int, gitPath string) ([]string, 
 			if prURL == "" {
 				// Create
 				fmt.Printf("[%s] Creating Pull Request...\n", getRepoName(r))
-				createCmd := exec.Command("gh", "pr", "create", "--repo", *r.URL, "--head", branchName, "--fill")
+
+				// Arguments for gh pr create
+				// gh pr create --fill --repo <url> --head <branch> --base <base_branch_if_configured>
+				args := []string{"pr", "create", "--repo", *r.URL, "--head", branchName, "--fill"}
+
+				if r.Branch != nil && *r.Branch != "" {
+					args = append(args, "--base", *r.Branch)
+				}
+
+				createCmd := exec.Command("gh", args...)
 				// Capture output to get URL
 				createOut, err := createCmd.Output()
 				if err != nil {
@@ -287,7 +342,7 @@ func updatePrDescriptions(prURLs []string, parallel int) error {
 	}
 
 	// Construct footer
-	footer := "\n----\nRelated Pull Request(s):\n"
+	footer := "\n\n----\nRelated Pull Request(s):\n"
 	for _, url := range prURLs {
 		footer += fmt.Sprintf("* %s\n", url)
 	}
@@ -305,7 +360,6 @@ func updatePrDescriptions(prURLs []string, parallel int) error {
 			defer func() { <-sem }()
 
 			// Get current body
-			// gh pr view <url> --json body -q .body
 			viewCmd := exec.Command("gh", "pr", "view", targetURL, "--json", "body", "-q", ".body")
 			bodyOut, err := viewCmd.Output()
 			if err != nil {
@@ -316,20 +370,9 @@ func updatePrDescriptions(prURLs []string, parallel int) error {
 			}
 			originalBody := strings.TrimSpace(string(bodyOut))
 
-			// Check if already updated to avoid duplication if run multiple times
-			// Simplified check
-			if strings.Contains(originalBody, "Related Pull Request(s):") {
-				// Maybe strip old footer and replace?
-				// For now, assume we append. But if we append every time, it gets messy.
-				// Let's split by "----\nRelated Pull Request(s):"
-				parts := strings.Split(originalBody, "----\nRelated Pull Request(s):")
-				originalBody = strings.TrimSpace(parts[0])
-			}
-
-			newBody := originalBody + "\n" + footer
+			newBody := originalBody + footer
 
 			// Update
-			// gh pr edit <url> --body <newBody>
 			editCmd := exec.Command("gh", "pr", "edit", targetURL, "--body", newBody)
 			if err := editCmd.Run(); err != nil {
 				mu.Lock()
