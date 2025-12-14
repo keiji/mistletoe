@@ -19,15 +19,18 @@ mstl-gh pr status [options]
 
 ### 動作
 
-1.  **初期化**: 引数の解析、設定ファイルの読み込み、`gh` コマンドの利用可能性チェックを行う。
-2.  **検証**: 各リポジトリの整合性（ディレクトリ存在、Gitリポジトリ、Remote URL一致）を検証する。
-3.  **ステータス収集**:
-    *   既存の `CollectStatus` ロジックを使用し、Gitのステータス（Branch, Rev, Ahead/Behind/Conflict）を並列に収集する。
-4.  **PR情報収集**:
-    *   収集したGitステータスをもとに、`gh pr list` コマンドを使用してPull Request情報を並列に取得する。
-    *   検索条件: `repo` (URL), `head` (Local Branch Name).
-    *   取得項目: Number, State, IsDraft, URL, BaseRefName.
+1.  **初期化**: 引数の解析、設定ファイルの読み込み。
+2.  **`gh` チェック**: `pr create` 同様、`gh` コマンドがインストールされ、認証済み (`gh auth status`) であることを確認する。
+3.  **検証**: 各リポジトリの整合性（ディレクトリ存在、Gitリポジトリ、Remote URL一致）を検証する。
+4.  **ステータス収集 (並列 & プログレス)**:
+    *   プログレススピナーを表示する。
+    *   GitステータスとPRステータスの収集を並列実行する。
+    *   **Gitステータス**: Branch, Rev, Ahead/Behind/Conflict。
+    *   **PRステータス**: `gh pr list` コマンドを使用してPull Request情報を取得する。
+        *   検索条件: `repo` (URL), `head` (Local Branch Name).
+        *   取得項目: Number, State, IsDraft, URL, BaseRefName.
 5.  **表示**:
+    *   スピナーを停止する。
     *   収集した情報を結合し、テーブル形式で標準出力に表示する。
 
 ### 出力テーブル
@@ -54,22 +57,29 @@ mstl-gh pr status [options]
 ```mermaid
 flowchart TD
     Start([Start]) --> ParseArgs[引数解析]
-    ParseArgs --> LoadConfig[設定読み込み]
+    ParseArgs --> CheckGH[gh コマンド/認証チェック]
+    CheckGH --> LoadConfig[設定読み込み]
     LoadConfig --> Validate[整合性チェック]
-    Validate --> CollectGit[Gitステータス収集 (並列)]
-    CollectGit --> CollectPR[PR情報収集 (並列)]
-    CollectPR --> Render[テーブル描画]
-    Render --> End([End])
+    Validate --> StartSpinner[スピナー開始]
+    StartSpinner --> ParallelLoop[並列ループ開始]
 
-    subgraph "PR情報収集 (各リポジトリ)"
-        CheckBranch{ブランチ有効?}
-        CheckBranch -- No --> SetNA[N/A設定]
+    subgraph "並列処理 (各リポジトリ)"
+        ParallelLoop --> GitStatus[Gitステータス収集]
+        GitStatus --> CheckBranch{ブランチ有効?}
+        CheckBranch -- No --> SetNA[PR: N/A]
         CheckBranch -- Yes --> ExecGH[gh pr list 実行]
         ExecGH -- 成功 --> ParseJSON[JSON解析]
         ParseJSON -- PRあり --> SetInfo[PR情報設定]
         ParseJSON -- PRなし --> SetNA
         ExecGH -- 失敗 --> SetNA
+        SetNA --> MergeInfo[情報マージ]
+        SetInfo --> MergeInfo
     end
+
+    MergeInfo --> EndParallel[並列ループ終了]
+    EndParallel --> StopSpinner[スピナー停止]
+    StopSpinner --> Render[テーブル描画]
+    Render --> End([End])
 ```
 
 ### 注意事項

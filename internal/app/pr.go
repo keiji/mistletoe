@@ -85,11 +85,19 @@ func handlePrStatus(args []string, opts GlobalOptions) {
 		os.Exit(1)
 	}
 
+	// Initialize Spinner
+	spinner := NewSpinner()
+	spinner.Start()
+
 	// 4. Collect Status
+	// We call CollectStatus internally. It does not show a spinner itself.
+	// We wrap it here to provide feedback.
 	rows := CollectStatus(config, parallel, opts.GitPath)
 
 	// 5. Collect PR Status
 	prRows := CollectPrStatus(rows, config, parallel, opts.GhPath)
+
+	spinner.Stop()
 
 	// 6. Render
 	RenderPrStatusTable(prRows)
@@ -166,8 +174,6 @@ func CollectPrStatus(statusRows []StatusRow, config *Config, parallel int, ghPat
 						}
 					} else {
 						// On error (e.g. network), we might want to show error or just N/A.
-						// N/A is safer to keep table clean, or "Err".
-						// Let's stick to N/A for now.
 						prRow.PrNumber = "N/A"
 					}
 				} else {
