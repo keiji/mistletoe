@@ -44,10 +44,10 @@ jobs:
       with:
         script: |
           const fs = require('fs');
-          const exec = require('child_process').execSync;
+          const execSync = require('child_process').execSync;
 
           try {
-            const output = exec('go tool cover -func=coverage.out').toString();
+            const output = execSync('go tool cover -func=coverage.out').toString();
             const body = '## Test Coverage Report\n\n```\n' + output + '\n```';
 
             github.rest.issues.createComment({
