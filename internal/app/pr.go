@@ -667,11 +667,6 @@ func updatePrDescriptions(prURLs []string, parallel int, ghPath string, snapshot
 		return nil
 	}
 
-	footer := "\n\n----\nRelated Pull Request(s):\n"
-	for _, url := range prURLs {
-		footer += fmt.Sprintf("* %s\n", url)
-	}
-
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, parallel)
@@ -699,7 +694,21 @@ func updatePrDescriptions(prURLs []string, parallel int, ghPath string, snapshot
 			if !strings.Contains(originalBody, snapshotFilename) {
 				newBody += snapshotAttachment
 			}
-			newBody += footer
+
+			// Add Related Pull Requests, excluding self
+			var relatedURLs []string
+			for _, u := range prURLs {
+				if u != targetURL {
+					relatedURLs = append(relatedURLs, u)
+				}
+			}
+
+			if len(relatedURLs) > 0 {
+				newBody += "\n\n----\nRelated Pull Request(s):\n"
+				for _, u := range relatedURLs {
+					newBody += fmt.Sprintf("* %s\n", u)
+				}
+			}
 
 			// Update
 			editCmd := execCommand(ghPath, "pr", "edit", targetURL, "--body", newBody)
