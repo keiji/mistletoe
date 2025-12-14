@@ -35,7 +35,7 @@ type StatusRow struct {
 // ValidateRepositoriesIntegrity checks if repositories exist and are valid.
 func ValidateRepositoriesIntegrity(config *Config, gitPath string) error {
 	for _, repo := range *config.Repositories {
-		targetDir := getRepoDir(repo)
+		targetDir := GetRepoDir(repo)
 		info, err := os.Stat(targetDir)
 		if os.IsNotExist(err) {
 			continue
@@ -97,7 +97,7 @@ func CollectStatus(config *Config, parallel int, gitPath string) []StatusRow {
 }
 
 func getRepoStatus(repo Repository, gitPath string) *StatusRow {
-	targetDir := getRepoDir(repo)
+	targetDir := GetRepoDir(repo)
 	repoName := targetDir
 	if repo.ID != nil && *repo.ID != "" {
 		repoName = *repo.ID

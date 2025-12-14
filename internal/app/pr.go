@@ -394,9 +394,31 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 		os.Exit(1)
 	}
 
+	fmt.Println("Generating configuration snapshot...")
+	snapshotData, snapshotID, err := GenerateSnapshot(config, opts.GitPath)
+	if err != nil {
+		fmt.Printf("Error generating snapshot: %v\n", err)
+		os.Exit(1)
+	}
+
+	filename := fmt.Sprintf("mistletoe-%s.json", snapshotID)
+	if err := os.WriteFile(filename, snapshotData, 0644); err != nil {
+		fmt.Printf("Error writing snapshot file: %v\n", err)
+		os.Exit(1)
+	}
+	fmt.Printf("Snapshot saved to %s\n", filename)
+
+	snapshotAttachment := fmt.Sprintf("\n\n<details>\n<summary>%s</summary>\n\n```json\n%s\n```\n</details>\n", filename, string(snapshotData))
+
+	prBodyWithSnapshot := prBody
+	if prBodyWithSnapshot != "" {
+		prBodyWithSnapshot += "\n"
+	}
+	prBodyWithSnapshot += snapshotAttachment
+
 	// 7. Execution: Push & Create PR
 	fmt.Println("Pushing changes and creating Pull Requests...")
-	prURLs, err := executePrCreation(activeRepos, parallel, opts.GitPath, opts.GhPath, existingPrURLs, prTitle, prBody)
+	prURLs, err := executePrCreation(activeRepos, parallel, opts.GitPath, opts.GhPath, existingPrURLs, prTitle, prBodyWithSnapshot)
 	if err != nil {
 		fmt.Printf("Error during execution: %v\n", err)
 		os.Exit(1)
@@ -421,7 +443,7 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 
 	// 8. Post-processing: Update Descriptions
 	fmt.Println("Updating Pull Request descriptions...")
-	if err := updatePrDescriptions(prURLs, parallel, opts.GhPath); err != nil {
+	if err := updatePrDescriptions(prURLs, parallel, opts.GhPath, snapshotAttachment, filename); err != nil {
 		fmt.Printf("Error updating descriptions: %v\n", err)
 		os.Exit(1)
 	}
@@ -500,7 +522,7 @@ func verifyGithubRequirements(repos []Repository, parallel int, gitPath, ghPath 
 
 			// 3. Check for existing PR
 			// We need the branch name to check for existing PR
-			repoDir := getRepoDir(r)
+			repoDir := GetRepoDir(r)
 			branchName, err := RunGit(repoDir, gitPath, "rev-parse", "--abbrev-ref", "HEAD")
 			if err != nil {
 				mu.Lock()
@@ -549,7 +571,7 @@ func executePrCreation(repos []Repository, parallel int, gitPath, ghPath string,
 			sem <- struct{}{}
 			defer func() { <-sem }()
 
-			repoDir := getRepoDir(r)
+			repoDir := GetRepoDir(r)
 			repoName := getRepoName(r)
 
 			// 1. Push
@@ -640,7 +662,7 @@ func executePrCreation(repos []Repository, parallel int, gitPath, ghPath string,
 	return prURLs, nil
 }
 
-func updatePrDescriptions(prURLs []string, parallel int, ghPath string) error {
+func updatePrDescriptions(prURLs []string, parallel int, ghPath string, snapshotAttachment, snapshotFilename string) error {
 	if len(prURLs) == 0 {
 		return nil
 	}
@@ -673,7 +695,11 @@ func updatePrDescriptions(prURLs []string, parallel int, ghPath string) error {
 			}
 			originalBody := strings.TrimSpace(string(bodyOut))
 
-			newBody := originalBody + footer
+			newBody := originalBody
+			if !strings.Contains(originalBody, snapshotFilename) {
+				newBody += snapshotAttachment
+			}
+			newBody += footer
 
 			// Update
 			editCmd := execCommand(ghPath, "pr", "edit", targetURL, "--body", newBody)
@@ -698,5 +724,5 @@ func getRepoName(r Repository) string {
 		return *r.ID
 	}
 	// Fallback to dir name
-	return getRepoDir(r)
+	return GetRepoDir(r)
 }
