@@ -16,7 +16,7 @@ func fakeExecCommand(command string, args ...string) *exec.Cmd {
 	cs = append(cs, args...)
 	cmd := exec.Command(os.Args[0], cs...)
 	// Pass environment variables to identify specific test cases
-	cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1"}
+	cmd.Env = append(os.Environ(), "GO_WANT_HELPER_PROCESS=1")
 	return cmd
 }
 
@@ -80,6 +80,20 @@ func handleGhMock(args []string) {
 		}
 		// pr create
 		if len(args) > 1 && args[1] == "create" {
+			// Check for draft failure simulation
+			hasDraft := false
+			for _, a := range args {
+				if a == "--draft" {
+					hasDraft = true
+					break
+				}
+			}
+
+			if os.Getenv("MOCK_GH_DRAFT_FAIL") == "1" && hasDraft {
+				fmt.Fprintln(os.Stderr, "Draft pull requests are not supported")
+				os.Exit(1)
+			}
+
 			// Output the URL
 			fmt.Println("https://github.com/user/repo/pull/2")
 			os.Exit(0)
@@ -122,19 +136,6 @@ func TestVerifyGithubRequirements_Success(t *testing.T) {
 	oldExec := execCommand
 	execCommand = fakeExecCommand
 	defer func() { execCommand = oldExec }()
-
-	// Need to use RunGit which uses real git... verifyGithubRequirements uses RunGit to get branch.
-	// But `RunGit` uses `exec.Command` directly in `utils.go`.
-	// We cannot mock `RunGit` easily unless we refactor `utils.go` too or use a dummy repo.
-	// `pr.go` imports `RunGit` from same package `app`.
-
-	// Since we are in the same package `app`, we can't shadow `RunGit` unless we define it as a var.
-	// `RunGit` is a function.
-	// But `verifyGithubRequirements` takes `gitPath`.
-	// If we provide a fake git path, `RunGit` will fail unless that fake path is executable.
-
-	// Strategy: Create a dummy git repo for the test, so real `git` works.
-	// We only need `rev-parse --abbrev-ref HEAD` to work.
 
 	tmpDir := t.TempDir()
 	_, err := exec.Command("git", "init", tmpDir).Output()
@@ -191,6 +192,59 @@ func TestVerifyGithubRequirements_ExistingPR(t *testing.T) {
 	}
 	if url, ok := existing[tmpDir]; !ok || url != "https://github.com/user/repo/pull/1" {
 		t.Errorf("Expected existing PR URL, got %v", existing)
+	}
+}
+
+func TestExecutePrCreation_DraftFallback(t *testing.T) {
+	oldExec := execCommand
+	execCommand = fakeExecCommand
+	defer func() { execCommand = oldExec }()
+
+	// Set env var to trigger draft failure in mock
+	os.Setenv("MOCK_GH_DRAFT_FAIL", "1")
+	defer os.Unsetenv("MOCK_GH_DRAFT_FAIL")
+
+	// Setup Local Repo
+	localDir := t.TempDir()
+	exec.Command("git", "init", localDir).Run()
+	// Config
+	cmdConfig := exec.Command("git", "-C", localDir, "config", "user.name", "test")
+	cmdConfig.Run()
+	exec.Command("git", "-C", localDir, "config", "user.email", "test@example.com").Run()
+
+	// Commit
+	exec.Command("git", "-C", localDir, "commit", "--allow-empty", "-m", "init").Run()
+	// Create feature branch
+	exec.Command("git", "-C", localDir, "checkout", "-b", "feature").Run()
+
+	// Setup Remote
+	remoteDir := t.TempDir()
+	exec.Command("git", "init", "--bare", remoteDir).Run()
+	exec.Command("git", "-C", localDir, "remote", "add", "origin", remoteDir).Run()
+
+	// Define Repo config
+	// ID must match localDir name for getRepoDir to resolve to localDir (since we can't change CWD easily for getRepoDir unless we use ID)
+	// getRepoDir uses ID if present.
+	// But `executePrCreation` takes `[]Repository`.
+	// We pass `Repository{ID: &localDir, ...}`.
+
+	url := "https://github.com/user/repo"
+	id := localDir
+	repo := Repository{ID: &id, URL: &url}
+	repos := []Repository{repo}
+
+	// Run
+	prURLs, err := executePrCreation(repos, 1, "git", map[string]string{}, "Title", "Body")
+	if err != nil {
+		t.Fatalf("executePrCreation failed: %v", err)
+	}
+
+	if len(prURLs) != 1 {
+		t.Errorf("Expected 1 PR URL, got %d", len(prURLs))
+	} else {
+		if prURLs[0] != "https://github.com/user/repo/pull/2" {
+			t.Errorf("Unexpected PR URL: %s", prURLs[0])
+		}
 	}
 }
 

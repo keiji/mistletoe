@@ -359,41 +359,58 @@ func executePrCreation(repos []Repository, parallel int, gitPath string, existin
 			// Check if we already found an existing PR
 			if url, ok := existingPRs[repoName]; ok {
 				fmt.Printf("[%s] Pull Request already exists: %s (skipping creation)\n", repoName, url)
-				// We don't add to prURLs here, because the caller will merge existingPRs.
-				// Or we can add it here. The prompt implies "exclude from PR creation target".
-				// It doesn't explicitly say "don't return it".
-				// But we need it for description updating.
-				// Let's rely on the caller to merge them, or add it here.
-				// To keep it simple, let's add it here so `prURLs` contains newly created ones.
-				// Wait, if I add it here, I don't need to merge in caller.
-				// But "newly created" vs "all involved" matters for the message "Creating Pull Request...".
 				return
 			}
 
-			// Double check? No, verifyGithubRequirements is authoritative enough for "existing" state at start.
-			// But race conditions exist. gh pr create will fail if it exists.
-
-			fmt.Printf("[%s] Creating Pull Request...\n", repoName)
-
-			args := []string{"pr", "create", "--repo", *r.URL, "--head", branchName}
+			// Base arguments
+			baseArgs := []string{"pr", "create", "--repo", *r.URL, "--head", branchName}
 
 			if title != "" || body != "" {
 				if title != "" {
-					args = append(args, "--title", title)
+					baseArgs = append(baseArgs, "--title", title)
 				}
 				if body != "" {
-					args = append(args, "--body", body)
+					baseArgs = append(baseArgs, "--body", body)
 				}
 			} else {
-				args = append(args, "--fill")
+				baseArgs = append(baseArgs, "--fill")
 			}
 
 			if r.Branch != nil && *r.Branch != "" {
-				args = append(args, "--base", *r.Branch)
+				baseArgs = append(baseArgs, "--base", *r.Branch)
 			}
 
-			createCmd := execCommand("gh", args...)
+			// Try Draft First
+			fmt.Printf("[%s] Creating Pull Request (Draft)...\n", repoName)
+			draftArgs := append(append([]string{}, baseArgs...), "--draft")
+
+			createCmd := execCommand("gh", draftArgs...)
 			createOut, err := createCmd.Output()
+
+			if err != nil {
+				// Check for "already exists"
+				var exitErr *exec.ExitError
+				isAlreadyExists := false
+				if errors.As(err, &exitErr) {
+					stderr := string(exitErr.Stderr)
+					if strings.Contains(stderr, "already exists") {
+						isAlreadyExists = true
+					}
+				}
+
+				if isAlreadyExists {
+					// Fallthrough to handle existing
+				} else {
+					// Assume failure is due to Draft restrictions (or other recoverable error by fallback)
+					fmt.Printf("[%s] Draft creation failed (retrying as standard PR)... \n", repoName)
+
+					// Retry without draft
+					createCmd = execCommand("gh", baseArgs...)
+					createOut, err = createCmd.Output()
+				}
+			}
+
+			// Final Error Check
 			if err != nil {
 				var exitErr *exec.ExitError
 				if errors.As(err, &exitErr) {
