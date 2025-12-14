@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 )
 
@@ -15,20 +16,12 @@ func strPtr(s string) *string {
 }
 
 func getModuleRoot(t *testing.T) string {
-	dir, err := os.Getwd()
+	cmd := exec.Command("go", "list", "-m", "-f", "{{.Dir}}")
+	out, err := cmd.Output()
 	if err != nil {
-		t.Fatalf("failed to get current dir: %v", err)
+		t.Fatalf("failed to get module root: %v", err)
 	}
-	for {
-		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
-			return dir
-		}
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			t.Fatalf("go.mod not found")
-		}
-		dir = parent
-	}
+	return strings.TrimSpace(string(out))
 }
 
 // buildMstl builds the mstl binary and returns its path.
