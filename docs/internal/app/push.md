@@ -32,28 +32,28 @@ mstl push [options]
 
 ```mermaid
 flowchart TD
-    Start([開始]) --> ParseArgs[引数パース]
-    ParseArgs --> LoadConfig[設定読み込み]
-    LoadConfig --> ValidateEnv[環境検証]
-    ValidateEnv --> CollectStatus[ステータス収集 (statusロジック再利用)]
+    Start(["開始"]) --> ParseArgs["引数パース"]
+    ParseArgs --> LoadConfig["設定読み込み"]
+    LoadConfig --> ValidateEnv["環境検証"]
+    ValidateEnv --> CollectStatus["ステータス収集 (statusロジック再利用)"]
 
-    CollectStatus --> RenderTable[ステータステーブル表示]
-    RenderTable --> CheckSafety{安全チェック}
+    CollectStatus --> RenderTable["ステータステーブル表示"]
+    RenderTable --> CheckSafety{"安全チェック"}
 
-    CheckSafety -- "Conflictあり" --> ErrorConflict[エラー: Conflicts detected]
-    CheckSafety -- "Pullableあり" --> ErrorSync[エラー: Sync required]
+    CheckSafety -- "Conflictあり" --> ErrorConflict["エラー: Conflicts detected"]
+    CheckSafety -- "Pullableあり" --> ErrorSync["エラー: Sync required"]
 
-    CheckSafety -- "問題なし" --> FilterPushable[Push対象抽出 (Unpushed)]
-    FilterPushable --> CheckEmpty{対象あり？}
-    CheckEmpty -- No --> MsgEmpty[メッセージ: No repositories to push] --> End([終了])
+    CheckSafety -- "問題なし" --> FilterPushable["Push対象抽出 (Unpushed)"]
+    FilterPushable --> CheckEmpty{"対象あり？"}
+    CheckEmpty -- No --> MsgEmpty["メッセージ: No repositories to push"] --> End(["終了"])
 
-    CheckEmpty -- Yes --> UserPrompt{ユーザー確認 (y/n)}
+    CheckEmpty -- Yes --> UserPrompt{"ユーザー確認 (y/n)"}
     UserPrompt -- No --> End
-    UserPrompt -- Yes --> PushLoop[並列プッシュ実行]
+    UserPrompt -- Yes --> PushLoop["並列プッシュ実行"]
 
     subgraph "プッシュ実行"
-        PushLoop --> GitPush[git push origin branch]
-        GitPush --> ResultLog[結果表示]
+        PushLoop --> GitPush["git push origin branch"]
+        GitPush --> ResultLog["結果表示"]
     end
 
     ResultLog --> End

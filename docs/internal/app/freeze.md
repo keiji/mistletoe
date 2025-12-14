@@ -36,35 +36,35 @@ mstl freeze --file <output_path>
 
 ```mermaid
 flowchart TD
-    Start([開始]) --> ParseArgs[引数パース]
-    ParseArgs --> CheckFile{出力ファイル指定あり？}
-    CheckFile -- No --> ErrorArg[エラー: ファイル必須]
-    CheckFile -- Yes --> CheckExist{ファイル存在？}
+    Start(["開始"]) --> ParseArgs["引数パース"]
+    ParseArgs --> CheckFile{"出力ファイル指定あり？"}
+    CheckFile -- No --> ErrorArg["エラー: ファイル必須"]
+    CheckFile -- Yes --> CheckExist{"ファイル存在？"}
 
-    CheckExist -- Yes --> ErrorExist[エラー: ファイル既存]
-    CheckExist -- No --> ScanDir[カレントディレクトリ走査]
+    CheckExist -- Yes --> ErrorExist["エラー: ファイル既存"]
+    CheckExist -- No --> ScanDir["カレントディレクトリ走査"]
 
-    ScanDir --> Loop[ディレクトリループ]
+    ScanDir --> Loop["ディレクトリループ"]
 
     subgraph "各ディレクトリの処理"
         Loop --> CheckGit{Is Git Repo?}
-        CheckGit -- No --> Skip[スキップ]
-        CheckGit -- Yes --> GetURL[Remote URL取得]
-        GetURL --> GetHEAD[HEAD状態取得]
+        CheckGit -- No --> Skip["スキップ"]
+        CheckGit -- Yes --> GetURL["Remote URL取得"]
+        GetURL --> GetHEAD["HEAD状態取得"]
 
         GetHEAD --> CheckDetached{Detached HEAD?}
-        CheckDetached -- No --> SetBranch[Branch設定]
-        CheckDetached -- Yes --> SetRev[Revision設定]
+        CheckDetached -- No --> SetBranch["Branch設定"]
+        CheckDetached -- Yes --> SetRev["Revision設定"]
 
-        SetBranch --> AppendList[リストに追加]
+        SetBranch --> AppendList["リストに追加"]
         SetRev --> AppendList
     end
 
-    Loop --> CheckEnd{全ディレクトリ完了？}
+    Loop --> CheckEnd{"全ディレクトリ完了？"}
     CheckEnd -- No --> Loop
-    CheckEnd -- Yes --> Marshal[JSON生成]
-    Marshal --> WriteFile[ファイル書き込み]
-    WriteFile --> End([終了])
+    CheckEnd -- Yes --> Marshal["JSON生成"]
+    Marshal --> WriteFile["ファイル書き込み"]
+    WriteFile --> End(["終了"])
 
     ErrorArg --> End
     ErrorExist --> End

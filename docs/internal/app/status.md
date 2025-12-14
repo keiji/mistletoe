@@ -41,36 +41,36 @@ mstl status [options]
 
 ```mermaid
 flowchart TD
-    Start([開始]) --> ParseArgs[引数パース]
-    ParseArgs --> LoadConfig[設定読み込み]
-    LoadConfig --> ValidateEnv[環境検証 (全リポジトリ)]
-    ValidateEnv -- "エラー" --> ErrorExit([エラー終了])
-    ValidateEnv -- "成功" --> InitSpinner[スピナー開始]
-    InitSpinner --> ParallelLoop[並列ループ開始]
+    Start(["開始"]) --> ParseArgs["引数パース"]
+    ParseArgs --> LoadConfig["設定読み込み"]
+    LoadConfig --> ValidateEnv["環境検証 (全リポジトリ)"]
+    ValidateEnv -- "エラー" --> ErrorExit(["エラー終了"])
+    ValidateEnv -- "成功" --> InitSpinner["スピナー開始"]
+    InitSpinner --> ParallelLoop["並列ループ開始"]
 
     subgraph "各リポジトリのステータス取得 (CollectStatus)"
-        ParallelLoop --> GetLocal[ローカル状態取得 (HEAD, SHA)]
-        GetLocal --> GetRemote[リモート状態取得 (ls-remote)]
-        GetRemote --> CheckRemoteDiff{ローカルとリモートに差異?}
-        CheckRemoteDiff -- Yes --> CalcAhead[Unpushed判定 (rev-list remote..local)]
+        ParallelLoop --> GetLocal["ローカル状態取得 (HEAD, SHA)"]
+        GetLocal --> GetRemote["リモート状態取得 (ls-remote)"]
+        GetRemote --> CheckRemoteDiff{"ローカルとリモートに差異?"}
+        CheckRemoteDiff -- Yes --> CalcAhead["Unpushed判定 (rev-list remote..local)"]
 
-        CalcAhead --> CheckBranchMatch{Configブランチ == 現在ブランチ?}
-        CheckBranchMatch -- Yes --> CalcBehind[Pullable判定 (rev-list local..remote)]
+        CalcAhead --> CheckBranchMatch{"Configブランチ == 現在ブランチ?"}
+        CheckBranchMatch -- Yes --> CalcBehind["Pullable判定 (rev-list local..remote)"]
 
-        CalcBehind --> CheckConflict{Pullable?}
-        CheckConflict -- Yes --> MergeTree[Merge Tree (競合チェック)]
-        MergeTree --> Result[結果構造体作成]
+        CalcBehind --> CheckConflict{"Pullable?"}
+        CheckConflict -- Yes --> MergeTree["Merge Tree (競合チェック)"]
+        MergeTree --> Result["結果構造体作成"]
 
         CheckRemoteDiff -- No --> Result
         CheckBranchMatch -- No --> Result
         CheckConflict -- No --> Result
     end
 
-    Result --> Gather[結果収集]
-    Gather --> StopSpinner[スピナー停止]
-    StopSpinner --> SortResults[リポジトリ名でソート]
-    SortResults --> RenderTable[テーブル描画]
-    RenderTable --> End([終了])
+    Result --> Gather["結果収集"]
+    Gather --> StopSpinner["スピナー停止"]
+    StopSpinner --> SortResults["リポジトリ名でソート"]
+    SortResults --> RenderTable["テーブル描画"]
+    RenderTable --> End(["終了"])
 ```
 
 ### 4.2. 詳細ロジック

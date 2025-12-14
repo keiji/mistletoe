@@ -34,43 +34,43 @@ mstl switch --create <branch_name> --file <path> [options]
 
 ```mermaid
 flowchart TD
-    Start([開始]) --> ParseArgs[引数・フラグパース]
-    ParseArgs --> LoadConfig[設定読み込み]
-    LoadConfig --> PreCheckLoop[事前チェックループ (並列)]
+    Start(["開始"]) --> ParseArgs["引数・フラグパース"]
+    ParseArgs --> LoadConfig["設定読み込み"]
+    LoadConfig --> PreCheckLoop["事前チェックループ (並列)"]
 
     subgraph "事前チェック (Pre-check Phase)"
-        PreCheckLoop --> CheckDir{ディレクトリ存在?}
-        CheckDir -- No --> ErrorDir[エラー: ディレクトリ不在]
-        CheckDir -- Yes --> CheckBranch[ブランチ存在確認 (git show-ref)]
-        CheckBranch --> StoreResult[結果をマップに保存]
+        PreCheckLoop --> CheckDir{"ディレクトリ存在?"}
+        CheckDir -- No --> ErrorDir["エラー: ディレクトリ不在"]
+        CheckDir -- Yes --> CheckBranch["ブランチ存在確認 (git show-ref)"]
+        CheckBranch --> StoreResult["結果をマップに保存"]
     end
-    ErrorDir --> ErrorExit([エラー終了])
+    ErrorDir --> ErrorExit(["エラー終了"])
 
-    StoreResult --> WaitPreCheck[チェック完了待機]
-    WaitPreCheck --> CheckMode{作成モード (-c) ?}
+    StoreResult --> WaitPreCheck["チェック完了待機"]
+    WaitPreCheck --> CheckMode{"作成モード (-c) ?"}
 
-    CheckMode -- No (Switch Mode) --> VerifyAll{全リポジトリで\nブランチが存在?}
-    VerifyAll -- No --> ReportMissing[エラー: 不足リポジトリ一覧表示]
+    CheckMode -- No (Switch Mode) --> VerifyAll{"全リポジトリで\nブランチが存在?"}
+    VerifyAll -- No --> ReportMissing["エラー: 不足リポジトリ一覧表示"]
     ReportMissing --> ErrorExit
 
-    VerifyAll -- Yes --> ExecLoopSwitch[実行ループ (並列)]
+    VerifyAll -- Yes --> ExecLoopSwitch["実行ループ (並列)"]
 
     subgraph "実行: 切り替えモード"
-        ExecLoopSwitch --> GitCheckout[git checkout branch]
+        ExecLoopSwitch --> GitCheckout["git checkout branch"]
     end
 
-    CheckMode -- Yes (Create Mode) --> ExecLoopCreate[実行ループ (並列)]
+    CheckMode -- Yes (Create Mode) --> ExecLoopCreate["実行ループ (並列)"]
 
     subgraph "実行: 作成モード"
-        ExecLoopCreate --> CheckMap{マップ確認: 存在?}
-        CheckMap -- Yes --> SwitchOnly[git checkout branch]
-        CheckMap -- No --> CreateAndSwitch[git checkout -b branch]
+        ExecLoopCreate --> CheckMap{"マップ確認: 存在?"}
+        CheckMap -- Yes --> SwitchOnly["git checkout branch"]
+        CheckMap -- No --> CreateAndSwitch["git checkout -b branch"]
     end
 
-    GitCheckout --> WaitExec[完了待機]
+    GitCheckout --> WaitExec["完了待機"]
     SwitchOnly --> WaitExec
     CreateAndSwitch --> WaitExec
-    WaitExec --> Stop([終了])
+    WaitExec --> Stop(["終了"])
 ```
 
 ### 3.2. 詳細挙動 (Detailed Behavior)

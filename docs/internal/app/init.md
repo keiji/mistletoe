@@ -48,38 +48,38 @@ mstl init --file <path> [options]
 
 ```mermaid
 flowchart TD
-    Start([開始]) --> ParseArgs[引数パース]
-    ParseArgs --> CheckFile{設定ファイル指定あり？}
-    CheckFile -- No --> ErrorFile[エラー: ファイル必須]
-    CheckFile -- Yes --> LoadConfig[設定読み込み]
-    LoadConfig --> ValidateEnv[環境検証 (全リポジトリ)]
+    Start(["開始"]) --> ParseArgs["引数パース"]
+    ParseArgs --> CheckFile{"設定ファイル指定あり？"}
+    CheckFile -- No --> ErrorFile["エラー: ファイル必須"]
+    CheckFile -- Yes --> LoadConfig["設定読み込み"]
+    LoadConfig --> ValidateEnv["環境検証 (全リポジトリ)"]
 
-    ValidateEnv -- "エラー (リポジトリ無効, ディレクトリ空でない, URL不一致)" --> ErrorExit([エラー終了])
-    ValidateEnv -- "成功" --> ExecLoop[並列実行ループ]
+    ValidateEnv -- "エラー (リポジトリ無効, ディレクトリ空でない, URL不一致)" --> ErrorExit(["エラー終了"])
+    ValidateEnv -- "成功" --> ExecLoop["並列実行ループ"]
 
     subgraph "リポジトリごとの実行"
-        ExecLoop --> CheckState{ディレクトリ状態確認}
+        ExecLoop --> CheckState{"ディレクトリ状態確認"}
 
-        CheckState -- "なし または 空" --> Clone[git clone]
-        CheckState -- "Gitリポジトリ存在" --> SkipClone[クローン・スキップ]
+        CheckState -- "なし または 空" --> Clone["git clone"]
+        CheckState -- "Gitリポジトリ存在" --> SkipClone["クローン・スキップ"]
 
-        Clone --> CheckRev{Revision指定あり？}
+        Clone --> CheckRev{"Revision指定あり？"}
         SkipClone --> CheckRev
 
-        CheckRev -- Yes --> CheckoutRev[git checkout revision]
-        CheckoutRev --> CheckBranchWithRev{Branch指定あり？}
+        CheckRev -- Yes --> CheckoutRev["git checkout revision"]
+        CheckoutRev --> CheckBranchWithRev{"Branch指定あり？"}
 
-        CheckBranchWithRev -- Yes --> CreateBranch[git checkout -b branch]
-        CheckBranchWithRev -- No --> Detached[結果: Detached HEAD]
+        CheckBranchWithRev -- Yes --> CreateBranch["git checkout -b branch"]
+        CheckBranchWithRev -- No --> Detached["結果: Detached HEAD"]
 
-        CheckRev -- No --> CheckBranchOnly{Branch指定あり？}
+        CheckRev -- No --> CheckBranchOnly{"Branch指定あり？"}
 
-        CheckBranchOnly -- Yes --> CheckoutBranch[git checkout branch]
-        CheckBranchOnly -- No --> DefaultBranch[結果: Default Branch]
+        CheckBranchOnly -- Yes --> CheckoutBranch["git checkout branch"]
+        CheckBranchOnly -- No --> DefaultBranch["結果: Default Branch"]
     end
 
     ErrorFile --> ErrorExit
-    ErrorExit --> Stop([終了])
+    ErrorExit --> Stop(["終了"])
 ```
 
 ### 4.2. 環境検証 (Environment Validation)

@@ -25,37 +25,37 @@ mstl sync --file <path> [options]
 
 ```mermaid
 flowchart TD
-    Start([開始]) --> ParseArgs[引数パース]
-    ParseArgs --> LoadConfig[設定読み込み]
-    LoadConfig --> ValidateIntegrity[整合性検証]
+    Start(["開始"]) --> ParseArgs["引数パース"]
+    ParseArgs --> LoadConfig["設定読み込み"]
+    LoadConfig --> ValidateIntegrity["整合性検証"]
 
-    ValidateIntegrity -- "エラー" --> ErrorExit([エラー終了])
-    ValidateIntegrity -- "成功" --> CollectStatus[ステータス収集 (並列)]
+    ValidateIntegrity -- "エラー" --> ErrorExit(["エラー終了"])
+    ValidateIntegrity -- "成功" --> CollectStatus["ステータス収集 (並列)"]
 
-    CollectStatus --> Analyze{競合判定}
+    CollectStatus --> Analyze{"競合判定"}
 
-    Analyze -- "Pull可能 かつ 未Push (競合)" --> Prompt[戦略選択プロンプト]
-    Analyze -- "Pull可能のみ (Fast-forward)" --> AutoPull[自動 Pull モード]
+    Analyze -- "Pull可能 かつ 未Push (競合)" --> Prompt["戦略選択プロンプト"]
+    Analyze -- "Pull可能のみ (Fast-forward)" --> AutoPull["自動 Pull モード"]
     Analyze -- "更新なし" --> AutoPull
 
-    Prompt -- "Abort / Invalid" --> Stop([中止])
-    Prompt -- "Merge" --> SetMerge[Merge オプション設定]
-    Prompt -- "Rebase" --> SetRebase[Rebase オプション設定]
+    Prompt -- "Abort / Invalid" --> Stop(["中止"])
+    Prompt -- "Merge" --> SetMerge["Merge オプション設定"]
+    Prompt -- "Rebase" --> SetRebase["Rebase オプション設定"]
 
-    SetMerge --> ExecLoop[同期実行ループ]
+    SetMerge --> ExecLoop["同期実行ループ"]
     SetRebase --> ExecLoop
     AutoPull --> ExecLoop
 
     subgraph "同期実行 (順次)"
-        ExecLoop --> CheckRemote{リモートブランチ存在?}
-        CheckRemote -- "なし" --> Skip[スキップ]
-        CheckRemote -- "あり" --> GitPull[git pull <args>]
+        ExecLoop --> CheckRemote{"リモートブランチ存在?"}
+        CheckRemote -- "なし" --> Skip["スキップ"]
+        CheckRemote -- "あり" --> GitPull["git pull <args>"]
 
-        GitPull -- "エラー" --> ErrorPull([エラー終了])
-        GitPull -- "成功" --> Next[次へ]
+        GitPull -- "エラー" --> ErrorPull(["エラー終了"])
+        GitPull -- "成功" --> Next["次へ"]
     end
 
-    Next --> End([終了])
+    Next --> End(["終了"])
 ```
 
 ### 3.2. ステータス収集と判定 (Status Collection & Analysis)
