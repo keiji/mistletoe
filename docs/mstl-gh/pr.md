@@ -32,10 +32,11 @@ mstl-gh pr create [options]
         *   **競合がないこと**: 競合状態でないこと。
     *   確認後、`status` コマンド相当のテーブルを表示します。
     *   Detached HEAD状態のリポジトリがある場合は警告し、処理を続行するか確認します。
+        *   続行を選択した場合、これらのリポジトリは以降の処理 (GitHub要件チェック、実行) から除外されます。
     *   実行前に確認プロンプトを表示します。
 4.  **GitHub要件チェック**:
-    *   すべてのリポジトリがGitHub管理下であることを確認します (URLチェック)。
-    *   すべてのリポジトリでPR作成権限があることを確認します。
+    *   対象リポジトリ (除外済みを除く) がすべてGitHub管理下であることを確認します (URLチェック)。
+    *   対象リポジトリすべてでPR作成権限があることを確認します。
     *   **既存PRの確認**: すでにPull Requestが存在するかを確認します。
         *   存在する場合: そのURLを記録し、後続の「PR作成」ステップはスキップしますが、「Push」は実行対象とします。
     *   条件を満たさないリポジトリがある場合、エラーとして終了します。
@@ -44,6 +45,7 @@ mstl-gh pr create [options]
         1.  **Push**: `git push origin <current_branch>` を実行します。
         2.  **PR作成**:
             *   既存のPRがない場合: `gh pr create --fill` (設定ファイルでbranch指定がある場合は `--base <branch>`) を実行し、作成されたPRのURLを取得します。
+            *   **競合回避**: PR作成コマンドが「すでに存在する」というエラーで失敗した場合、再度PRの存在確認を行い、URLが取得できれば「既存のPRがある」とみなして続行します。
             *   既存のPRがある場合: スキップします。
 6.  **事後処理 (Post-processing)**:
     *   すべてのPR (新規作成および既存) について、Descriptionを更新し、相互リンク (Related Pull Request(s)) を追記します。
@@ -62,19 +64,28 @@ flowchart TD
     D -- NG --> Z
     E --> F{Push不可/競合あり?}
     F -- Yes --> Z
-    F -- No --> G[ステータス表示 & 確認]
-    G --> H[GitHub要件/既存PRチェック]
-    H -- NG --> Z
-    H -- OK --> I[並列実行開始]
-    I --> J[Git Push]
-    J --> K{既存PRあり?}
-    K -- Yes --> L[URL収集 (既存)]
-    K -- No --> M[PR作成 gh pr create]
-    M --> L
-    L --> N[全リポジトリ完了?]
-    N -- No --> J
-    N -- Yes --> O[PR Description更新 gh pr edit]
-    O --> P[終了]
+    F -- No --> G[ステータス表示]
+    G --> H{Detached HEADあり?}
+    H -- Yes --> I[警告 & 続行確認]
+    I -- No --> Z
+    I -- Yes --> J[対象から除外]
+    H -- No --> J[確認プロンプト]
+    J -- No --> Z
+    J -- Yes --> K[GitHub要件/既存PRチェック]
+    K -- NG --> Z
+    K -- OK --> L[並列実行開始]
+    L --> M[Git Push]
+    M --> N{既存PRあり?}
+    N -- Yes --> O[URL収集 (既存)]
+    N -- No --> P[PR作成 gh pr create]
+    P -- エラー(重複) --> Q[再確認]
+    Q -- 発見 --> O
+    Q -- なし --> Z
+    P -- 成功 --> O
+    O --> R[全リポジトリ完了?]
+    R -- No --> M
+    R -- Yes --> S[PR Description更新 gh pr edit]
+    S --> T[終了]
 ```
 
 ### エラーハンドリング
