@@ -21,12 +21,16 @@ func buildMstl(t *testing.T) string {
 		binPath += ".exe"
 	}
 
-	// Build using package path
-	cmdPath := "mistletoe/cmd/mstl"
-
+	// Build from cmd/mstl
+	// Since tests run in internal/app, we need to go up two levels
+	rootDir, err := filepath.Abs("../..")
+	if err != nil {
+		t.Fatalf("failed to get root dir: %v", err)
+	}
+	cmdPath := filepath.Join(rootDir, "cmd", "mstl")
 	buildCmd := exec.Command("go", "build", "-o", binPath, cmdPath)
-	if out, err := buildCmd.CombinedOutput(); err != nil {
-		t.Fatalf("failed to build mstl: %v\nOutput: %s", err, out)
+	if err := buildCmd.Run(); err != nil {
+		t.Fatalf("failed to build mstl: %v", err)
 	}
 	return binPath
 }

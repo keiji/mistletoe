@@ -20,10 +20,15 @@ func TestMain(m *testing.M) {
 	}
 
 	// Build command
-	cmdPath := "mistletoe/cmd/mstl"
+	rootDir, err := filepath.Abs("../..")
+	if err != nil {
+		fmt.Printf("Failed to get root dir: %v\n", err)
+		os.Exit(1)
+	}
+	cmdPath := filepath.Join(rootDir, "cmd", "mstl")
 	cmd := exec.Command("go", "build", "-o", binaryPath, cmdPath)
-	if out, err := cmd.CombinedOutput(); err != nil {
-		fmt.Printf("Failed to build binary: %v\nOutput: %s\n", err, out)
+	if err := cmd.Run(); err != nil {
+		fmt.Printf("Failed to build binary: %v\n", err)
 		os.Exit(1)
 	}
 
