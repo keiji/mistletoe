@@ -258,7 +258,21 @@ func verifyGithubRequirements(repos []Repository, parallel int, gitPath string) 
 			}
 
 			checkCmd := exec.Command("gh", "pr", "list", "--repo", *r.URL, "--head", branchName, "--json", "url", "-q", ".[0].url")
-			out, err = checkCmd.Output()
+			out, errCheck := checkCmd.Output()
+			// err is not assigned because if this fails, we just assume no PR exists or it's not a critical error for verification?
+			// But wait, if err happens, maybe we should report?
+			// The original code was reusing `err` which was ineffassign because it was overwritten or not checked?
+			// Actually the linter said `ineffectual assignment to err`.
+			// `out, err = checkCmd.Output()`
+			// If I just declare `out, _ := ...` it might be safer if I don't care about the error.
+			// However, if `gh pr list` fails, it might be important.
+			// Let's check it.
+			if errCheck != nil {
+				mu.Lock()
+				errs = append(errs, fmt.Sprintf("[%s] Failed to check for existing PR: %v", repoName, errCheck))
+				mu.Unlock()
+				return
+			}
 			prURL := strings.TrimSpace(string(out))
 
 			if prURL != "" {
