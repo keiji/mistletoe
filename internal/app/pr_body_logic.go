@@ -39,10 +39,6 @@ func GenerateMistletoeBody(snapshotData string, snapshotFilename string, related
 		for _, u := range relatedURLs {
 			sb.WriteString(fmt.Sprintf(" * %s\n", u))
 		}
-	} else {
-		// If no related PRs, we can leave it empty or indicate none.
-		// Given the prompt example " * pr", we'll assume we list them if they exist.
-		// If none, we leave the section header but no list.
 	}
 
 	sb.WriteString(bottomSep + "\n")
