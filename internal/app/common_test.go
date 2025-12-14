@@ -6,22 +6,12 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"testing"
 )
 
 // strPtr returns a pointer to the string.
 func strPtr(s string) *string {
 	return &s
-}
-
-func getModuleRoot(t *testing.T) string {
-	cmd := exec.Command("go", "list", "-m", "-f", "{{.Dir}}")
-	out, err := cmd.Output()
-	if err != nil {
-		t.Fatalf("failed to get module root: %v", err)
-	}
-	return strings.TrimSpace(string(out))
 }
 
 // buildMstl builds the mstl binary and returns its path.
@@ -31,8 +21,8 @@ func buildMstl(t *testing.T) string {
 		binPath += ".exe"
 	}
 
-	rootDir := getModuleRoot(t)
-	cmdPath := filepath.Join(rootDir, "cmd", "mstl")
+	// Build using package path
+	cmdPath := "mistletoe/cmd/mstl"
 
 	buildCmd := exec.Command("go", "build", "-o", binPath, cmdPath)
 	if out, err := buildCmd.CombinedOutput(); err != nil {

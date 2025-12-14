@@ -6,21 +6,10 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"testing"
 )
 
 var binaryPath string
-
-func getModuleRootForTestMain() string {
-	cmd := exec.Command("go", "list", "-m", "-f", "{{.Dir}}")
-	out, err := cmd.Output()
-	if err != nil {
-		fmt.Printf("failed to get module root: %v\n", err)
-		os.Exit(1)
-	}
-	return strings.TrimSpace(string(out))
-}
 
 func TestMain(m *testing.M) {
 	// Build the binary
@@ -31,21 +20,7 @@ func TestMain(m *testing.M) {
 	}
 
 	// Build command
-	rootDir := getModuleRootForTestMain()
-	fmt.Printf("Module root: %s\n", rootDir)
-
-	// Debug: check file existence
-	if _, err := os.Stat(filepath.Join(rootDir, "cmd", "mstl")); os.IsNotExist(err) {
-		fmt.Printf("cmd/mstl does not exist at %s\n", filepath.Join(rootDir, "cmd", "mstl"))
-		// List root dir content
-		files, _ := os.ReadDir(rootDir)
-		fmt.Printf("Files in root:\n")
-		for _, f := range files {
-			fmt.Printf("- %s\n", f.Name())
-		}
-	}
-
-	cmdPath := filepath.Join(rootDir, "cmd", "mstl")
+	cmdPath := "mistletoe/cmd/mstl"
 	cmd := exec.Command("go", "build", "-o", binaryPath, cmdPath)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		fmt.Printf("Failed to build binary: %v\nOutput: %s\n", err, out)
