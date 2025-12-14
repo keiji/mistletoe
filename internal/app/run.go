@@ -144,8 +144,8 @@ func Run(name, version, hash string, args []string) {
 	switch subcmdName {
 	case "init":
 		handleInit(subcmdArgs, opts)
-	case "freeze":
-		handleFreeze(subcmdArgs, opts)
+	case "snapshot":
+		handleSnapshot(subcmdArgs, opts)
 	case "switch":
 		handleSwitch(subcmdArgs, opts)
 	case "status":

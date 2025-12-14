@@ -1,61 +1,91 @@
 package app
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
+	"flag"
+	"fmt"
 	"os"
-	"sort"
-	"strings"
 )
 
-// GenerateSnapshot creates a snapshot JSON of the current state of repositories defined in config
-// that also exist on disk.
-// It returns the JSON content and a unique identifier based on the revisions.
-func GenerateSnapshot(config *Config, gitPath string) ([]byte, string, error) {
-	var currentRepos []Repository
+func handleSnapshot(args []string, opts GlobalOptions) {
+	var fShort, fLong string
+	fs := flag.NewFlagSet("snapshot", flag.ExitOnError)
+	fs.StringVar(&fLong, "file", "", "configuration file")
+	fs.StringVar(&fShort, "f", "", "configuration file (short)")
 
-	// Iterate config repos and check if they exist on disk.
-	for _, repo := range *config.Repositories {
-		dir := GetRepoDir(repo)
-		if _, err := os.Stat(dir); err != nil {
-			// Skip missing repos
+	if err := ParseFlagsFlexible(fs, args); err != nil {
+		fmt.Println("Error parsing flags:", err)
+		os.Exit(1)
+	}
+
+	outputFile := fLong
+	if outputFile == "" {
+		outputFile = fShort
+	}
+
+	if outputFile == "" {
+		fmt.Println("Error: Specify output file using --file or -f.")
+		os.Exit(1)
+	}
+
+	if _, err := os.Stat(outputFile); err == nil {
+		fmt.Printf("Error: Output file '%s' exists.\n", outputFile)
+		os.Exit(1)
+	}
+
+	entries, err := os.ReadDir(".")
+	if err != nil {
+		fmt.Printf("Error reading current directory: %v.\n", err)
+		os.Exit(1)
+	}
+
+	var repos []Repository
+
+	for _, entry := range entries {
+		if !entry.IsDir() {
 			continue
 		}
 
-		// Get current state
-		// URL
-		url, err := RunGit(dir, gitPath, "config", "--get", "remote.origin.url")
+		dirName := entry.Name()
+		gitDir := fmt.Sprintf("%s/.git", dirName)
+
+		if _, err := os.Stat(gitDir); err != nil {
+			// Not a git repository
+			continue
+		}
+
+		// Get remote origin URL
+		url, err := RunGit(dirName, opts.GitPath, "remote", "get-url", "origin")
 		if err != nil {
-			// Fallback to config URL if git fails
-			if repo.URL != nil {
-				url = *repo.URL
+			// Try getting it via config if get-url fails (older git versions or odd setups)
+			url, err = RunGit(dirName, opts.GitPath, "config", "--get", "remote.origin.url")
+			if err != nil {
+				fmt.Printf("Warning: Could not get remote origin for %s. Skipping.\n", dirName)
+				continue
+			}
+		}
+		// RunGit already trims
+
+		// Get current branch
+		branch, err := RunGit(dirName, opts.GitPath, "rev-parse", "--abbrev-ref", "HEAD")
+		if err != nil {
+			fmt.Printf("Warning: Could not get current branch for %s.\n", dirName)
+			branch = ""
+		}
+
+		revision := ""
+		// If branch is "HEAD", it's a detached HEAD state
+		if branch == "HEAD" {
+			branch = ""
+			revision, err = RunGit(dirName, opts.GitPath, "rev-parse", "HEAD")
+			if err != nil {
+				fmt.Printf("Warning: Could not get revision for %s.\n", dirName)
+				revision = ""
 			}
 		}
 
-		// Branch
-		branch, err := RunGit(dir, gitPath, "rev-parse", "--abbrev-ref", "HEAD")
-		if err != nil {
-			branch = ""
-		}
-
-		// Revision
-		revision, err := RunGit(dir, gitPath, "rev-parse", "HEAD")
-		if err != nil {
-			revision = ""
-		}
-
-		// Detached HEAD handling
-		if branch == "HEAD" {
-			branch = ""
-		}
-
-		// Use ID from config if present
-		id := dir
-		if repo.ID != nil && *repo.ID != "" {
-			id = *repo.ID
-		}
-
+		id := dirName
+		// Construct repository
 		var branchPtr *string
 		if branch != "" {
 			branchPtr = &branch
@@ -64,47 +94,28 @@ func GenerateSnapshot(config *Config, gitPath string) ([]byte, string, error) {
 		if revision != "" {
 			revisionPtr = &revision
 		}
-		urlPtr := &url
 
-		currentRepos = append(currentRepos, Repository{
+		repo := Repository{
 			ID:       &id,
-			URL:      urlPtr,
+			URL:      &url,
 			Branch:   branchPtr,
 			Revision: revisionPtr,
-		})
-	}
-
-	identifier := CalculateSnapshotIdentifier(currentRepos)
-
-	// Create JSON
-	snapshotConfig := Config{
-		Repositories: &currentRepos,
-	}
-	data, err := json.MarshalIndent(snapshotConfig, "", "  ")
-	if err != nil {
-		return nil, "", err
-	}
-
-	return data, identifier, nil
-}
-
-// CalculateSnapshotIdentifier calculates the unique identifier for a list of repositories.
-// It sorts the repositories by ID to ensure a deterministic hash.
-func CalculateSnapshotIdentifier(repos []Repository) string {
-	// Sort by ID
-	sort.Slice(repos, func(i, j int) bool {
-		return *repos[i].ID < *repos[j].ID
-	})
-
-	var revisions []string
-	for _, r := range repos {
-		rev := ""
-		if r.Revision != nil {
-			rev = *r.Revision
 		}
-		revisions = append(revisions, rev)
+		repos = append(repos, repo)
 	}
-	concat := strings.Join(revisions, ",")
-	hash := sha256.Sum256([]byte(concat))
-	return hex.EncodeToString(hash[:])
+
+	config := Config{
+		Repositories: &repos,
+	}
+
+	data, err := json.MarshalIndent(config, "", "  ")
+	if err != nil {
+		fmt.Printf("Error generating JSON: %v.\n", err)
+		os.Exit(1)
+	}
+
+	if err := os.WriteFile(outputFile, data, 0644); err != nil {
+		fmt.Printf("Error writing to file '%s': %v.\n", outputFile, err)
+		os.Exit(1)
+	}
 }

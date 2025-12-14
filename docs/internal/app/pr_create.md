@@ -128,7 +128,7 @@ flowchart TD
 
 ### 依存関係
 
-*   `internal/app/snapshot.go`: スナップショット生成ロジック
+*   `internal/app/pr_create_snapshot.go`: スナップショット生成ロジック
 *   `internal/app/status_logic.go`: ステータス収集ロジックを再利用
 *   `internal/app/utils.go`: Git実行、並列制御
 *   `os/exec`: `gh` コマンドの実行

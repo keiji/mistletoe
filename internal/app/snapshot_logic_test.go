@@ -9,9 +9,9 @@ import (
 	"testing"
 )
 
-func TestFreeze_DetachedHead(t *testing.T) {
+func TestSnapshot_DetachedHead(t *testing.T) {
 	// Create temp dir
-	tmpDir, err := os.MkdirTemp("", "mstl-freeze-detached-test")
+	tmpDir, err := os.MkdirTemp("", "mstl-snapshot-detached-test")
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
@@ -42,14 +42,14 @@ func TestFreeze_DetachedHead(t *testing.T) {
 		t.Fatalf("failed to checkout hash: %v", err)
 	}
 
-	// Run freeze
-	outputFile := "frozen.json"
-	// binaryPath is defined in freeze_test.go and populated by TestMain
-	cmd = exec.Command(binaryPath, "freeze", "-f", outputFile)
+	// Run snapshot
+	outputFile := "snapshot.json"
+	// binaryPath is defined in snapshot_test.go and populated by TestMain
+	cmd = exec.Command(binaryPath, "snapshot", "-f", outputFile)
 	cmd.Dir = tmpDir
 	out, err = cmd.CombinedOutput()
 	if err != nil {
-		t.Fatalf("freeze command failed: %v\nOutput: %s", err, out)
+		t.Fatalf("snapshot command failed: %v\nOutput: %s", err, out)
 	}
 
 	// Read output

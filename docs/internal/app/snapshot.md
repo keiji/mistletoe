@@ -1,13 +1,13 @@
-# `freeze` サブコマンド Design Doc
+# `snapshot` サブコマンド Design Doc
 
 ## 1. 概要 (Overview)
 
-`freeze` サブコマンドは、現在のディレクトリ直下にあるすべての Git リポジトリをスキャンし、その時点の状態（リモート URL、ブランチ、またはリビジョン）を記録した新しい設定ファイル（JSON）を生成します。現在の環境をスナップショットとして保存する際に使用します。
+`snapshot` サブコマンドは、現在のディレクトリ直下にあるすべての Git リポジトリをスキャンし、その時点の状態（リモート URL、ブランチ、またはリビジョン）を記録した新しい設定ファイル（JSON）を生成します。現在の環境をスナップショットとして保存する際に使用します。
 
 ## 2. 使用方法 (Usage)
 
 ```bash
-mstl freeze --file <output_path>
+mstl snapshot --file <output_path>
 ```
 
 ### オプション (Options)
