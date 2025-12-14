@@ -99,7 +99,7 @@ func TestSnapshot(t *testing.T) {
 	// Run snapshot
 	outputFile := "snapshot.json"
 
-	cmd := exec.Command(binaryPath, "snapshot", "-f", outputFile)
+	cmd := exec.Command(binaryPath, "snapshot", "-o", outputFile)
 	cmd.Dir = tmpDir
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -172,6 +172,50 @@ func TestSnapshot(t *testing.T) {
 	}
 }
 
+func TestSnapshot_DefaultFilename(t *testing.T) {
+	// Create temp dir
+	tmpDir, err := os.MkdirTemp("", "mstl-snapshot-default")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// Setup repos in tmpDir
+	repo1Dir := filepath.Join(tmpDir, "repo1")
+	repo1URL := "https://github.com/example/repo1.git"
+	repo1Branch := "main"
+	setupDummyRepo(t, repo1Dir, repo1URL, repo1Branch)
+
+	// Run snapshot without -o
+	cmd := exec.Command(binaryPath, "snapshot")
+	cmd.Dir = tmpDir
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("snapshot command failed: %v\nOutput: %s", err, out)
+	}
+
+	// We don't know the exact ID easily without duplicating logic, but we can search for the file pattern
+	files, err := os.ReadDir(tmpDir)
+	if err != nil {
+		t.Fatalf("failed to read dir: %v", err)
+	}
+
+	found := false
+	for _, f := range files {
+		if !f.IsDir() {
+			name := f.Name()
+			if len(name) > 19 && name[:19] == "mistletoe-snapshot-" && name[len(name)-5:] == ".json" {
+				found = true
+				break
+			}
+		}
+	}
+
+	if !found {
+		t.Errorf("default snapshot file not found in %v", files)
+	}
+}
+
 func TestSnapshot_FileExists(t *testing.T) {
 	// Create temp dir
 	tmpDir, err := os.MkdirTemp("", "mstl-snapshot-fail")
@@ -187,7 +231,7 @@ func TestSnapshot_FileExists(t *testing.T) {
 		t.Fatalf("failed to create existing output file: %v", err)
 	}
 
-	cmd := exec.Command(binaryPath, "snapshot", "-f", outputFile)
+	cmd := exec.Command(binaryPath, "snapshot", "-o", outputFile)
 	cmd.Dir = tmpDir
 	out, err := cmd.CombinedOutput()
 

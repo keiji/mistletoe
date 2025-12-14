@@ -7,14 +7,16 @@
 ## 2. 使用方法 (Usage)
 
 ```bash
-mstl snapshot --file <output_path>
+mstl snapshot [options]
 ```
 
 ### オプション (Options)
 
 | オプション | 短縮形 | 説明 | デフォルト |
 | :--- | :--- | :--- | :--- |
-| `--file` | `-f` | **(必須)** 出力する設定ファイルのパス。 | - |
+| `--output-file` | `-o` | 出力する設定ファイルのパス。 | `mistletoe-snapshot-[identifier].json` |
+
+※ `identifier` は含まれるリポジトリのリビジョン情報のハッシュ値から計算されます。
 
 ## 3. 動作仕様 (Specifications)
 
@@ -26,8 +28,11 @@ mstl snapshot --file <output_path>
     *   **Branch/Revision**:
         *   現在の HEAD がブランチを指している場合、そのブランチ名を `branch` フィールドに設定します。
         *   **Detached HEAD** 状態の場合（ブランチ名が "HEAD"）、現在のコミットハッシュを `revision` フィールドに設定し、`branch` は設定しません。
-4.  **ファイル出力**:
-    *   指定されたパスにファイルが既に存在する場合は、上書きせずにエラー終了します。
+4.  **ファイル名決定**:
+    *   オプションで指定された場合はそのファイル名を使用します。
+    *   指定がない場合、スキャンしたリポジトリ情報から識別子（identifier）を計算し、`mistletoe-snapshot-[identifier].json` とします。
+5.  **ファイル出力**:
+    *   指定されたパス（またはデフォルトパス）にファイルが既に存在する場合は、上書きせずにエラー終了します。
     *   出力形式はインデントされた JSON です。
 
 ## 4. 内部ロジック (Internal Logic)
@@ -37,12 +42,7 @@ mstl snapshot --file <output_path>
 ```mermaid
 flowchart TD
     Start(["開始"]) --> ParseArgs["引数パース"]
-    ParseArgs --> CheckFile{"出力ファイル指定あり？"}
-    CheckFile -- No --> ErrorArg["エラー: ファイル必須"]
-    CheckFile -- Yes --> CheckExist{"ファイル存在？"}
-
-    CheckExist -- Yes --> ErrorExist["エラー: ファイル既存"]
-    CheckExist -- No --> ScanDir["カレントディレクトリ走査"]
+    ParseArgs --> ScanDir["カレントディレクトリ走査"]
 
     ScanDir --> Loop["ディレクトリループ"]
 
@@ -62,20 +62,32 @@ flowchart TD
 
     Loop --> CheckEnd{"全ディレクトリ完了？"}
     CheckEnd -- No --> Loop
-    CheckEnd -- Yes --> Marshal["JSON生成"]
+    CheckEnd -- Yes --> DecideName{"ファイル名指定あり？"}
+    DecideName -- Yes --> UseName["指定名使用"]
+    DecideName -- No --> CalcID["Identifier計算"]
+    CalcID --> DefaultName["デフォルト名生成"]
+
+    UseName --> CheckExist{"ファイル存在？"}
+    DefaultName --> CheckExist
+
+    CheckExist -- Yes --> ErrorExist["エラー: ファイル既存"]
+    CheckExist -- No --> Marshal["JSON生成"]
     Marshal --> WriteFile["ファイル書き込み"]
     WriteFile --> End(["終了"])
 
-    ErrorArg --> End
     ErrorExist --> End
 ```
 
 ### 4.2. 詳細ロジック
 
-1.  **出力ファイルチェック**: `os.Stat` を使用して出力先ファイルが既に存在するか確認し、存在する場合は誤って上書きしないように終了します。
-2.  **リポジトリ情報の構築**:
+1.  **リポジトリ情報の構築**:
     *   `os.ReadDir(".")` でエントリを取得します。
     *   各ディレクトリについて、`rev-parse --abbrev-ref HEAD` を実行します。
         *   戻り値が `HEAD` 文字列そのものであれば、Detached HEAD とみなして `rev-parse HEAD` で完全なハッシュを取得し、`Revision` フィールドに格納します。
         *   それ以外の場合はブランチ名として `Branch` フィールドに格納します。
-    *   設定ファイルの構造体（`Config`）において、`Branch` と `Revision` はポインタ型（`*string`）であるため、該当しないフィールドは `nil`（JSON 上では省略または null）として扱われます。これにより、`branch` と `revision` の相互排他性を表現します。
+2.  **ファイル名決定**:
+    *   `--output-file` (`-o`) が指定されていない場合、`CalculateSnapshotIdentifier` 関数を使用して識別子を計算します。
+    *   ファイル名を `mistletoe-snapshot-[identifier].json` とします。
+3.  **出力ファイルチェック**: `os.Stat` を使用して出力先ファイルが既に存在するか確認し、存在する場合は誤って上書きしないように終了します。
+4.  **出力**:
+    *   設定ファイルの構造体（`Config`）において、`Branch` と `Revision` はポインタ型（`*string`）であるため、該当しないフィールドは `nil`（JSON 上では省略または null）として扱われます。

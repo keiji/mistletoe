@@ -401,7 +401,7 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 		os.Exit(1)
 	}
 
-	filename := fmt.Sprintf("mistletoe-%s.json", snapshotID)
+	filename := fmt.Sprintf("mistletoe-snapshot-%s.json", snapshotID)
 	if err := os.WriteFile(filename, snapshotData, 0644); err != nil {
 		fmt.Printf("Error writing snapshot file: %v\n", err)
 		os.Exit(1)

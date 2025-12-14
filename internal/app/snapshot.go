@@ -8,29 +8,19 @@ import (
 )
 
 func handleSnapshot(args []string, opts GlobalOptions) {
-	var fShort, fLong string
+	var oShort, oLong string
 	fs := flag.NewFlagSet("snapshot", flag.ExitOnError)
-	fs.StringVar(&fLong, "file", "", "configuration file")
-	fs.StringVar(&fShort, "f", "", "configuration file (short)")
+	fs.StringVar(&oLong, "output-file", "", "output file path")
+	fs.StringVar(&oShort, "o", "", "output file path (short)")
 
 	if err := ParseFlagsFlexible(fs, args); err != nil {
 		fmt.Println("Error parsing flags:", err)
 		os.Exit(1)
 	}
 
-	outputFile := fLong
+	outputFile := oLong
 	if outputFile == "" {
-		outputFile = fShort
-	}
-
-	if outputFile == "" {
-		fmt.Println("Error: Specify output file using --file or -f.")
-		os.Exit(1)
-	}
-
-	if _, err := os.Stat(outputFile); err == nil {
-		fmt.Printf("Error: Output file '%s' exists.\n", outputFile)
-		os.Exit(1)
+		outputFile = oShort
 	}
 
 	entries, err := os.ReadDir(".")
@@ -94,14 +84,25 @@ func handleSnapshot(args []string, opts GlobalOptions) {
 		if revision != "" {
 			revisionPtr = &revision
 		}
+		urlPtr := &url
 
 		repo := Repository{
 			ID:       &id,
-			URL:      &url,
+			URL:      urlPtr,
 			Branch:   branchPtr,
 			Revision: revisionPtr,
 		}
 		repos = append(repos, repo)
+	}
+
+	if outputFile == "" {
+		identifier := CalculateSnapshotIdentifier(repos)
+		outputFile = fmt.Sprintf("mistletoe-snapshot-%s.json", identifier)
+	}
+
+	if _, err := os.Stat(outputFile); err == nil {
+		fmt.Printf("Error: Output file '%s' exists.\n", outputFile)
+		os.Exit(1)
 	}
 
 	config := Config{
@@ -118,4 +119,6 @@ func handleSnapshot(args []string, opts GlobalOptions) {
 		fmt.Printf("Error writing to file '%s': %v.\n", outputFile, err)
 		os.Exit(1)
 	}
+
+	fmt.Printf("Snapshot saved to %s\n", outputFile)
 }

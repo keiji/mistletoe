@@ -53,7 +53,7 @@ mstl-gh pr create [options]
 6.  **スナップショット生成**:
     *   設定ファイルに含まれ、かつローカルディスクに存在するすべてのリポジトリの現在の状態 (URL, Branch, Revision) を収集します。
     *   各リポジトリのRevisionをID順に連結してSHA-256ハッシュを計算し、識別子 (Identifier) とします。
-    *   `mistletoe-[Identifier].json` という名前でスナップショットJSONファイルをローカルに保存します。
+    *   `mistletoe-snapshot-[Identifier].json` という名前でスナップショットJSONファイルをローカルに保存します。
     *   JSONファイルの内容を `<details>` ブロックで囲み、PR本文への追加用テキストとして準備します。
 7.  **実行 (Execution)**:
     *   以下の処理を並列実行します。

@@ -45,7 +45,7 @@ func TestSnapshot_DetachedHead(t *testing.T) {
 	// Run snapshot
 	outputFile := "snapshot.json"
 	// binaryPath is defined in snapshot_test.go and populated by TestMain
-	cmd = exec.Command(binaryPath, "snapshot", "-f", outputFile)
+	cmd = exec.Command(binaryPath, "snapshot", "-o", outputFile)
 	cmd.Dir = tmpDir
 	out, err = cmd.CombinedOutput()
 	if err != nil {
