@@ -56,36 +56,37 @@ mstl-gh pr create [options]
 
 ```mermaid
 flowchart TD
-    A[開始] --> B{ghコマンド確認}
-    B -- OK --> C[設定ファイル読み込み]
-    B -- NG --> Z[エラー終了]
-    C --> D[リポジトリ整合性検証]
-    D -- OK --> E[ステータス収集 CollectStatus]
+    A["開始"] --> B{"ghコマンド確認"}
+    B -- OK --> C["設定ファイル読み込み"]
+    B -- NG --> Z["エラー終了"]
+    C --> D["リポジトリ整合性検証"]
+    D -- OK --> E["ステータス収集 CollectStatus"]
     D -- NG --> Z
-    E --> F{Push不可/競合あり?}
+    E --> F{"Push不可/競合あり?"}
     F -- Yes --> Z
-    F -- No --> G[ステータス表示]
-    G --> H{Detached HEADあり?}
-    H -- Yes --> I[警告 & 続行確認]
+    F -- No --> G["ステータス表示"]
+    G --> H{"Detached HEADあり?"}
+    H -- Yes --> I["警告 & 続行確認"]
     I -- No --> Z
-    I -- Yes --> J[対象から除外]
-    H -- No --> J[確認プロンプト]
+    I -- Yes --> J_EXCL["対象から除外"]
+    J_EXCL --> J["確認プロンプト"]
+    H -- No --> J
     J -- No --> Z
-    J -- Yes --> K[GitHub要件/既存PRチェック]
+    J -- Yes --> K["GitHub要件/既存PRチェック"]
     K -- NG --> Z
-    K -- OK --> L[並列実行開始]
-    L --> M[Git Push]
-    M --> N{既存PRあり?}
-    N -- Yes --> O[URL収集 (既存)]
-    N -- No --> P[PR作成 gh pr create]
-    P -- エラー(重複) --> Q[再確認]
-    Q -- 発見 --> O
-    Q -- なし --> Z
-    P -- 成功 --> O
-    O --> R[全リポジトリ完了?]
+    K -- OK --> L["並列実行開始"]
+    L --> M["Git Push"]
+    M --> N{"既存PRあり?"}
+    N -- Yes --> O["URL収集 (既存)"]
+    N -- No --> P["PR作成 gh pr create"]
+    P -- "エラー(重複)" --> Q["再確認"]
+    Q -- "発見" --> O
+    Q -- "なし" --> Z
+    P -- "成功" --> O
+    O --> R["全リポジトリ完了?"]
     R -- No --> M
-    R -- Yes --> S[PR Description更新 gh pr edit]
-    S --> T[終了]
+    R -- Yes --> S["PR Description更新 gh pr edit"]
+    S --> T["終了"]
 ```
 
 ### エラーハンドリング
