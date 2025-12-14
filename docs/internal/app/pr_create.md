@@ -53,7 +53,9 @@ mstl-gh pr create [options]
     *   以下の処理を並列実行します。
         1.  **Push**: `git push origin <current_branch>` を実行します。
         2.  **PR作成**:
-            *   既存のPRがない場合: `gh pr create --title "<title>" --body "<body>"` (設定ファイルでbranch指定がある場合は `--base <branch>`) を実行し、作成されたPRのURLを取得します。
+            *   既存のPRがない場合、以下の手順で作成を試みます。
+                1.  **Draft作成試行**: まず `--draft` オプション付きで `gh pr create` を実行します。
+                2.  **通常作成 (フォールバック)**: Draft作成が失敗した場合 (リポジトリ設定やアカウント制約などでDraftがサポートされていない場合)、`--draft` なしで `gh pr create` を再試行します。
             *   **競合回避**: PR作成コマンドが「すでに存在する」というエラーで失敗した場合、再度PRの存在確認を行い、URLが取得できれば「既存のPRがある」とみなして続行します。
             *   既存のPRがある場合: スキップします。
 7.  **事後処理 (Post-processing)**:
@@ -88,11 +90,13 @@ flowchart TD
     L --> M["Git Push"]
     M --> N{"既存PRあり?"}
     N -- Yes --> O["URL収集 (既存)"]
-    N -- No --> P["PR作成 gh pr create"]
-    P -- "エラー(重複)" --> Q["再確認"]
+    N -- No --> P_DRAFT["PR作成 (Draft) 試行"]
+    P_DRAFT -- "成功" --> O
+    P_DRAFT -- "失敗" --> P_NORMAL["PR作成 (通常) 再試行"]
+    P_NORMAL -- "成功" --> O
+    P_NORMAL -- "エラー(重複)" --> Q["再確認"]
     Q -- "発見" --> O
     Q -- "なし" --> Z
-    P -- "成功" --> O
     O --> R["全リポジトリ完了?"]
     R -- No --> M
     R -- Yes --> S["PR Description更新 gh pr edit"]
