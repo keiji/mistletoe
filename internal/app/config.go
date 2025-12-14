@@ -46,16 +46,26 @@ func ParseConfig(data []byte) (*Config, error) {
 }
 
 // validateRepositories checks for duplicate IDs in the repository list.
-// IDs that are nil are ignored.
+// If an ID is missing, it is derived from the URL.
 func validateRepositories(repos []Repository) error {
 	seenIDs := make(map[string]bool)
-	for _, repo := range repos {
-		if repo.ID != nil && *repo.ID != "" {
-			if seenIDs[*repo.ID] {
-				return fmt.Errorf("%w: %s", ErrDuplicateID, *repo.ID)
+	for i := range repos {
+		repo := &repos[i]
+		if repo.ID == nil || *repo.ID == "" {
+			if repo.URL == nil {
+				// Should have been caught by ParseConfig, but just in case
+				continue
 			}
-			seenIDs[*repo.ID] = true
+			url := strings.TrimRight(*repo.URL, "/")
+			base := path.Base(url)
+			id := strings.TrimSuffix(base, ".git")
+			repo.ID = &id
 		}
+
+		if seenIDs[*repo.ID] {
+			return fmt.Errorf("%w: %s", ErrDuplicateID, *repo.ID)
+		}
+		seenIDs[*repo.ID] = true
 	}
 	return nil
 }

@@ -122,6 +122,98 @@ func TestLoadConfig(t *testing.T) {
 	}
 }
 
+func TestIDDerivationAndDuplicates(t *testing.T) {
+	tests := []struct {
+		name     string
+		repos    []Repository
+		wantErr  bool
+		checkIDs map[int]string // Index -> Expected ID
+	}{
+		{
+			name: "Explicit ID OK",
+			repos: []Repository{
+				{URL: ptr("u1"), ID: ptr("id1")},
+				{URL: ptr("u2"), ID: ptr("id2")},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Implicit ID Derivation (.git)",
+			repos: []Repository{
+				{URL: ptr("https://github.com/foo/bar.git")},
+			},
+			wantErr:  false,
+			checkIDs: map[int]string{0: "bar"},
+		},
+		{
+			name: "Implicit ID Derivation (no .git)",
+			repos: []Repository{
+				{URL: ptr("https://github.com/foo/baz")},
+			},
+			wantErr:  false,
+			checkIDs: map[int]string{0: "baz"},
+		},
+		{
+			name: "Implicit ID Derivation (mixed)",
+			repos: []Repository{
+				{URL: ptr("https://github.com/foo/alpha.git")},
+				{URL: ptr("https://github.com/foo/beta")},
+			},
+			wantErr:  false,
+			checkIDs: map[int]string{0: "alpha", 1: "beta"},
+		},
+		{
+			name: "Duplicate Explicit IDs",
+			repos: []Repository{
+				{URL: ptr("u1"), ID: ptr("dup")},
+				{URL: ptr("u2"), ID: ptr("dup")},
+			},
+			wantErr: true,
+		},
+		{
+			name: "Duplicate Explicit and Implicit",
+			repos: []Repository{
+				{URL: ptr("https://github.com/foo/bar.git")}, // -> bar
+				{URL: ptr("u2"), ID: ptr("bar")},
+			},
+			wantErr: true,
+		},
+		{
+			name: "Duplicate Implicit",
+			repos: []Repository{
+				{URL: ptr("https://github.com/foo/bar.git")}, // -> bar
+				{URL: ptr("https://gitlab.com/other/bar")},   // -> bar
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateRepositories(tt.repos)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("validateRepositories() error = %v, wantErr %v", err, tt.wantErr)
+			}
+
+			if err == nil && tt.checkIDs != nil {
+				for idx, expectedID := range tt.checkIDs {
+					if tt.repos[idx].ID == nil || *tt.repos[idx].ID != expectedID {
+						got := "<nil>"
+						if tt.repos[idx].ID != nil {
+							got = *tt.repos[idx].ID
+						}
+						t.Errorf("Repo[%d] ID = %s, want %s", idx, got, expectedID)
+					}
+				}
+			}
+		})
+	}
+}
+
+func ptr(s string) *string {
+	return &s
+}
+
 func TestParseConfig(t *testing.T) {
 	tests := []struct {
 		name    string
