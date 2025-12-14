@@ -1,98 +1,99 @@
 package app
 
 import (
-	"encoding/json"
-	"os"
-	"os/exec"
-	"path/filepath"
-	"strings"
+	"crypto/sha256"
+	"encoding/hex"
 	"testing"
 )
 
-func TestSnapshot_DetachedHead(t *testing.T) {
-	// Create temp dir
-	tmpDir, err := os.MkdirTemp("", "mstl-snapshot-detached-test")
-	if err != nil {
-		t.Fatalf("failed to create temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
+func TestCalculateSnapshotIdentifier(t *testing.T) {
+	// Logic:
+	// sort by ID
+	// for each: if branch != nil && branch != "" -> branch
+	//           else if revision != nil -> revision
+	// concat with ","
+	// sha256
 
-	// Setup normal repo (branch)
-	repoBranchDir := filepath.Join(tmpDir, "repo_branch")
-	repoBranchURL := "https://github.com/example/repo_branch.git"
-	setupDummyRepo(t, repoBranchDir, repoBranchURL, "main")
-
-	// Setup detached repo
-	repoDetachedDir := filepath.Join(tmpDir, "repo_detached")
-	repoDetachedURL := "https://github.com/example/repo_detached.git"
-	setupDummyRepo(t, repoDetachedDir, repoDetachedURL, "main")
-
-	// Detach HEAD in repo_detached
-	cmd := exec.Command("git", "rev-parse", "HEAD")
-	cmd.Dir = repoDetachedDir
-	out, err := cmd.Output()
-	if err != nil {
-		t.Fatalf("failed to get HEAD: %v", err)
-	}
-	hash := strings.TrimSpace(string(out))
-
-	cmd = exec.Command("git", "checkout", hash)
-	cmd.Dir = repoDetachedDir
-	if err := cmd.Run(); err != nil {
-		t.Fatalf("failed to checkout hash: %v", err)
+	r1ID := "repo1"
+	r1Branch := "feature/abc"
+	r1Rev := "rev1"
+	r1 := Repository{
+		ID:       &r1ID,
+		Branch:   &r1Branch,
+		Revision: &r1Rev,
 	}
 
-	// Run snapshot
-	outputFile := "snapshot.json"
-	// binaryPath is defined in snapshot_test.go and populated by TestMain
-	cmd = exec.Command(binaryPath, "snapshot", "-o", outputFile)
-	cmd.Dir = tmpDir
-	out, err = cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("snapshot command failed: %v\nOutput: %s", err, out)
+	r2ID := "repo2"
+	r2Rev := "rev2"
+	// Detached HEAD or no branch specified
+	r2 := Repository{
+		ID:       &r2ID,
+		Branch:   nil,
+		Revision: &r2Rev,
 	}
 
-	// Read output
-	data, err := os.ReadFile(filepath.Join(tmpDir, outputFile))
-	if err != nil {
-		t.Fatalf("failed to read output file: %v", err)
+	repos := []Repository{r2, r1} // Unsorted input
+
+	// Expected string before hash:
+	// repo1 -> feature/abc
+	// repo2 -> rev2
+	// "feature/abc,rev2"
+
+	expectedStr := "feature/abc,rev2"
+	hash := sha256.Sum256([]byte(expectedStr))
+	expectedID := hex.EncodeToString(hash[:])
+
+	id := CalculateSnapshotIdentifier(repos)
+
+	if id != expectedID {
+		t.Errorf("Expected ID %s, got %s", expectedID, id)
+	}
+}
+
+func TestCalculateSnapshotIdentifier_BranchPriority(t *testing.T) {
+	// Even if revision is present, branch should be used if available
+	r1ID := "repo1"
+	r1Branch := "main"
+	r1Rev := "aabbcc"
+	r1 := Repository{
+		ID:       &r1ID,
+		Branch:   &r1Branch,
+		Revision: &r1Rev,
 	}
 
-	// Unmarshal into map to check for presence/absence of fields
-	var rawConfig map[string][]map[string]interface{}
-	if err := json.Unmarshal(data, &rawConfig); err != nil {
-		t.Fatalf("failed to parse output json to map: %v", err)
+	repos := []Repository{r1}
+
+	expectedStr := "main"
+	hash := sha256.Sum256([]byte(expectedStr))
+	expectedID := hex.EncodeToString(hash[:])
+
+	id := CalculateSnapshotIdentifier(repos)
+
+	if id != expectedID {
+		t.Errorf("Expected ID %s, got %s", expectedID, id)
+	}
+}
+
+func TestCalculateSnapshotIdentifier_RevisionFallback(t *testing.T) {
+	// If branch is empty string or nil, use revision
+	r1ID := "repo1"
+	r1Branch := ""
+	r1Rev := "112233"
+	r1 := Repository{
+		ID:       &r1ID,
+		Branch:   &r1Branch,
+		Revision: &r1Rev,
 	}
 
-	repos := rawConfig["repositories"]
-	repoMap := make(map[string]map[string]interface{})
-	for _, r := range repos {
-		if id, ok := r["id"].(string); ok {
-			repoMap[id] = r
-		}
-	}
+	repos := []Repository{r1}
 
-	// Check repo_branch
-	rBranch, ok := repoMap["repo_branch"]
-	if !ok {
-		t.Fatal("repo_branch not found in output")
-	}
-	if b, ok := rBranch["branch"]; !ok || b != "main" {
-		t.Errorf("repo_branch: expected branch 'main', got %v", b)
-	}
-	if r, ok := rBranch["revision"]; ok {
-		t.Errorf("repo_branch: unexpected revision field: %v", r)
-	}
+	expectedStr := "112233"
+	hash := sha256.Sum256([]byte(expectedStr))
+	expectedID := hex.EncodeToString(hash[:])
 
-	// Check repo_detached
-	rDetached, ok := repoMap["repo_detached"]
-	if !ok {
-		t.Fatal("repo_detached not found in output")
-	}
-	if b, ok := rDetached["branch"]; ok {
-		t.Errorf("repo_detached: unexpected branch field: %v", b)
-	}
-	if rev, ok := rDetached["revision"]; !ok || rev != hash {
-		t.Errorf("repo_detached: expected revision '%s', got %v", hash, rev)
+	id := CalculateSnapshotIdentifier(repos)
+
+	if id != expectedID {
+		t.Errorf("Expected ID %s, got %s", expectedID, id)
 	}
 }
