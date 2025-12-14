@@ -120,6 +120,12 @@ func Run(name, version, hash string, args []string) {
 		handleSync(subcmdArgs, opts)
 	case "push":
 		handlePush(subcmdArgs, opts)
+	case "pr":
+		if AppName != "Mistletoe-gh" {
+			fmt.Printf("Unknown subcommand: %s.\n", subcmdName)
+			os.Exit(1)
+		}
+		handlePr(subcmdArgs, opts)
 	case "help":
 		handleHelp(subcmdArgs, opts)
 	case "version":
