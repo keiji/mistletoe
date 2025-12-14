@@ -9,8 +9,6 @@ import (
 	"strings"
 )
 
-const appVersion = "0.0.1"
-
 const (
 	MinParallel     = 1
 	MaxParallel     = 128
@@ -40,7 +38,7 @@ func handleVersion(opts GlobalOptions) {
 	if commitHash != "" {
 		v = fmt.Sprintf("%s-%s", appVersion, commitHash)
 	}
-	fmt.Printf("mstl version %s\n", v)
+	fmt.Printf("%s version %s\n", appName, v)
 	fmt.Println("https://github.com/keiji/mistletoe")
 	fmt.Println()
 

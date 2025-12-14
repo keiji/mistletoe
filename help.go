@@ -5,7 +5,7 @@ import (
 )
 
 func handleHelp(_ []string, _ GlobalOptions) {
-	fmt.Println("Usage: mstl <command> [options] [arguments]")
+	fmt.Printf("Usage: %s <command> [options] [arguments]\n", appName)
 	fmt.Println("")
 	fmt.Println("Commands:")
 	fmt.Println("  init       Initialize repositories")
