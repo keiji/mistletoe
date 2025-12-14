@@ -2,6 +2,7 @@ package app
 
 import (
 	"bufio"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -9,6 +10,9 @@ import (
 	"os/exec"
 	"strings"
 	"sync"
+
+	"github.com/olekukonko/tablewriter"
+	"github.com/olekukonko/tablewriter/tw"
 )
 
 var execCommand = exec.Command
@@ -17,7 +21,7 @@ var execCommand = exec.Command
 func handlePr(args []string, opts GlobalOptions) {
 	if len(args) == 0 {
 		fmt.Println("Usage: mstl-gh pr <subcommand> [options]")
-		fmt.Println("Available subcommands: create")
+		fmt.Println("Available subcommands: create, status")
 		os.Exit(1)
 	}
 
@@ -27,10 +31,215 @@ func handlePr(args []string, opts GlobalOptions) {
 	switch subcmd {
 	case "create":
 		handlePrCreate(subArgs, opts)
+	case "status":
+		handlePrStatus(subArgs, opts)
 	default:
 		fmt.Printf("Unknown pr subcommand: %s\n", subcmd)
 		os.Exit(1)
 	}
+}
+
+// handlePrStatus handles 'pr status'.
+func handlePrStatus(args []string, opts GlobalOptions) {
+	fs := flag.NewFlagSet("pr status", flag.ExitOnError)
+	var (
+		fLong     string
+		fShort    string
+		pVal      int
+		pValShort int
+	)
+
+	fs.StringVar(&fLong, "file", "", "Configuration file path")
+	fs.StringVar(&fShort, "f", "", "Configuration file path (shorthand)")
+	fs.IntVar(&pVal, "parallel", DefaultParallel, "Number of parallel processes")
+	fs.IntVar(&pValShort, "p", DefaultParallel, "Number of parallel processes (shorthand)")
+
+	if err := ParseFlagsFlexible(fs, args); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	// Resolve common values
+	configPath, parallel, err := ResolveCommonValues(fLong, fShort, pVal, pValShort)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	// 1. Check gh availability
+	if err := checkGhAvailability(); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	// 2. Load Config
+	config, err := loadConfig(configPath)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	// 3. Validate Integrity
+	if err := ValidateRepositoriesIntegrity(config, opts.GitPath); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	// 4. Collect Status
+	rows := CollectStatus(config, parallel, opts.GitPath)
+
+	// 5. Collect PR Status
+	prRows := CollectPrStatus(rows, config, parallel)
+
+	// 6. Render
+	RenderPrStatusTable(prRows)
+}
+
+type PrInfo struct {
+	Number      int    `json:"number"`
+	State       string `json:"state"`
+	IsDraft     bool   `json:"isDraft"`
+	URL         string `json:"url"`
+	BaseRefName string `json:"baseRefName"`
+}
+
+type PrStatusRow struct {
+	StatusRow
+	PrNumber string
+	PrState  string
+	PrURL    string
+	Base     string
+}
+
+func CollectPrStatus(statusRows []StatusRow, config *Config, parallel int) []PrStatusRow {
+	repoMap := make(map[string]Repository)
+	for _, r := range *config.Repositories {
+		repoMap[getRepoName(r)] = r
+	}
+
+	prRows := make([]PrStatusRow, len(statusRows))
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, parallel)
+	var mu sync.Mutex
+
+	for i, row := range statusRows {
+		wg.Add(1)
+		go func(idx int, r StatusRow) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+
+			prRow := PrStatusRow{StatusRow: r}
+
+			conf, ok := repoMap[r.Repo]
+			if ok && conf.URL != nil {
+				baseBranch := ""
+				if conf.Branch != nil && *conf.Branch != "" {
+					baseBranch = *conf.Branch
+					prRow.Base = baseBranch
+				}
+
+				if r.RepoDir != "" && r.BranchName != "HEAD" && r.BranchName != "" {
+					args := []string{"pr", "list", "--repo", *conf.URL, "--head", r.BranchName, "--json", "number,state,isDraft,url,baseRefName"}
+					if baseBranch != "" {
+						args = append(args, "--base", baseBranch)
+					}
+
+					cmd := execCommand("gh", args...)
+					out, err := cmd.Output()
+					if err == nil {
+						var prs []PrInfo
+						if err := json.Unmarshal(out, &prs); err == nil && len(prs) > 0 {
+							pr := prs[0]
+							prRow.PrNumber = fmt.Sprintf("#%d", pr.Number)
+							prRow.PrState = "Ready"
+							if pr.IsDraft {
+								prRow.PrState = "Draft"
+							}
+							prRow.PrURL = pr.URL
+
+							if prRow.Base == "" {
+								prRow.Base = pr.BaseRefName
+							}
+						} else {
+							prRow.PrNumber = "N/A"
+						}
+					} else {
+						// On error (e.g. network), we might want to show error or just N/A.
+						// N/A is safer to keep table clean, or "Err".
+						// Let's stick to N/A for now.
+						prRow.PrNumber = "N/A"
+					}
+				} else {
+					prRow.PrNumber = "N/A"
+				}
+			}
+
+			mu.Lock()
+			prRows[idx] = prRow
+			mu.Unlock()
+
+		}(i, row)
+	}
+	wg.Wait()
+
+	return prRows
+}
+
+func RenderPrStatusTable(rows []PrStatusRow) {
+	table := tablewriter.NewTable(os.Stdout,
+		tablewriter.WithHeaderAutoFormat(tw.Off),
+		tablewriter.WithRowAutoWrap(tw.WrapNone),
+		tablewriter.WithRendition(tw.Rendition{
+			Borders: tw.Border{Left: tw.On, Top: tw.Off, Right: tw.On, Bottom: tw.Off},
+			Settings: tw.Settings{
+				Separators: tw.Separators{BetweenColumns: tw.On, BetweenRows: tw.Off},
+			},
+			Symbols: tw.NewSymbolCustom("v0.0.5-like").
+				WithColumn("|").
+				WithRow("-").
+				WithCenter("|").
+				WithHeaderMid("-").
+				WithTopMid("-").
+				WithBottomMid("-"),
+		}),
+	)
+	table.Header("Repository", "PR", "Base", "Branch/Rev", "Status")
+
+	const (
+		Reset    = "\033[0m"
+		FgRed    = "\033[31m"
+		FgGreen  = "\033[32m"
+		FgYellow = "\033[33m"
+	)
+
+	for _, row := range rows {
+		statusStr := ""
+		if row.HasUnpushed {
+			statusStr += FgGreen + ">" + Reset
+		}
+
+		if row.HasConflict {
+			statusStr += FgYellow + "!" + Reset
+		} else if row.IsPullable {
+			statusStr += FgYellow + "<" + Reset
+		}
+
+		if statusStr == "" {
+			statusStr = "-"
+		}
+
+		prStr := row.PrNumber
+		if row.PrState != "" {
+			prStr += " - " + row.PrState
+		}
+
+		_ = table.Append(row.Repo, prStr, row.Base, row.LocalBranchRev, statusStr)
+	}
+	if err := table.Render(); err != nil {
+		fmt.Printf("Error rendering table: %v\n", err)
+	}
+	fmt.Println("Status Legend: < Pullable, > Unpushed, ! Conflict")
 }
 
 // handlePrCreate handles 'pr create'.
@@ -308,7 +517,6 @@ func verifyGithubRequirements(repos []Repository, parallel int, gitPath string) 
 				mu.Lock()
 				existingPRs[repoName] = prURL
 				mu.Unlock()
-				// We do NOT return here, because we still want to confirm it is valid for "push only" (which we just did by checking permissions/URL)
 			}
 
 		}(repo)
@@ -356,22 +564,10 @@ func executePrCreation(repos []Repository, parallel int, gitPath string, existin
 			}
 
 			// 2. Create PR
-			// Check if we already found an existing PR
 			if url, ok := existingPRs[repoName]; ok {
 				fmt.Printf("[%s] Pull Request already exists: %s (skipping creation)\n", repoName, url)
-				// We don't add to prURLs here, because the caller will merge existingPRs.
-				// Or we can add it here. The prompt implies "exclude from PR creation target".
-				// It doesn't explicitly say "don't return it".
-				// But we need it for description updating.
-				// Let's rely on the caller to merge them, or add it here.
-				// To keep it simple, let's add it here so `prURLs` contains newly created ones.
-				// Wait, if I add it here, I don't need to merge in caller.
-				// But "newly created" vs "all involved" matters for the message "Creating Pull Request...".
 				return
 			}
-
-			// Double check? No, verifyGithubRequirements is authoritative enough for "existing" state at start.
-			// But race conditions exist. gh pr create will fail if it exists.
 
 			fmt.Printf("[%s] Creating Pull Request...\n", repoName)
 
@@ -397,12 +593,8 @@ func executePrCreation(repos []Repository, parallel int, gitPath string, existin
 			if err != nil {
 				var exitErr *exec.ExitError
 				if errors.As(err, &exitErr) {
-					// Fallback: Check if it failed because it exists?
-					// output might contain "already exists".
 					stderr := string(exitErr.Stderr)
 					if strings.Contains(stderr, "already exists") {
-						// Try to fetch it again?
-						// Re-run list command
 						checkCmd := execCommand("gh", "pr", "list", "--repo", *r.URL, "--head", branchName, "--json", "url", "-q", ".[0].url")
 						out, _ := checkCmd.Output()
 						prURL := strings.TrimSpace(string(out))
