@@ -22,6 +22,7 @@ var (
 
 type GlobalOptions struct {
 	GitPath string
+	GhPath  string
 }
 
 func parseArgs(args []string) (string, []string, error) {
@@ -67,6 +68,26 @@ func handleVersion(opts GlobalOptions) {
 	if len(lines) > 0 {
 		fmt.Println(lines[0])
 	}
+
+	if AppName == "Mistletoe-gh" {
+		displayGhPath := opts.GhPath
+		if resolved, err := exec.LookPath(opts.GhPath); err == nil {
+			displayGhPath = resolved
+		} else if filepath.IsAbs(opts.GhPath) {
+			displayGhPath = opts.GhPath
+		}
+		fmt.Printf("gh path: %s\n", displayGhPath)
+
+		outGh, err := exec.Command(opts.GhPath, "--version").Output()
+		if err == nil {
+			linesGh := strings.Split(string(outGh), "\n")
+			if len(linesGh) > 0 {
+				fmt.Println(linesGh[0])
+			}
+		} else {
+			fmt.Println("Error getting gh version (gh might not be installed)")
+		}
+	}
 }
 
 func getGitPath() string {
@@ -74,6 +95,13 @@ func getGitPath() string {
 		return filepath.Join(envPath, "git")
 	}
 	return "git"
+}
+
+func getGhPath() string {
+	if envPath := os.Getenv("GH_EXEC_PATH"); envPath != "" {
+		return filepath.Join(envPath, "gh")
+	}
+	return "gh"
 }
 
 func validateGit(gitPath string) error {
@@ -103,8 +131,14 @@ func Run(name, version, hash string, args []string) {
 		os.Exit(1)
 	}
 
+	ghPath := "gh"
+	if AppName == "Mistletoe-gh" {
+		ghPath = getGhPath()
+	}
+
 	opts := GlobalOptions{
 		GitPath: gitPath,
+		GhPath:  ghPath,
 	}
 
 	switch subcmdName {
