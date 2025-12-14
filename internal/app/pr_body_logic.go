@@ -35,6 +35,7 @@ func GenerateMistletoeBody(snapshotData string, snapshotFilename string, related
 	sb.WriteString("</details>\n\n")
 
 	sb.WriteString("### Related Pull Request(s)\n\n")
+	// If no related PRs, we leave the section header but no list.
 	if len(relatedURLs) > 0 {
 		for _, u := range relatedURLs {
 			sb.WriteString(fmt.Sprintf(" * %s\n", u))
