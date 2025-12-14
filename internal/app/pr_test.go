@@ -112,7 +112,7 @@ func TestCheckGhAvailability(t *testing.T) {
 	}()
 
 	// Test Success
-	if err := checkGhAvailability(); err != nil {
+	if err := checkGhAvailability("gh"); err != nil {
 		t.Errorf("Expected success, got %v", err)
 	}
 }
@@ -155,7 +155,7 @@ func TestVerifyGithubRequirements_Success(t *testing.T) {
 	repos := []Repository{repo}
 
 	// Mock gh to return success
-	existing, err := verifyGithubRequirements(repos, 1, "git")
+	existing, err := verifyGithubRequirements(repos, 1, "git", "gh")
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -185,7 +185,7 @@ func TestVerifyGithubRequirements_ExistingPR(t *testing.T) {
 	os.Setenv("MOCK_PR_EXISTS", "1")
 	defer os.Unsetenv("MOCK_PR_EXISTS")
 
-	existing, err := verifyGithubRequirements(repos, 1, "git")
+	existing, err := verifyGithubRequirements(repos, 1, "git", "gh")
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}

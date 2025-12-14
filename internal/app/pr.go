@@ -67,7 +67,7 @@ func handlePrStatus(args []string, opts GlobalOptions) {
 	}
 
 	// 1. Check gh availability
-	if err := checkGhAvailability(); err != nil {
+	if err := checkGhAvailability(opts.GhPath); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
@@ -89,7 +89,7 @@ func handlePrStatus(args []string, opts GlobalOptions) {
 	rows := CollectStatus(config, parallel, opts.GitPath)
 
 	// 5. Collect PR Status
-	prRows := CollectPrStatus(rows, config, parallel)
+	prRows := CollectPrStatus(rows, config, parallel, opts.GhPath)
 
 	// 6. Render
 	RenderPrStatusTable(prRows)
@@ -111,7 +111,7 @@ type PrStatusRow struct {
 	Base     string
 }
 
-func CollectPrStatus(statusRows []StatusRow, config *Config, parallel int) []PrStatusRow {
+func CollectPrStatus(statusRows []StatusRow, config *Config, parallel int, ghPath string) []PrStatusRow {
 	repoMap := make(map[string]Repository)
 	for _, r := range *config.Repositories {
 		repoMap[getRepoName(r)] = r
@@ -145,7 +145,7 @@ func CollectPrStatus(statusRows []StatusRow, config *Config, parallel int) []PrS
 						args = append(args, "--base", baseBranch)
 					}
 
-					cmd := execCommand("gh", args...)
+					cmd := execCommand(ghPath, args...)
 					out, err := cmd.Output()
 					if err == nil {
 						var prs []PrInfo
@@ -288,7 +288,7 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 	}
 
 	// 1. Check gh availability
-	if err := checkGhAvailability(); err != nil {
+	if err := checkGhAvailability(opts.GhPath); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
@@ -382,7 +382,7 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 	}
 
 	fmt.Println("Verifying GitHub permissions and checking existing PRs...")
-	existingPrURLs, err := verifyGithubRequirements(activeRepos, parallel, opts.GitPath)
+	existingPrURLs, err := verifyGithubRequirements(activeRepos, parallel, opts.GitPath, opts.GhPath)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -390,7 +390,7 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 
 	// 7. Execution: Push & Create PR
 	fmt.Println("Pushing changes and creating Pull Requests...")
-	prURLs, err := executePrCreation(activeRepos, parallel, opts.GitPath, existingPrURLs, prTitle, prBody)
+	prURLs, err := executePrCreation(activeRepos, parallel, opts.GitPath, opts.GhPath, existingPrURLs, prTitle, prBody)
 	if err != nil {
 		fmt.Printf("Error during execution: %v\n", err)
 		os.Exit(1)
@@ -415,7 +415,7 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 
 	// 8. Post-processing: Update Descriptions
 	fmt.Println("Updating Pull Request descriptions...")
-	if err := updatePrDescriptions(prURLs, parallel); err != nil {
+	if err := updatePrDescriptions(prURLs, parallel, opts.GhPath); err != nil {
 		fmt.Printf("Error updating descriptions: %v\n", err)
 		os.Exit(1)
 	}
@@ -437,12 +437,12 @@ func filterRepositories(config *Config, ignoredRepos map[string]bool) []Reposito
 // Mockable lookPath for testing
 var lookPath = exec.LookPath
 
-func checkGhAvailability() error {
-	_, err := lookPath("gh")
+func checkGhAvailability(ghPath string) error {
+	_, err := lookPath(ghPath)
 	if err != nil {
 		return errors.New("Error: 'gh' command not found. Please install GitHub CLI.")
 	}
-	cmd := execCommand("gh", "auth", "status")
+	cmd := execCommand(ghPath, "auth", "status")
 	if err := cmd.Run(); err != nil {
 		return errors.New("Error: 'gh' is not authenticated. Please run 'gh auth login'.")
 	}
@@ -451,7 +451,7 @@ func checkGhAvailability() error {
 
 // verifyGithubRequirements checks GitHub URL, permissions, and existing PRs.
 // It returns a map of RepoName -> Existing PR URL.
-func verifyGithubRequirements(repos []Repository, parallel int, gitPath string) (map[string]string, error) {
+func verifyGithubRequirements(repos []Repository, parallel int, gitPath, ghPath string) (map[string]string, error) {
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, parallel)
@@ -476,7 +476,7 @@ func verifyGithubRequirements(repos []Repository, parallel int, gitPath string) 
 			}
 
 			// 2. Check Permission
-			cmd := execCommand("gh", "repo", "view", *r.URL, "--json", "viewerPermission", "-q", ".viewerPermission")
+			cmd := execCommand(ghPath, "repo", "view", *r.URL, "--json", "viewerPermission", "-q", ".viewerPermission")
 			out, err := cmd.Output()
 			if err != nil {
 				mu.Lock()
@@ -503,7 +503,7 @@ func verifyGithubRequirements(repos []Repository, parallel int, gitPath string) 
 				return
 			}
 
-			checkCmd := execCommand("gh", "pr", "list", "--repo", *r.URL, "--head", branchName, "--json", "url", "-q", ".[0].url")
+			checkCmd := execCommand(ghPath, "pr", "list", "--repo", *r.URL, "--head", branchName, "--json", "url", "-q", ".[0].url")
 			out, errCheck := checkCmd.Output()
 			if errCheck != nil {
 				mu.Lock()
@@ -529,7 +529,7 @@ func verifyGithubRequirements(repos []Repository, parallel int, gitPath string) 
 	return existingPRs, nil
 }
 
-func executePrCreation(repos []Repository, parallel int, gitPath string, existingPRs map[string]string, title, body string) ([]string, error) {
+func executePrCreation(repos []Repository, parallel int, gitPath, ghPath string, existingPRs map[string]string, title, body string) ([]string, error) {
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, parallel)
@@ -588,14 +588,14 @@ func executePrCreation(repos []Repository, parallel int, gitPath string, existin
 				args = append(args, "--base", *r.Branch)
 			}
 
-			createCmd := execCommand("gh", args...)
+			createCmd := execCommand(ghPath, args...)
 			createOut, err := createCmd.Output()
 			if err != nil {
 				var exitErr *exec.ExitError
 				if errors.As(err, &exitErr) {
 					stderr := string(exitErr.Stderr)
 					if strings.Contains(stderr, "already exists") {
-						checkCmd := execCommand("gh", "pr", "list", "--repo", *r.URL, "--head", branchName, "--json", "url", "-q", ".[0].url")
+						checkCmd := execCommand(ghPath, "pr", "list", "--repo", *r.URL, "--head", branchName, "--json", "url", "-q", ".[0].url")
 						out, _ := checkCmd.Output()
 						prURL := strings.TrimSpace(string(out))
 						if prURL != "" {
@@ -634,7 +634,7 @@ func executePrCreation(repos []Repository, parallel int, gitPath string, existin
 	return prURLs, nil
 }
 
-func updatePrDescriptions(prURLs []string, parallel int) error {
+func updatePrDescriptions(prURLs []string, parallel int, ghPath string) error {
 	if len(prURLs) == 0 {
 		return nil
 	}
@@ -657,7 +657,7 @@ func updatePrDescriptions(prURLs []string, parallel int) error {
 			defer func() { <-sem }()
 
 			// Get current body
-			viewCmd := execCommand("gh", "pr", "view", targetURL, "--json", "body", "-q", ".body")
+			viewCmd := execCommand(ghPath, "pr", "view", targetURL, "--json", "body", "-q", ".body")
 			bodyOut, err := viewCmd.Output()
 			if err != nil {
 				mu.Lock()
@@ -670,7 +670,7 @@ func updatePrDescriptions(prURLs []string, parallel int) error {
 			newBody := originalBody + footer
 
 			// Update
-			editCmd := execCommand("gh", "pr", "edit", targetURL, "--body", newBody)
+			editCmd := execCommand(ghPath, "pr", "edit", targetURL, "--body", newBody)
 			if err := editCmd.Run(); err != nil {
 				mu.Lock()
 				errs = append(errs, fmt.Sprintf("Failed to edit PR %s: %v", targetURL, err))
