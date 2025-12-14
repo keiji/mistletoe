@@ -35,6 +35,52 @@ func RunGitInteractive(dir string, gitPath string, args ...string) error {
 	return cmd.Run()
 }
 
+// --- Editor Helpers ---
+
+// RunEditor opens the user's preferred editor (or a default) to edit a temporary file.
+// It returns the content of the file after the editor is closed.
+// If the content is empty, it returns an error.
+func RunEditor() (string, error) {
+	editor := os.Getenv("EDITOR")
+	if editor == "" {
+		if _, err := exec.LookPath("vi"); err == nil {
+			editor = "vi"
+		} else if _, err := exec.LookPath("notepad"); err == nil {
+			editor = "notepad"
+		} else {
+			return "", fmt.Errorf("no suitable editor found. Please set the EDITOR environment variable")
+		}
+	}
+
+	tmpFile, err := os.CreateTemp("", "mstl-gh-pr-*.md")
+	if err != nil {
+		return "", fmt.Errorf("failed to create temporary file: %w", err)
+	}
+	defer os.Remove(tmpFile.Name())
+	tmpFile.Close() // Close immediately, let editor open it
+
+	cmd := exec.Command(editor, tmpFile.Name())
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("failed to run editor: %w", err)
+	}
+
+	content, err := os.ReadFile(tmpFile.Name())
+	if err != nil {
+		return "", fmt.Errorf("failed to read temporary file: %w", err)
+	}
+
+	trimmed := strings.TrimSpace(string(content))
+	if trimmed == "" {
+		return "", fmt.Errorf("empty message, aborted")
+	}
+
+	return trimmed, nil
+}
+
 // --- Flag Helpers ---
 
 // ResolveCommonValues resolves the configuration file path and parallel count

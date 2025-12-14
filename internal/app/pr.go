@@ -41,12 +41,20 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 		fShort     string
 		pVal       int
 		pValShort  int
+		tLong      string
+		tShort     string
+		bLong      string
+		bShort     string
 	)
 
 	fs.StringVar(&fLong, "file", "", "Configuration file path")
 	fs.StringVar(&fShort, "f", "", "Configuration file path (shorthand)")
 	fs.IntVar(&pVal, "parallel", DefaultParallel, "Number of parallel processes")
 	fs.IntVar(&pValShort, "p", DefaultParallel, "Number of parallel processes (shorthand)")
+	fs.StringVar(&tLong, "title", "", "Pull Request title")
+	fs.StringVar(&tShort, "t", "", "Pull Request title (shorthand)")
+	fs.StringVar(&bLong, "body", "", "Pull Request body")
+	fs.StringVar(&bShort, "b", "", "Pull Request body (shorthand)")
 
 	if err := ParseFlagsFlexible(fs, args); err != nil {
 		fmt.Println(err)
@@ -58,6 +66,16 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
+	}
+
+	// Resolve title and body
+	prTitle := tLong
+	if prTitle == "" {
+		prTitle = tShort
+	}
+	prBody := bLong
+	if prBody == "" {
+		prBody = bShort
 	}
 
 	// 1. Check gh availability
@@ -132,6 +150,20 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 		os.Exit(1)
 	}
 
+	// Input Message if needed
+	if prTitle == "" && prBody == "" {
+		content, err := RunEditor()
+		if err != nil {
+			fmt.Printf("Error getting message: %v\n", err)
+			os.Exit(1)
+		}
+		lines := strings.Split(content, "\n")
+		if len(lines) > 0 {
+			prTitle = lines[0]
+			prBody = content
+		}
+	}
+
 	// 6. Check GitHub Management & Permissions & Existing PRs
 	// Filter out ignored repos
 	activeRepos := filterRepositories(config, ignoredRepos)
@@ -149,7 +181,7 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 
 	// 7. Execution: Push & Create PR
 	fmt.Println("Pushing changes and creating Pull Requests...")
-	prURLs, err := executePrCreation(activeRepos, parallel, opts.GitPath, existingPrURLs)
+	prURLs, err := executePrCreation(activeRepos, parallel, opts.GitPath, existingPrURLs, prTitle, prBody)
 	if err != nil {
 		fmt.Printf("Error during execution: %v\n", err)
 		os.Exit(1)
@@ -289,7 +321,7 @@ func verifyGithubRequirements(repos []Repository, parallel int, gitPath string) 
 	return existingPRs, nil
 }
 
-func executePrCreation(repos []Repository, parallel int, gitPath string, existingPRs map[string]string) ([]string, error) {
+func executePrCreation(repos []Repository, parallel int, gitPath string, existingPRs map[string]string, title, body string) ([]string, error) {
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, parallel)
@@ -343,7 +375,18 @@ func executePrCreation(repos []Repository, parallel int, gitPath string, existin
 
 			fmt.Printf("[%s] Creating Pull Request...\n", repoName)
 
-			args := []string{"pr", "create", "--repo", *r.URL, "--head", branchName, "--fill"}
+			args := []string{"pr", "create", "--repo", *r.URL, "--head", branchName}
+
+			if title != "" || body != "" {
+				if title != "" {
+					args = append(args, "--title", title)
+				}
+				if body != "" {
+					args = append(args, "--body", body)
+				}
+			} else {
+				args = append(args, "--fill")
+			}
 
 			if r.Branch != nil && *r.Branch != "" {
 				args = append(args, "--base", *r.Branch)
