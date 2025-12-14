@@ -111,6 +111,7 @@ flowchart TD
 3.  **識別子計算 (`CalculateSnapshotIdentifier`)**:
     *   リポジトリリストをIDでソートします。
     *   各リポジトリについて、**ブランチ上に有る場合はブランチ名を、ブランチ上にない場合はリビジョン (SHA)** を採用します。
+        *   **注意**: `pr create` コマンドにおいては、前段の状態確認 (Status Check) でDetached HEADをエラーとして排除しているため、ここでの値は**常にブランチ名**となります。リビジョンが採用されることはありません。
     *   それらの値をカンマ区切りで連結します。
     *   連結した文字列のSHA-256ハッシュを計算し、Hex文字列として識別子とします。
 4.  **JSON生成**: 収集した情報を `Config` 構造体としてJSON化し、インデント付きで保存します。
@@ -123,7 +124,7 @@ flowchart TD
 
 ### 依存関係
 
-*   `internal/app/pr_create_snapshot.go`: スナップショット生成ロジック
+*   `internal/app/snapshot.go`: スナップショット生成ロジック (`GenerateSnapshot` / `CalculateSnapshotIdentifier`)
 *   `internal/app/status_logic.go`: ステータス収集ロジックを再利用
 *   `internal/app/utils.go`: Git実行、並列制御
 *   `os/exec`: `gh` コマンドの実行
