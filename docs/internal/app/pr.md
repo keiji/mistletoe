@@ -31,16 +31,22 @@ mstl-gh pr create [options]
         *   **Push可能であること**: Pullが必要な変更 (RemoteがLocalより進んでいる) がないこと。
         *   **競合がないこと**: 競合状態でないこと。
     *   確認後、`status` コマンド相当のテーブルを表示します。
+    *   Detached HEAD状態のリポジトリがある場合は警告し、処理を続行するか確認します。
+    *   実行前に確認プロンプトを表示します。
 4.  **GitHub要件チェック**:
     *   すべてのリポジトリがGitHub管理下であることを確認します (URLチェック)。
     *   すべてのリポジトリでPR作成権限があることを確認します。
+    *   **既存PRの確認**: すでにPull Requestが存在するかを確認します。
+        *   存在する場合: そのURLを記録し、後続の「PR作成」ステップはスキップしますが、「Push」は実行対象とします。
     *   条件を満たさないリポジトリがある場合、エラーとして終了します。
 5.  **実行 (Execution)**:
     *   以下の処理を並列実行します。
         1.  **Push**: `git push origin <current_branch>` を実行します。
-        2.  **PR作成**: `gh pr create --fill` を実行し、作成されたPRのURLを取得します。
+        2.  **PR作成**:
+            *   既存のPRがない場合: `gh pr create --fill` (設定ファイルでbranch指定がある場合は `--base <branch>`) を実行し、作成されたPRのURLを取得します。
+            *   既存のPRがある場合: スキップします。
 6.  **事後処理 (Post-processing)**:
-    *   すべてのPR作成が完了した後、各PRのDescriptionを更新し、相互リンク (Related Pull Request(s)) を追記します。
+    *   すべてのPR (新規作成および既存) について、Descriptionを更新し、相互リンク (Related Pull Request(s)) を追記します。
 
 ## 内部ロジック
 
@@ -56,17 +62,19 @@ flowchart TD
     D -- NG --> Z
     E --> F{Push不可/競合あり?}
     F -- Yes --> Z
-    F -- No --> G[ステータス表示]
-    G --> H[GitHub管理/権限チェック]
+    F -- No --> G[ステータス表示 & 確認]
+    G --> H[GitHub要件/既存PRチェック]
     H -- NG --> Z
     H -- OK --> I[並列実行開始]
     I --> J[Git Push]
-    J --> K[PR作成 gh pr create]
-    K --> L[URL収集]
-    L --> M[全PR完了?]
-    M -- No --> J
-    M -- Yes --> N[PR Description更新 gh pr edit]
-    N --> O[終了]
+    J --> K{既存PRあり?}
+    K -- Yes --> L[URL収集 (既存)]
+    K -- No --> M[PR作成 gh pr create]
+    M --> L
+    L --> N[全リポジトリ完了?]
+    N -- No --> J
+    N -- Yes --> O[PR Description更新 gh pr edit]
+    O --> P[終了]
 ```
 
 ### エラーハンドリング
