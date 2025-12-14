@@ -33,7 +33,7 @@ mstl status [options]
 
 *   `>` (緑色): **Unpushed**。ローカルに未プッシュのコミットがあります。
 *   `<` (黄色): **Pullable**。リモートに新しいコミットがあり、取り込む必要があります（現在のブランチが設定と一致する場合のみ判定）。
-*   `x` (赤色): **Conflict**。プルすると競合が発生する状態です（Pullable な場合のみ判定）。
+*   `!` (黄色): **Conflict**。プルすると競合が発生する状態です（Pullable な場合のみ判定）。
 
 ## 4. 内部ロジック (Internal Logic)
 
@@ -89,7 +89,7 @@ flowchart TD
     *   **Unpushed (`>`)**: `remote..local` のコミット数が 0 より大きい場合。
     *   **Pullable (`<`)**: 現在のブランチが設定ファイルの `branch` と一致する場合のみ判定します。`local..remote` のコミット数が 0 より大きい場合。
         *   リモートオブジェクトがローカルに存在しない場合（`cat-file -e` 失敗）、`git fetch` を試行してから再判定します。
-    *   **Conflict (`x`)**: Pullable である場合、`git merge-base` で共通祖先を特定し、`git merge-tree` を実行してコンフリクトマーカー（`<<<<<<<`）が含まれるかを確認します。
+    *   **Conflict (`!`)**: Pullable である場合、`git merge-base` で共通祖先を特定し、`git merge-tree` を実行してコンフリクトマーカー（`<<<<<<<`）が含まれるかを確認します。
 
 4.  **表示**:
     *   `tablewriter` ライブラリを使用し、各リポジトリの計算結果を整形して出力します。

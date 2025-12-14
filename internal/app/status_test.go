@@ -327,13 +327,13 @@ func TestStatusCmd(t *testing.T) {
 		}
 		output := string(out)
 
-		// Expect < (Yellow) and > (Green)
-		// With new logic, Pullable (<) takes precedence over Conflict (x)
-		coloredPullable := "\033[33m<\033[0m"
+		// Expect ! (Yellow) and > (Green)
+		// With new logic, Conflict (!) takes precedence over Pullable (<)
+		coloredConflict := "\033[33m!\033[0m"
 		coloredUnpushed := "\033[32m>\033[0m"
 
-		if !strings.Contains(output, coloredPullable) {
-			t.Errorf("Expected '<' (Yellow) due to precedence, got:\n%s", output)
+		if !strings.Contains(output, coloredConflict) {
+			t.Errorf("Expected '!' (Yellow) due to precedence, got:\n%s", output)
 		}
 		if !strings.Contains(output, coloredUnpushed) {
 			t.Errorf("Expected '>' (Green), got:\n%s", output)
