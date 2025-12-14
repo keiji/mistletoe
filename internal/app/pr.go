@@ -83,11 +83,6 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 	RenderStatusTable(rows)
 
 	// 5. Check Pushability & Detached HEAD
-	// "If there are repositories that cannot be pushed, terminate with error."
-	// Cannot push if:
-	// - Behind remote (IsPullable)
-	// - Conflict (HasConflict)
-	// - Detached HEAD (BranchName == "HEAD") -> Prompt user
 	var detachedRepos []string
 
 	for _, row := range rows {
@@ -99,8 +94,6 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 			fmt.Printf("Error: Repository '%s' has conflicts. Cannot proceed.\n", row.Repo)
 			os.Exit(1)
 		}
-		// Check for detached HEAD
-		// CollectStatus sets BranchName to "HEAD" if detached (based on rev-parse --abbrev-ref HEAD returning HEAD, see status_logic.go:114)
 		if row.BranchName == "HEAD" {
 			detachedRepos = append(detachedRepos, row.Repo)
 		}
@@ -137,7 +130,7 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 		os.Exit(1)
 	}
 
-	// 6. Check GitHub Management & Permissions
+	// 6. Check GitHub Management & Permissions & Existing PRs
 	// Filter out ignored repos
 	activeRepos := filterRepositories(config, ignoredRepos)
 	if len(activeRepos) == 0 {
@@ -145,18 +138,36 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 		return
 	}
 
-	fmt.Println("Verifying GitHub permissions...")
-	if err := verifyGithubRequirements(activeRepos, parallel); err != nil {
+	fmt.Println("Verifying GitHub permissions and checking existing PRs...")
+	existingPrURLs, err := verifyGithubRequirements(activeRepos, parallel, opts.GitPath)
+	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
 
 	// 7. Execution: Push & Create PR
 	fmt.Println("Pushing changes and creating Pull Requests...")
-	prURLs, err := executePrCreation(activeRepos, parallel, opts.GitPath)
+	prURLs, err := executePrCreation(activeRepos, parallel, opts.GitPath, existingPrURLs)
 	if err != nil {
 		fmt.Printf("Error during execution: %v\n", err)
 		os.Exit(1)
+	}
+
+	// Add already existing URLs to the list for description updating
+	for _, url := range existingPrURLs {
+		if url != "" {
+			// Avoid duplicates if executePrCreation somehow added it (it shouldn't if we pass it)
+			found := false
+			for _, p := range prURLs {
+				if p == url {
+					found = true
+					break
+				}
+			}
+			if !found {
+				prURLs = append(prURLs, url)
+			}
+		}
 	}
 
 	// 8. Post-processing: Update Descriptions
@@ -181,13 +192,10 @@ func filterRepositories(config *Config, ignoredRepos map[string]bool) []Reposito
 }
 
 func checkGhAvailability() error {
-	// check if gh is in path
 	_, err := exec.LookPath("gh")
 	if err != nil {
 		return errors.New("Error: 'gh' command not found. Please install GitHub CLI.")
 	}
-	// check auth status
-	// gh auth status
 	cmd := exec.Command("gh", "auth", "status")
 	if err := cmd.Run(); err != nil {
 		return errors.New("Error: 'gh' is not authenticated. Please run 'gh auth login'.")
@@ -195,11 +203,14 @@ func checkGhAvailability() error {
 	return nil
 }
 
-func verifyGithubRequirements(repos []Repository, parallel int) error {
+// verifyGithubRequirements checks GitHub URL, permissions, and existing PRs.
+// It returns a map of RepoName -> Existing PR URL.
+func verifyGithubRequirements(repos []Repository, parallel int, gitPath string) (map[string]string, error) {
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, parallel)
 	var errs []string
+	existingPRs := make(map[string]string)
 
 	for _, repo := range repos {
 		wg.Add(1)
@@ -208,44 +219,66 @@ func verifyGithubRequirements(repos []Repository, parallel int) error {
 			sem <- struct{}{}
 			defer func() { <-sem }()
 
+			repoName := getRepoName(r)
+
 			// 1. Check if URL is GitHub
-			// Simplified check: contains "github.com"
 			if r.URL == nil || !strings.Contains(*r.URL, "github.com") {
 				mu.Lock()
-				errs = append(errs, fmt.Sprintf("Repository %s is not a GitHub repository", getRepoName(r)))
+				errs = append(errs, fmt.Sprintf("Repository %s is not a GitHub repository", repoName))
 				mu.Unlock()
 				return
 			}
 
 			// 2. Check Permission
-			// gh repo view <url> --json viewerPermission -q .viewerPermission
-			// Expected: ADMIN, MAINTAIN, WRITE. READ is not enough.
 			cmd := exec.Command("gh", "repo", "view", *r.URL, "--json", "viewerPermission", "-q", ".viewerPermission")
 			out, err := cmd.Output()
 			if err != nil {
 				mu.Lock()
-				errs = append(errs, fmt.Sprintf("Failed to check permission for %s: %v", getRepoName(r), err))
+				errs = append(errs, fmt.Sprintf("Failed to check permission for %s: %v", repoName, err))
 				mu.Unlock()
 				return
 			}
 			perm := strings.TrimSpace(string(out))
 			if perm != "ADMIN" && perm != "MAINTAIN" && perm != "WRITE" {
 				mu.Lock()
-				errs = append(errs, fmt.Sprintf("Insufficient permission for %s: %s (need WRITE or better)", getRepoName(r), perm))
+				errs = append(errs, fmt.Sprintf("Insufficient permission for %s: %s (need WRITE or better)", repoName, perm))
 				mu.Unlock()
 				return
 			}
+
+			// 3. Check for existing PR
+			// We need the branch name to check for existing PR
+			repoDir := getRepoDir(r)
+			branchName, err := RunGit(repoDir, gitPath, "rev-parse", "--abbrev-ref", "HEAD")
+			if err != nil {
+				mu.Lock()
+				errs = append(errs, fmt.Sprintf("[%s] Failed to get branch for PR check: %v", repoName, err))
+				mu.Unlock()
+				return
+			}
+
+			checkCmd := exec.Command("gh", "pr", "list", "--repo", *r.URL, "--head", branchName, "--json", "url", "-q", ".[0].url")
+			out, err = checkCmd.Output()
+			prURL := strings.TrimSpace(string(out))
+
+			if prURL != "" {
+				mu.Lock()
+				existingPRs[repoName] = prURL
+				mu.Unlock()
+				// We do NOT return here, because we still want to confirm it is valid for "push only" (which we just did by checking permissions/URL)
+			}
+
 		}(repo)
 	}
 	wg.Wait()
 
 	if len(errs) > 0 {
-		return fmt.Errorf("GitHub validation failed:\n%s", strings.Join(errs, "\n"))
+		return nil, fmt.Errorf("GitHub validation failed:\n%s", strings.Join(errs, "\n"))
 	}
-	return nil
+	return existingPRs, nil
 }
 
-func executePrCreation(repos []Repository, parallel int, gitPath string) ([]string, error) {
+func executePrCreation(repos []Repository, parallel int, gitPath string, existingPRs map[string]string) ([]string, error) {
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, parallel)
@@ -260,67 +293,86 @@ func executePrCreation(repos []Repository, parallel int, gitPath string) ([]stri
 			defer func() { <-sem }()
 
 			repoDir := getRepoDir(r)
+			repoName := getRepoName(r)
 
 			// 1. Push
-			// git push origin <current_branch>
-			// We need current branch.
 			branchName, err := RunGit(repoDir, gitPath, "rev-parse", "--abbrev-ref", "HEAD")
 			if err != nil {
 				mu.Lock()
-				errs = append(errs, fmt.Sprintf("[%s] Failed to get branch: %v", getRepoName(r), err))
+				errs = append(errs, fmt.Sprintf("[%s] Failed to get branch: %v", repoName, err))
 				mu.Unlock()
 				return
 			}
 
-			fmt.Printf("[%s] Pushing to origin/%s...\n", getRepoName(r), branchName)
+			fmt.Printf("[%s] Pushing to origin/%s...\n", repoName, branchName)
 			if _, err := RunGit(repoDir, gitPath, "push", "origin", branchName); err != nil {
 				mu.Lock()
-				errs = append(errs, fmt.Sprintf("[%s] Push failed: %v", getRepoName(r), err))
+				errs = append(errs, fmt.Sprintf("[%s] Push failed: %v", repoName, err))
 				mu.Unlock()
 				return
 			}
 
 			// 2. Create PR
-			// Check if PR exists
-			checkCmd := exec.Command("gh", "pr", "list", "--repo", *r.URL, "--head", branchName, "--json", "url", "-q", ".[0].url")
-			out, err := checkCmd.Output()
-			prURL := strings.TrimSpace(string(out))
-
-			if prURL == "" {
-				// Create
-				fmt.Printf("[%s] Creating Pull Request...\n", getRepoName(r))
-
-				// Arguments for gh pr create
-				// gh pr create --fill --repo <url> --head <branch> --base <base_branch_if_configured>
-				args := []string{"pr", "create", "--repo", *r.URL, "--head", branchName, "--fill"}
-
-				if r.Branch != nil && *r.Branch != "" {
-					args = append(args, "--base", *r.Branch)
-				}
-
-				createCmd := exec.Command("gh", args...)
-				// Capture output to get URL
-				createOut, err := createCmd.Output()
-				if err != nil {
-					// Retrieve error output if possible
-					var exitErr *exec.ExitError
-					if errors.As(err, &exitErr) {
-						mu.Lock()
-						errs = append(errs, fmt.Sprintf("[%s] PR Create failed: %s", getRepoName(r), string(exitErr.Stderr)))
-						mu.Unlock()
-					} else {
-						mu.Lock()
-						errs = append(errs, fmt.Sprintf("[%s] PR Create failed: %v", getRepoName(r), err))
-						mu.Unlock()
-					}
-					return
-				}
-				// Output of gh pr create is the URL
-				lines := strings.Split(strings.TrimSpace(string(createOut)), "\n")
-				prURL = lines[len(lines)-1] // URL is usually last line
-			} else {
-				fmt.Printf("[%s] Pull Request already exists: %s\n", getRepoName(r), prURL)
+			// Check if we already found an existing PR
+			if url, ok := existingPRs[repoName]; ok {
+				fmt.Printf("[%s] Pull Request already exists: %s (skipping creation)\n", repoName, url)
+				// We don't add to prURLs here, because the caller will merge existingPRs.
+				// Or we can add it here. The prompt implies "exclude from PR creation target".
+				// It doesn't explicitly say "don't return it".
+				// But we need it for description updating.
+				// Let's rely on the caller to merge them, or add it here.
+				// To keep it simple, let's add it here so `prURLs` contains newly created ones.
+				// Wait, if I add it here, I don't need to merge in caller.
+				// But "newly created" vs "all involved" matters for the message "Creating Pull Request...".
+				return
 			}
+
+			// Double check? No, verifyGithubRequirements is authoritative enough for "existing" state at start.
+			// But race conditions exist. gh pr create will fail if it exists.
+
+			fmt.Printf("[%s] Creating Pull Request...\n", repoName)
+
+			args := []string{"pr", "create", "--repo", *r.URL, "--head", branchName, "--fill"}
+
+			if r.Branch != nil && *r.Branch != "" {
+				args = append(args, "--base", *r.Branch)
+			}
+
+			createCmd := exec.Command("gh", args...)
+			createOut, err := createCmd.Output()
+			if err != nil {
+				var exitErr *exec.ExitError
+				if errors.As(err, &exitErr) {
+					// Fallback: Check if it failed because it exists?
+					// output might contain "already exists".
+					stderr := string(exitErr.Stderr)
+					if strings.Contains(stderr, "already exists") {
+						// Try to fetch it again?
+						// Re-run list command
+						checkCmd := exec.Command("gh", "pr", "list", "--repo", *r.URL, "--head", branchName, "--json", "url", "-q", ".[0].url")
+						out, _ := checkCmd.Output()
+						prURL := strings.TrimSpace(string(out))
+						if prURL != "" {
+							fmt.Printf("[%s] Pull Request already exists: %s\n", repoName, prURL)
+							mu.Lock()
+							prURLs = append(prURLs, prURL)
+							mu.Unlock()
+							return
+						}
+					}
+
+					mu.Lock()
+					errs = append(errs, fmt.Sprintf("[%s] PR Create failed: %s", repoName, stderr))
+					mu.Unlock()
+				} else {
+					mu.Lock()
+					errs = append(errs, fmt.Sprintf("[%s] PR Create failed: %v", repoName, err))
+					mu.Unlock()
+				}
+				return
+			}
+			lines := strings.Split(strings.TrimSpace(string(createOut)), "\n")
+			prURL := lines[len(lines)-1]
 
 			mu.Lock()
 			prURLs = append(prURLs, prURL)
@@ -341,7 +393,6 @@ func updatePrDescriptions(prURLs []string, parallel int) error {
 		return nil
 	}
 
-	// Construct footer
 	footer := "\n\n----\nRelated Pull Request(s):\n"
 	for _, url := range prURLs {
 		footer += fmt.Sprintf("* %s\n", url)
