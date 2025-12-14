@@ -53,7 +53,7 @@ mstl-gh pr create [options]
     *   設定ファイルに含まれ、かつローカルディスクに存在するすべてのリポジトリの現在の状態 (URL, Branch, Revision) を収集します。
     *   各リポジトリの識別値 (ブランチ名、ブランチ上にない場合はリビジョン) をID順に連結してSHA-256ハッシュを計算し、識別子 (Identifier) とします。
     *   `mistletoe-snapshot-[Identifier].json` という名前でスナップショットJSONファイルをローカルに保存します。
-    *   JSONファイルの内容を `<details>` ブロックで囲み、PR本文への追加用テキストとして準備します。
+    *   Mistletoeブロック形式（後述）に従って、スナップショットと関連PR情報を含む自動生成テキストを準備します。
 7.  **実行 (Execution)**:
     *   以下の処理を並列実行します。
         1.  **Push**: `git push origin <current_branch>` を実行します。
@@ -63,10 +63,42 @@ mstl-gh pr create [options]
             *   既存のPRがある場合: スキップします。
 8.  **事後処理 (Post-processing)**:
     *   すべてのPR (新規作成および既存) について、Descriptionを更新します。
-    *   **スナップショット**: 本文に含まれていない場合、スナップショットテキストを追記します。
-    *   **相互リンク**: Related Pull Request(s) セクションとして、関連するPRのURL一覧を追記します。ただし、**そのPR自身のURLは一覧から除外**します。また、他にPRが存在しない場合はセクション自体を追加しません。
+    *   Mistletoeブロック形式を検知し、既存のブロックがある場合は置換、ない場合は追記することで、スナップショットと関連PRリンク（自分自身を除く）を最新の状態にします。
 
 ## 内部ロジック
+
+### Mistletoeブロック形式
+
+PR本文に挿入される自動生成コンテンツは、将来的な更新を可能にするために以下の形式で埋め込まれます。
+
+```text
+
+----
+## Mistletoe
+This content is auto-generated. Manual edits may be lost.
+
+### snapshot
+
+<details>
+<summary>mistletoe-snapshot-[ID].json</summary>
+
+\`\`\`json
+...
+\`\`\`
+</details>
+
+### Related Pull Request(s)
+
+ * URL
+ * URL
+
+---------
+```
+
+*   **上部区切り線**: 4以上16以下のランダムな偶数個のハイフン (`-`)。
+*   **ヘッダ**: 区切り線の直後に `## Mistletoe` (レベルは問わないが `Mistletoe` で始まる見出し)。
+*   **下部区切り線**: 上部区切り線の個数を `n` としたとき、`2n + 1` 個のハイフン。
+*   **更新ロジック**: このブロック形式を検知し、ブロック全体を置換することで、ユーザが手動で記述した他の説明文を保持したまま自動生成部分のみを更新します。
 
 ### 処理フローチャート
 
