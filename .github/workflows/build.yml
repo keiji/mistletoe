@@ -12,6 +12,10 @@ on:
       - '**.md'
       - '.gitignore'
 
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -32,4 +36,26 @@ jobs:
       run: go build -v ./...
 
     - name: Test
-      run: go test -v ./...
+      run: go test -v -coverprofile=coverage.out ./...
+
+    - name: Comment Coverage
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const fs = require('fs');
+          const execSync = require('child_process').execSync;
+
+          try {
+            const output = execSync('go tool cover -func=coverage.out').toString();
+            const body = '## Test Coverage Report\n\n```\n' + output + '\n```';
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            })
+          } catch (error) {
+            console.log(error);
+          }
