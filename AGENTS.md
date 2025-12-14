@@ -1,3 +1,7 @@
+# Communication Guidelines
+
+*   **Language**: Prioritize **Japanese** for basic interactions, and include **English** as well.
+
 # Pull Request Guidelines
 
 Before creating a Pull Request, ensure that you verify not only that the build succeeds but also that the `golint` checks pass.
