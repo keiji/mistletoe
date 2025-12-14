@@ -74,23 +74,7 @@ func GenerateSnapshot(config *Config, gitPath string) ([]byte, string, error) {
 		})
 	}
 
-	// Sort by ID
-	sort.Slice(currentRepos, func(i, j int) bool {
-		return *currentRepos[i].ID < *currentRepos[j].ID
-	})
-
-	// Calculate Identifier
-	var revisions []string
-	for _, r := range currentRepos {
-		rev := ""
-		if r.Revision != nil {
-			rev = *r.Revision
-		}
-		revisions = append(revisions, rev)
-	}
-	concat := strings.Join(revisions, ",")
-	hash := sha256.Sum256([]byte(concat))
-	identifier := hex.EncodeToString(hash[:])
+	identifier := CalculateSnapshotIdentifier(currentRepos)
 
 	// Create JSON
 	snapshotConfig := Config{
@@ -102,4 +86,25 @@ func GenerateSnapshot(config *Config, gitPath string) ([]byte, string, error) {
 	}
 
 	return data, identifier, nil
+}
+
+// CalculateSnapshotIdentifier calculates the unique identifier for a list of repositories.
+// It sorts the repositories by ID to ensure a deterministic hash.
+func CalculateSnapshotIdentifier(repos []Repository) string {
+	// Sort by ID
+	sort.Slice(repos, func(i, j int) bool {
+		return *repos[i].ID < *repos[j].ID
+	})
+
+	var revisions []string
+	for _, r := range repos {
+		rev := ""
+		if r.Revision != nil {
+			rev = *r.Revision
+		}
+		revisions = append(revisions, rev)
+	}
+	concat := strings.Join(revisions, ",")
+	hash := sha256.Sum256([]byte(concat))
+	return hex.EncodeToString(hash[:])
 }

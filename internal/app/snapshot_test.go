@@ -96,3 +96,36 @@ func TestGenerateSnapshot_Subset(t *testing.T) {
 		t.Errorf("Expected repo %s, got %s", id1, *(*snapshotConfig.Repositories)[0].ID)
 	}
 }
+
+func TestCalculateSnapshotIdentifier(t *testing.T) {
+	id1 := "repo1"
+	rev1 := "sha1"
+	id2 := "repo2"
+	rev2 := "sha2"
+
+	repos := []Repository{
+		{ID: &id2, Revision: &rev2}, // Unsorted
+		{ID: &id1, Revision: &rev1},
+	}
+
+	identifier := CalculateSnapshotIdentifier(repos)
+
+	// Check sorting
+	if *repos[0].ID != id1 {
+		t.Errorf("Expected repos to be sorted, but got %s first", *repos[0].ID)
+	}
+
+	// Check identifier determinism
+	// repo1(sha1),repo2(sha2) -> "sha1,sha2"
+
+	// Create same set in different order
+	repos2 := []Repository{
+		{ID: &id1, Revision: &rev1},
+		{ID: &id2, Revision: &rev2},
+	}
+	identifier2 := CalculateSnapshotIdentifier(repos2)
+
+	if identifier != identifier2 {
+		t.Errorf("Identifier mismatch: %s != %s", identifier, identifier2)
+	}
+}
