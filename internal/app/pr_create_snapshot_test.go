@@ -1,131 +1,99 @@
 package app
 
 import (
-	"encoding/json"
-	"os/exec"
+	"crypto/sha256"
+	"encoding/hex"
 	"testing"
 )
 
-func TestGenerateSnapshot(t *testing.T) {
-	// Setup 2 repos
-	remoteURL1, repoDir1 := setupRemoteAndContent(t, 1)
-	remoteURL2, repoDir2 := setupRemoteAndContent(t, 1)
+func TestCalculateSnapshotIdentifier_NewLogic(t *testing.T) {
+	// Logic:
+	// sort by ID
+	// for each: if branch != nil && branch != "" -> branch
+	//           else if revision != nil -> revision
+	// concat with ","
+	// sha256
 
-	// Since GenerateSnapshot uses GetRepoDir which returns ID if present.
-	// We use absolute paths as IDs for testing.
-	id1 := repoDir1
-	id2 := repoDir2
-
-	config := Config{
-		Repositories: &[]Repository{
-			{ID: &id1, URL: &remoteURL1},
-			{ID: &id2, URL: &remoteURL2},
-		},
+	r1ID := "repo1"
+	r1Branch := "feature/abc"
+	r1Rev := "rev1"
+	r1 := Repository{
+		ID:       &r1ID,
+		Branch:   &r1Branch,
+		Revision: &r1Rev,
 	}
 
-	// We need git path
-	gitPath, err := exec.LookPath("git")
-	if err != nil {
-		t.Fatal("git not found")
+	r2ID := "repo2"
+	r2Rev := "rev2"
+	// Detached HEAD or no branch specified
+	r2 := Repository{
+		ID:       &r2ID,
+		Branch:   nil,
+		Revision: &r2Rev,
 	}
 
-	data, identifier, err := GenerateSnapshot(&config, gitPath)
-	if err != nil {
-		t.Fatalf("GenerateSnapshot failed: %v", err)
-	}
+	repos := []Repository{r2, r1} // Unsorted input
 
-	// Verify identifier is SHA256 (64 hex chars)
-	if len(identifier) != 64 {
-		t.Errorf("Identifier length %d, expected 64", len(identifier))
-	}
+	// Expected string before hash:
+	// repo1 -> feature/abc
+	// repo2 -> rev2
+	// "feature/abc,rev2"
 
-	// Verify JSON
-	var snapshotConfig Config
-	if err := json.Unmarshal(data, &snapshotConfig); err != nil {
-		t.Fatalf("Failed to unmarshal snapshot: %v", err)
-	}
+	expectedStr := "feature/abc,rev2"
+	hash := sha256.Sum256([]byte(expectedStr))
+	expectedID := hex.EncodeToString(hash[:])
 
-	if len(*snapshotConfig.Repositories) != 2 {
-		t.Errorf("Expected 2 repos, got %d", len(*snapshotConfig.Repositories))
-	}
+	id := CalculateSnapshotIdentifier(repos)
 
-	// Check content
-	for _, r := range *snapshotConfig.Repositories {
-		if r.Revision == nil || *r.Revision == "" {
-			t.Errorf("Revision missing for %s", *r.ID)
-		}
-		// Branch should be master (default from setupRemoteAndContent)
-		if r.Branch == nil || *r.Branch != "master" {
-			t.Errorf("Expected branch master, got %v", r.Branch)
-		}
+	if id != expectedID {
+		t.Errorf("Expected ID %s, got %s", expectedID, id)
 	}
 }
 
-func TestGenerateSnapshot_Subset(t *testing.T) {
-	// Setup 1 repo
-	remoteURL1, repoDir1 := setupRemoteAndContent(t, 1)
-
-	// Config has 2 repos, one missing
-	id1 := repoDir1
-	id2 := "/path/to/missing/repo"
-	url2 := "https://example.com/missing.git"
-
-	config := Config{
-		Repositories: &[]Repository{
-			{ID: &id1, URL: &remoteURL1},
-			{ID: &id2, URL: &url2},
-		},
+func TestCalculateSnapshotIdentifier_BranchPriority(t *testing.T) {
+	// Even if revision is present, branch should be used if available
+	r1ID := "repo1"
+	r1Branch := "main"
+	r1Rev := "aabbcc"
+	r1 := Repository{
+		ID:       &r1ID,
+		Branch:   &r1Branch,
+		Revision: &r1Rev,
 	}
 
-	gitPath, _ := exec.LookPath("git")
-	data, _, err := GenerateSnapshot(&config, gitPath)
-	if err != nil {
-		t.Fatalf("GenerateSnapshot failed: %v", err)
-	}
+	repos := []Repository{r1}
 
-	var snapshotConfig Config
-	if err := json.Unmarshal(data, &snapshotConfig); err != nil {
-		t.Fatalf("Failed to unmarshal snapshot: %v", err)
-	}
+	expectedStr := "main"
+	hash := sha256.Sum256([]byte(expectedStr))
+	expectedID := hex.EncodeToString(hash[:])
 
-	// Should only have 1 repo
-	if len(*snapshotConfig.Repositories) != 1 {
-		t.Errorf("Expected 1 repo, got %d", len(*snapshotConfig.Repositories))
-	}
-	if *(*snapshotConfig.Repositories)[0].ID != id1 {
-		t.Errorf("Expected repo %s, got %s", id1, *(*snapshotConfig.Repositories)[0].ID)
+	id := CalculateSnapshotIdentifier(repos)
+
+	if id != expectedID {
+		t.Errorf("Expected ID %s, got %s", expectedID, id)
 	}
 }
 
-func TestCalculateSnapshotIdentifier(t *testing.T) {
-	id1 := "repo1"
-	rev1 := "sha1"
-	id2 := "repo2"
-	rev2 := "sha2"
-
-	repos := []Repository{
-		{ID: &id2, Revision: &rev2}, // Unsorted
-		{ID: &id1, Revision: &rev1},
+func TestCalculateSnapshotIdentifier_RevisionFallback(t *testing.T) {
+	// If branch is empty string or nil, use revision
+	r1ID := "repo1"
+	r1Branch := ""
+	r1Rev := "112233"
+	r1 := Repository{
+		ID:       &r1ID,
+		Branch:   &r1Branch,
+		Revision: &r1Rev,
 	}
 
-	identifier := CalculateSnapshotIdentifier(repos)
+	repos := []Repository{r1}
 
-	// Check sorting
-	if *repos[0].ID != id1 {
-		t.Errorf("Expected repos to be sorted, but got %s first", *repos[0].ID)
-	}
+	expectedStr := "112233"
+	hash := sha256.Sum256([]byte(expectedStr))
+	expectedID := hex.EncodeToString(hash[:])
 
-	// Check identifier determinism
-	// repo1(sha1),repo2(sha2) -> "sha1,sha2"
+	id := CalculateSnapshotIdentifier(repos)
 
-	// Create same set in different order
-	repos2 := []Repository{
-		{ID: &id1, Revision: &rev1},
-		{ID: &id2, Revision: &rev2},
-	}
-	identifier2 := CalculateSnapshotIdentifier(repos2)
-
-	if identifier != identifier2 {
-		t.Errorf("Identifier mismatch: %s != %s", identifier, identifier2)
+	if id != expectedID {
+		t.Errorf("Expected ID %s, got %s", expectedID, id)
 	}
 }

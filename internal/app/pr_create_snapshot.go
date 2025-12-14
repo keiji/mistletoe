@@ -96,15 +96,17 @@ func CalculateSnapshotIdentifier(repos []Repository) string {
 		return *repos[i].ID < *repos[j].ID
 	})
 
-	var revisions []string
+	var parts []string
 	for _, r := range repos {
-		rev := ""
-		if r.Revision != nil {
-			rev = *r.Revision
+		val := ""
+		if r.Branch != nil && *r.Branch != "" {
+			val = *r.Branch
+		} else if r.Revision != nil {
+			val = *r.Revision
 		}
-		revisions = append(revisions, rev)
+		parts = append(parts, val)
 	}
-	concat := strings.Join(revisions, ",")
+	concat := strings.Join(parts, ",")
 	hash := sha256.Sum256([]byte(concat))
 	return hex.EncodeToString(hash[:])
 }

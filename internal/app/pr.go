@@ -318,8 +318,6 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 	RenderStatusTable(rows)
 
 	// 5. Check Pushability & Detached HEAD
-	var detachedRepos []string
-
 	for _, row := range rows {
 		if row.IsPullable {
 			fmt.Printf("Error: Repository '%s' has unpulled commits (sync required). Cannot proceed.\n", row.Repo)
@@ -330,28 +328,8 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 			os.Exit(1)
 		}
 		if row.BranchName == "HEAD" {
-			detachedRepos = append(detachedRepos, row.Repo)
-		}
-	}
-
-	// Handle Detached HEADs
-	ignoredRepos := make(map[string]bool)
-	if len(detachedRepos) > 0 {
-		fmt.Printf("Warning: The following repositories are in a detached HEAD state and cannot participate in PR creation:\n")
-		for _, r := range detachedRepos {
-			fmt.Printf(" - %s\n", r)
-		}
-
-		fmt.Print("Do you want to continue processing other repositories? (yes/no): ")
-		reader := bufio.NewReader(os.Stdin)
-		input, _ := reader.ReadString('\n')
-		input = strings.TrimSpace(strings.ToLower(input))
-		if input != "y" && input != "yes" {
-			fmt.Println("Aborted.")
+			fmt.Printf("Error: Repository '%s' is in a detached HEAD state. Cannot proceed.\n", row.Repo)
 			os.Exit(1)
-		}
-		for _, r := range detachedRepos {
-			ignoredRepos[r] = true
 		}
 	}
 
@@ -380,8 +358,14 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 	}
 
 	// 6. Check GitHub Management & Permissions & Existing PRs
-	// Filter out ignored repos
-	activeRepos := filterRepositories(config, ignoredRepos)
+	// Since we aborted on detached HEADs, we process all repositories in config that exist.
+	// We can't filter out ignored repos anymore as we don't ignore any.
+	// However, filterRepositories was filtering based on ignoredRepos map.
+	// We just pass the config repositories dereferenced.
+	// But Wait, filterRepositories also handled checking if the repo is in the ignore list.
+	// Now ignore list is empty. So we can just convert *config.Repositories to []Repository.
+	activeRepos := *config.Repositories
+
 	if len(activeRepos) == 0 {
 		fmt.Println("No repositories to process.")
 		return
