@@ -4,6 +4,7 @@
 
 `pr` サブコマンドは、複数のGitHubリポジトリに対して一括でPull Request (PR) を作成・管理するための機能を提供します。
 `gh` コマンド (GitHub CLI) を内部的に利用します。
+また、PR作成時に環境復元用の設定スナップショットを生成し、PRの本文に添付します。
 
 ## 仕様
 
@@ -49,15 +50,22 @@ mstl-gh pr create [options]
     *   **既存PRの確認**: すでにPull Requestが存在するかを確認します。
         *   存在する場合: そのURLを記録し、後続の「PR作成」ステップはスキップしますが、「Push」は実行対象とします。
     *   条件を満たさないリポジトリがある場合、エラーとして終了します。
-6.  **実行 (Execution)**:
+6.  **スナップショット生成**:
+    *   設定ファイルに含まれ、かつローカルディスクに存在するすべてのリポジトリの現在の状態 (URL, Branch, Revision) を収集します。
+    *   各リポジトリのRevisionをID順に連結してSHA-256ハッシュを計算し、識別子 (Identifier) とします。
+    *   `mistletoe-[Identifier].json` という名前でスナップショットJSONファイルをローカルに保存します。
+    *   JSONファイルの内容を `<details>` ブロックで囲み、PR本文への追加用テキストとして準備します。
+7.  **実行 (Execution)**:
     *   以下の処理を並列実行します。
         1.  **Push**: `git push origin <current_branch>` を実行します。
         2.  **PR作成**:
-            *   既存のPRがない場合: `gh pr create --title "<title>" --body "<body>"` (設定ファイルでbranch指定がある場合は `--base <branch>`) を実行し、作成されたPRのURLを取得します。
+            *   既存のPRがない場合: `gh pr create` を実行します。本文にはユーザ入力内容に加え、準備したスナップショットテキストが追記されます。
             *   **競合回避**: PR作成コマンドが「すでに存在する」というエラーで失敗した場合、再度PRの存在確認を行い、URLが取得できれば「既存のPRがある」とみなして続行します。
             *   既存のPRがある場合: スキップします。
-7.  **事後処理 (Post-processing)**:
-    *   すべてのPR (新規作成および既存) について、Descriptionを更新し、相互リンク (Related Pull Request(s)) を追記します。
+8.  **事後処理 (Post-processing)**:
+    *   すべてのPR (新規作成および既存) について、Descriptionを更新します。
+    *   **スナップショット**: 本文に含まれていない場合、スナップショットテキストを追記します。
+    *   **相互リンク**: Related Pull Request(s) セクションとして、関連するPRのURL一覧を追記します。
 
 ## 内部ロジック
 
@@ -84,20 +92,33 @@ flowchart TD
     J -- Yes --> MSG["メッセージ入力処理"]
     MSG --> K["GitHub要件/既存PRチェック"]
     K -- NG --> Z
-    K -- OK --> L["並列実行開始"]
+    K -- OK --> SNAP["スナップショット生成 GenerateSnapshot"]
+    SNAP --> L["並列実行開始"]
     L --> M["Git Push"]
     M --> N{"既存PRあり?"}
     N -- Yes --> O["URL収集 (既存)"]
-    N -- No --> P["PR作成 gh pr create"]
+    N -- No --> P["PR作成 gh pr create (Snapshot付与)"]
     P -- "エラー(重複)" --> Q["再確認"]
     Q -- "発見" --> O
     Q -- "なし" --> Z
     P -- "成功" --> O
     O --> R["全リポジトリ完了?"]
     R -- No --> M
-    R -- Yes --> S["PR Description更新 gh pr edit"]
+    R -- Yes --> S["PR Description更新 (Snapshot/Link追記)"]
     S --> T["終了"]
 ```
+
+### スナップショット生成ロジック
+
+`GenerateSnapshot` 関数および `CalculateSnapshotIdentifier` 関数にて実装されています。
+
+1.  **対象抽出**: 設定ファイル (`Config`) に定義されたリポジトリのうち、ローカルディスクに存在するものを抽出します。
+2.  **情報収集**: `git config` や `git rev-parse` を用いて、URL、現在のブランチ、HEADリビジョンを取得します。
+3.  **識別子計算 (`CalculateSnapshotIdentifier`)**:
+    *   リポジトリリストをIDでソートします。
+    *   各リポジトリのリビジョン (SHA) を抽出し、カンマ区切りで連結します。
+    *   連結した文字列のSHA-256ハッシュを計算し、Hex文字列として識別子とします。
+4.  **JSON生成**: 収集した情報を `Config` 構造体としてJSON化し、インデント付きで保存します。
 
 ### エラーハンドリング
 
@@ -107,6 +128,7 @@ flowchart TD
 
 ### 依存関係
 
+*   `internal/app/snapshot.go`: スナップショット生成ロジック
 *   `internal/app/status_logic.go`: ステータス収集ロジックを再利用
 *   `internal/app/utils.go`: Git実行、並列制御
 *   `os/exec`: `gh` コマンドの実行
