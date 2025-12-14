@@ -41,6 +41,8 @@ func handleVersion(opts GlobalOptions) {
 		v = fmt.Sprintf("%s-%s", appVersion, commitHash)
 	}
 	fmt.Printf("mstl version %s\n", v)
+	fmt.Println("https://github.com/keiji/mistletoe")
+	fmt.Println()
 
 	// In handleVersion, we check existence again or assume the one passed in GlobalOptions
 	// If the startup validation failed for help/version, opts.GitPath is still set to what was attempted.
