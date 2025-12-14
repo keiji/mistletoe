@@ -31,13 +31,22 @@ jobs:
         run: echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
 
       - name: Build Linux
-        run: GOOS=linux GOARCH=amd64 go build -ldflags "-X main.commitHash=${{ env.SHORT_SHA }}" -o mstl-linux-amd64 .
+        run: GOOS=linux GOARCH=amd64 go build -ldflags "-X main.commitHash=${{ env.SHORT_SHA }}" -o mstl-linux-amd64 ./cmd/mstl
 
       - name: Build Mac
-        run: GOOS=darwin GOARCH=amd64 go build -ldflags "-X main.commitHash=${{ env.SHORT_SHA }}" -o mstl-darwin-amd64 .
+        run: GOOS=darwin GOARCH=amd64 go build -ldflags "-X main.commitHash=${{ env.SHORT_SHA }}" -o mstl-darwin-amd64 ./cmd/mstl
 
       - name: Build Windows
-        run: GOOS=windows GOARCH=amd64 go build -ldflags "-X main.commitHash=${{ env.SHORT_SHA }}" -o mstl-windows-amd64.exe .
+        run: GOOS=windows GOARCH=amd64 go build -ldflags "-X main.commitHash=${{ env.SHORT_SHA }}" -o mstl-windows-amd64.exe ./cmd/mstl
+
+      - name: Build Linux (mstl-gh)
+        run: GOOS=linux GOARCH=amd64 go build -ldflags "-X main.commitHash=${{ env.SHORT_SHA }}" -o mstl-gh-linux-amd64 ./cmd/mstl-gh
+
+      - name: Build Mac (mstl-gh)
+        run: GOOS=darwin GOARCH=amd64 go build -ldflags "-X main.commitHash=${{ env.SHORT_SHA }}" -o mstl-gh-darwin-amd64 ./cmd/mstl-gh
+
+      - name: Build Windows (mstl-gh)
+        run: GOOS=windows GOARCH=amd64 go build -ldflags "-X main.commitHash=${{ env.SHORT_SHA }}" -o mstl-gh-windows-amd64.exe ./cmd/mstl-gh
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
@@ -47,4 +56,7 @@ jobs:
             mstl-linux-amd64
             mstl-darwin-amd64
             mstl-windows-amd64.exe
+            mstl-gh-linux-amd64
+            mstl-gh-darwin-amd64
+            mstl-gh-windows-amd64.exe
           retention-days: 1
