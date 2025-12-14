@@ -435,17 +435,6 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 	fmt.Println("Done.")
 }
 
-func filterRepositories(config *Config, ignoredRepos map[string]bool) []Repository {
-	var filtered []Repository
-	for _, repo := range *config.Repositories {
-		name := getRepoName(repo)
-		if !ignoredRepos[name] {
-			filtered = append(filtered, repo)
-		}
-	}
-	return filtered
-}
-
 // Mockable lookPath for testing
 var lookPath = exec.LookPath
 
