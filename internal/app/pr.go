@@ -11,6 +11,8 @@ import (
 	"sync"
 )
 
+var execCommand = exec.Command
+
 // handlePr handles the 'pr' subcommand.
 func handlePr(args []string, opts GlobalOptions) {
 	if len(args) == 0 {
@@ -191,12 +193,15 @@ func filterRepositories(config *Config, ignoredRepos map[string]bool) []Reposito
 	return filtered
 }
 
+// Mockable lookPath for testing
+var lookPath = exec.LookPath
+
 func checkGhAvailability() error {
-	_, err := exec.LookPath("gh")
+	_, err := lookPath("gh")
 	if err != nil {
 		return errors.New("Error: 'gh' command not found. Please install GitHub CLI.")
 	}
-	cmd := exec.Command("gh", "auth", "status")
+	cmd := execCommand("gh", "auth", "status")
 	if err := cmd.Run(); err != nil {
 		return errors.New("Error: 'gh' is not authenticated. Please run 'gh auth login'.")
 	}
@@ -230,7 +235,7 @@ func verifyGithubRequirements(repos []Repository, parallel int, gitPath string) 
 			}
 
 			// 2. Check Permission
-			cmd := exec.Command("gh", "repo", "view", *r.URL, "--json", "viewerPermission", "-q", ".viewerPermission")
+			cmd := execCommand("gh", "repo", "view", *r.URL, "--json", "viewerPermission", "-q", ".viewerPermission")
 			out, err := cmd.Output()
 			if err != nil {
 				mu.Lock()
@@ -257,16 +262,8 @@ func verifyGithubRequirements(repos []Repository, parallel int, gitPath string) 
 				return
 			}
 
-			checkCmd := exec.Command("gh", "pr", "list", "--repo", *r.URL, "--head", branchName, "--json", "url", "-q", ".[0].url")
+			checkCmd := execCommand("gh", "pr", "list", "--repo", *r.URL, "--head", branchName, "--json", "url", "-q", ".[0].url")
 			out, errCheck := checkCmd.Output()
-			// err is not assigned because if this fails, we just assume no PR exists or it's not a critical error for verification?
-			// But wait, if err happens, maybe we should report?
-			// The original code was reusing `err` which was ineffassign because it was overwritten or not checked?
-			// Actually the linter said `ineffectual assignment to err`.
-			// `out, err = checkCmd.Output()`
-			// If I just declare `out, _ := ...` it might be safer if I don't care about the error.
-			// However, if `gh pr list` fails, it might be important.
-			// Let's check it.
 			if errCheck != nil {
 				mu.Lock()
 				errs = append(errs, fmt.Sprintf("[%s] Failed to check for existing PR: %v", repoName, errCheck))
@@ -352,7 +349,7 @@ func executePrCreation(repos []Repository, parallel int, gitPath string, existin
 				args = append(args, "--base", *r.Branch)
 			}
 
-			createCmd := exec.Command("gh", args...)
+			createCmd := execCommand("gh", args...)
 			createOut, err := createCmd.Output()
 			if err != nil {
 				var exitErr *exec.ExitError
@@ -363,7 +360,7 @@ func executePrCreation(repos []Repository, parallel int, gitPath string, existin
 					if strings.Contains(stderr, "already exists") {
 						// Try to fetch it again?
 						// Re-run list command
-						checkCmd := exec.Command("gh", "pr", "list", "--repo", *r.URL, "--head", branchName, "--json", "url", "-q", ".[0].url")
+						checkCmd := execCommand("gh", "pr", "list", "--repo", *r.URL, "--head", branchName, "--json", "url", "-q", ".[0].url")
 						out, _ := checkCmd.Output()
 						prURL := strings.TrimSpace(string(out))
 						if prURL != "" {
@@ -425,7 +422,7 @@ func updatePrDescriptions(prURLs []string, parallel int) error {
 			defer func() { <-sem }()
 
 			// Get current body
-			viewCmd := exec.Command("gh", "pr", "view", targetURL, "--json", "body", "-q", ".body")
+			viewCmd := execCommand("gh", "pr", "view", targetURL, "--json", "body", "-q", ".body")
 			bodyOut, err := viewCmd.Output()
 			if err != nil {
 				mu.Lock()
@@ -438,7 +435,7 @@ func updatePrDescriptions(prURLs []string, parallel int) error {
 			newBody := originalBody + footer
 
 			// Update
-			editCmd := exec.Command("gh", "pr", "edit", targetURL, "--body", newBody)
+			editCmd := execCommand("gh", "pr", "edit", targetURL, "--body", newBody)
 			if err := editCmd.Run(); err != nil {
 				mu.Lock()
 				errs = append(errs, fmt.Sprintf("Failed to edit PR %s: %v", targetURL, err))
