@@ -193,26 +193,3 @@ func TestVerifyGithubRequirements_ExistingPR(t *testing.T) {
 		t.Errorf("Expected existing PR URL, got %v", existing)
 	}
 }
-
-func TestFilterRepositories(t *testing.T) {
-	url := "http://example.com"
-	id1 := "repo1"
-	id2 := "repo2"
-	r1 := Repository{ID: &id1, URL: &url}
-	r2 := Repository{ID: &id2, URL: &url}
-
-	config := &Config{
-		Repositories: &[]Repository{r1, r2},
-	}
-
-	ignored := map[string]bool{"repo1": true}
-
-	filtered := filterRepositories(config, ignored)
-
-	if len(filtered) != 1 {
-		t.Errorf("Expected 1 repo, got %d", len(filtered))
-	}
-	if *filtered[0].ID != "repo2" {
-		t.Errorf("Expected repo2, got %s", *filtered[0].ID)
-	}
-}

@@ -33,9 +33,8 @@ mstl-gh pr create [options]
     *   以下の条件を満たさないリポジトリがある場合、エラーとして終了します。
         *   **Push可能であること**: Pullが必要な変更 (RemoteがLocalより進んでいる) がないこと。
         *   **競合がないこと**: 競合状態でないこと。
+        *   **ブランチ上にあること**: Detached HEAD状態でないこと。これによってsnapshotおよびpush時点で必ずブランチ上にあることが保証されます。
     *   確認後、`status` コマンド相当のテーブルを表示します。
-    *   Detached HEAD状態のリポジトリがある場合は警告し、処理を続行するか確認します。
-        *   続行を選択した場合、これらのリポジトリは以降の処理 (GitHub要件チェック、実行) から除外されます。
     *   実行前に確認プロンプトを表示します。
 4.  **メッセージ入力**:
     *   `--title` および `--body` オプションが指定されている場合はそれらを使用します。
@@ -45,14 +44,14 @@ mstl-gh pr create [options]
         *   入力された全文 (1行目を含む) を本文 (Description) として扱います。
     *   入力が空の場合は処理を中断します。
 5.  **GitHub要件チェック**:
-    *   対象リポジトリ (除外済みを除く) がすべてGitHub管理下であることを確認します (URLチェック)。
+    *   対象リポジトリがすべてGitHub管理下であることを確認します (URLチェック)。
     *   対象リポジトリすべてでPR作成権限があることを確認します。
     *   **既存PRの確認**: すでにPull Requestが存在するかを確認します。
         *   存在する場合: そのURLを記録し、後続の「PR作成」ステップはスキップしますが、「Push」は実行対象とします。
     *   条件を満たさないリポジトリがある場合、エラーとして終了します。
 6.  **スナップショット生成**:
     *   設定ファイルに含まれ、かつローカルディスクに存在するすべてのリポジトリの現在の状態 (URL, Branch, Revision) を収集します。
-    *   各リポジトリのRevisionをID順に連結してSHA-256ハッシュを計算し、識別子 (Identifier) とします。
+    *   各リポジトリの識別値 (ブランチ名、ブランチ上にない場合はリビジョン) をID順に連結してSHA-256ハッシュを計算し、識別子 (Identifier) とします。
     *   `mistletoe-snapshot-[Identifier].json` という名前でスナップショットJSONファイルをローカルに保存します。
     *   JSONファイルの内容を `<details>` ブロックで囲み、PR本文への追加用テキストとして準備します。
 7.  **実行 (Execution)**:
@@ -79,15 +78,10 @@ flowchart TD
     C --> D["リポジトリ整合性検証"]
     D -- OK --> E["ステータス収集 CollectStatus"]
     D -- NG --> Z
-    E --> F{"Push不可/競合あり?"}
+    E --> F{"Push不可/競合/Detached HEAD?"}
     F -- Yes --> Z
     F -- No --> G["ステータス表示"]
-    G --> H{"Detached HEADあり?"}
-    H -- Yes --> I["警告 & 続行確認"]
-    I -- No --> Z
-    I -- Yes --> J_EXCL["対象から除外"]
-    J_EXCL --> J["確認プロンプト"]
-    H -- No --> J
+    G --> J["確認プロンプト"]
     J -- No --> Z
     J -- Yes --> MSG["メッセージ入力処理"]
     MSG --> K["GitHub要件/既存PRチェック"]
@@ -116,7 +110,9 @@ flowchart TD
 2.  **情報収集**: `git config` や `git rev-parse` を用いて、URL、現在のブランチ、HEADリビジョンを取得します。
 3.  **識別子計算 (`CalculateSnapshotIdentifier`)**:
     *   リポジトリリストをIDでソートします。
-    *   各リポジトリのリビジョン (SHA) を抽出し、カンマ区切りで連結します。
+    *   各リポジトリについて、**ブランチ上に有る場合はブランチ名を、ブランチ上にない場合はリビジョン (SHA)** を採用します。
+        *   **注意**: `pr create` コマンドにおいては、前段の状態確認 (Status Check) でDetached HEADをエラーとして排除しているため、ここでの値は**常にブランチ名**となります。リビジョンが採用されることはありません。
+    *   それらの値をカンマ区切りで連結します。
     *   連結した文字列のSHA-256ハッシュを計算し、Hex文字列として識別子とします。
 4.  **JSON生成**: 収集した情報を `Config` 構造体としてJSON化し、インデント付きで保存します。
 
@@ -128,7 +124,7 @@ flowchart TD
 
 ### 依存関係
 
-*   `internal/app/pr_create_snapshot.go`: スナップショット生成ロジック
+*   `internal/app/snapshot.go`: スナップショット生成ロジック (`GenerateSnapshot` / `CalculateSnapshotIdentifier`)
 *   `internal/app/status_logic.go`: ステータス収集ロジックを再利用
 *   `internal/app/utils.go`: Git実行、並列制御
 *   `os/exec`: `gh` コマンドの実行
