@@ -206,9 +206,9 @@ func TestGetRepoDir(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := getRepoDir(tt.repo)
+			got := GetRepoDir(tt.repo)
 			if got != tt.expected {
-				t.Errorf("getRepoDir() = %v, want %v", got, tt.expected)
+				t.Errorf("GetRepoDir() = %v, want %v", got, tt.expected)
 			}
 		})
 	}

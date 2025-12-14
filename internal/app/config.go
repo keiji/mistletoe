@@ -70,9 +70,9 @@ func validateRepositories(repos []Repository) error {
 	return nil
 }
 
-// getRepoDir determines the checkout directory name.
+// GetRepoDir determines the checkout directory name.
 // If ID is present and not empty, it is used. Otherwise, it is derived from the URL.
-func getRepoDir(repo Repository) string {
+func GetRepoDir(repo Repository) string {
 	if repo.ID != nil && *repo.ID != "" {
 		return *repo.ID
 	}

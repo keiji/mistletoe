@@ -31,7 +31,7 @@ func branchExistsLocallyOrRemotely(gitPath, dir, branch string) (bool, error) {
 // validateEnvironment checks if the current directory state is consistent with the configuration.
 func validateEnvironment(repos []Repository, gitPath string) error {
 	for _, repo := range repos {
-		targetDir := getRepoDir(repo)
+		targetDir := GetRepoDir(repo)
 		info, err := os.Stat(targetDir)
 		if os.IsNotExist(err) {
 			continue // Directory doesn't exist, safe to clone
@@ -144,7 +144,7 @@ func handleInit(args []string, opts GlobalOptions) {
 				gitArgs = append(gitArgs, "--depth", fmt.Sprintf("%d", depth))
 			}
 			gitArgs = append(gitArgs, *repo.URL)
-			targetDir := getRepoDir(repo)
+			targetDir := GetRepoDir(repo)
 
 			// Explicitly pass target directory to avoid ambiguity and to know where to checkout later.
 			gitArgs = append(gitArgs, targetDir)
