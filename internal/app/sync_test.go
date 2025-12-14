@@ -33,10 +33,12 @@ func TestHandleSync(t *testing.T) {
 
 	// Config
 	master := "master"
+	repo1Rel := "repo1"
+	repo2Rel := "repo2"
 	config := Config{
 		Repositories: &[]Repository{
-			{URL: strPtr(remoteURL), ID: &repo1, Branch: &master},
-			{URL: strPtr(remoteURL), ID: &repo2, Branch: &master},
+			{URL: strPtr(remoteURL), ID: &repo1Rel, Branch: &master},
+			{URL: strPtr(remoteURL), ID: &repo2Rel, Branch: &master},
 		},
 	}
 	configPath := filepath.Join(tmpDir, "mstl.json")
@@ -48,6 +50,7 @@ func TestHandleSync(t *testing.T) {
 		args := []string{"sync", "--file", configPath}
 		args = append(args, extraArgs...)
 		cmd := exec.Command(binPath, args...)
+		cmd.Dir = tmpDir
 		if input != "" {
 			cmd.Stdin = strings.NewReader(input + "\n")
 		}
@@ -62,10 +65,11 @@ func TestHandleSync(t *testing.T) {
 		if err != nil {
 			t.Fatalf("sync failed: %v, out: %s", err, out)
 		}
-		if !strings.Contains(out, fmt.Sprintf("Syncing %s...", repo1)) {
+		// Since we use relative paths in config, output will use relative paths (repo1Rel).
+		if !strings.Contains(out, fmt.Sprintf("Syncing %s...", repo1Rel)) {
 			t.Errorf("Expected Syncing repo1 output. Got: %s", out)
 		}
-		if !strings.Contains(out, fmt.Sprintf("Syncing %s...", repo2)) {
+		if !strings.Contains(out, fmt.Sprintf("Syncing %s...", repo2Rel)) {
 			t.Errorf("Expected Syncing repo2 output. Got: %s", out)
 		}
 	})
@@ -77,7 +81,7 @@ func TestHandleSync(t *testing.T) {
 			t.Fatalf("sync failed: %v, out: %s", err, out)
 		}
 		// Output should be similar
-		if !strings.Contains(out, fmt.Sprintf("Syncing %s...", repo1)) {
+		if !strings.Contains(out, fmt.Sprintf("Syncing %s...", repo1Rel)) {
 			t.Errorf("Expected Syncing repo1 output. Got: %s", out)
 		}
 	})
@@ -166,15 +170,15 @@ func TestHandleSync(t *testing.T) {
 			t.Fatal("Expected sync to fail due to conflict, but it succeeded")
 		}
 
-		if strings.Contains(out, fmt.Sprintf("Skipping %s due to detected conflict.", repo1)) {
+		if strings.Contains(out, fmt.Sprintf("Skipping %s due to detected conflict.", repo1Rel)) {
 			t.Errorf("Did NOT expect skipping message for repo1. Got: %s", out)
 		}
 
-		if !strings.Contains(out, fmt.Sprintf("Syncing %s...", repo1)) {
+		if !strings.Contains(out, fmt.Sprintf("Syncing %s...", repo1Rel)) {
 			t.Errorf("Expected Syncing message for repo1. Got: %s", out)
 		}
 
-		if !strings.Contains(out, fmt.Sprintf("Error pulling %s", repo1)) {
+		if !strings.Contains(out, fmt.Sprintf("Error pulling %s", repo1Rel)) {
 			t.Errorf("Expected Error pulling message for repo1. Got: %s", out)
 		}
 	})

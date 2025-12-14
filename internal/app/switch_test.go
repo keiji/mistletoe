@@ -71,10 +71,12 @@ func TestHandleSwitch(t *testing.T) {
 
 	// Create a config file
 	configPath := filepath.Join(tmpDir, "mstl.json")
+	repo1Rel := "repo1"
+	repo2Rel := "repo2"
 	config := Config{
 		Repositories: &[]Repository{
-			{URL: strPtr("repo1"), ID: &repo1}, // Using local path as ID to force directory name
-			{URL: strPtr("repo2"), ID: &repo2},
+			{URL: strPtr("repo1"), ID: &repo1Rel},
+			{URL: strPtr("repo2"), ID: &repo2Rel},
 		},
 	}
 	configData, _ := json.Marshal(config)

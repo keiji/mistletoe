@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 )
 
@@ -13,6 +14,7 @@ var (
 	ErrConfigFileNotFound = errors.New("File not found")
 	ErrInvalidDataFormat  = errors.New("Invalid data format")
 	ErrDuplicateID        = errors.New("Duplicate repository ID")
+	ErrInvalidFilePath    = errors.New("Invalid file path")
 )
 
 type Repository struct {
@@ -62,12 +64,30 @@ func validateRepositories(repos []Repository) error {
 			repo.ID = &id
 		}
 
+		if hasPathTraversal(*repo.ID) || filepath.IsAbs(*repo.ID) {
+			return fmt.Errorf("%w: %s", ErrInvalidFilePath, *repo.ID)
+		}
+
+		if hasPathTraversal(*repo.URL) {
+			return fmt.Errorf("%w: %s", ErrInvalidFilePath, *repo.URL)
+		}
+
 		if seenIDs[*repo.ID] {
 			return fmt.Errorf("%w: %s", ErrDuplicateID, *repo.ID)
 		}
 		seenIDs[*repo.ID] = true
 	}
 	return nil
+}
+
+func hasPathTraversal(path string) bool {
+	parts := strings.Split(strings.ReplaceAll(path, "\\", "/"), "/")
+	for _, part := range parts {
+		if part == ".." {
+			return true
+		}
+	}
+	return false
 }
 
 // GetRepoDir determines the checkout directory name.
