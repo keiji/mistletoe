@@ -10,3 +10,7 @@ Before creating a Pull Request, ensure that you verify not only that the build s
 
 *   [Material Design Writing Best Practices](https://m3.material.io/foundations/writing/best-practices)
 *   [Digital.gov Style Guide](https://digital.gov/style-guide)
+
+## Documentation
+
+*   **Design Documents**: All design documents (e.g., in `docs/`) must be written in **Japanese**.
