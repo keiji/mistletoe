@@ -20,20 +20,19 @@ mstl-gh pr status [options]
 ## 3. 出力形式 (Output Format)
 
 ```text
-+------------+-------+--------+---------------+--------+
-| REPOSITORY | PR    | BASE   | BRANCH/REV    | STATUS |
-+------------+-------+--------+---------------+--------+
-| frontend   | #123  | main   | feature/ui    | OPEN   |
-| backend    | -     | main   | feature/api   |   >    |
-| tools      | #456  | develop| fix/bug       | MERGED |
-+------------+-------+--------+---------------+--------+
++------------+--------+---------------+--------+------------------------------------------+
+| REPOSITORY | BASE   | BRANCH/REV    | STATUS | PR                                       |
++------------+--------+---------------+--------+------------------------------------------+
+| frontend   | main   | feature/ui    |   <    | https://github.com/org/frontend/pull/123 |
+| backend    | main   | feature/api   |   >    | -                                        |
+| tools      | develop| fix/bug       |   -    | https://github.com/org/tools/pull/456    |
++------------+--------+---------------+--------+------------------------------------------+
 ```
 
-*   **PR**: PR 番号。存在しない場合はハイフン。
 *   **BASE**: PR のベースブランチ、または設定上のブランチ。
-*   **STATUS**:
-    *   PR がある場合: PR の状態 (OPEN, MERGED, CLOSED, DRAFT)。
-    *   PR がない場合: ローカル Git ステータス ( `>` など)。
+*   **BRANCH/REV**: ローカルの現在のブランチまたはリビジョン。
+*   **STATUS**: ローカル Git ステータス ( `<` Pullable, `>` Unpushed, `!` Conflict )。
+*   **PR**: PR の URL。存在しない場合はハイフン。
 
 ## 4. ロジックフロー (Logic Flow)
 
@@ -58,4 +57,4 @@ flowchart TD
 
 1.  `status` コマンドと同様に、ローカルおよびリモートの Git 情報の収集。
 2.  `gh` CLI を使用して、現在のブランチに関連する PR の検索。
-3.  PR が見つかった場合、そのステータス（State）を優先して表示。見つからない場合、Git の同期ステータスの表示。
+3.  PR が見つかった場合、その URL を表示。見つからない場合、ハイフンを表示。
