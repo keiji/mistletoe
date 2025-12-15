@@ -15,7 +15,7 @@ mstl snapshot [options]
 | オプション | 短縮形 | 説明 | デフォルト |
 | :--- | :--- | :--- | :--- |
 | `--output-file` | `-o` | 出力する設定ファイルのパス。 | `mistletoe-snapshot-[identifier].json` |
-| `--file` | `-f` | 参照元の設定ファイル（ベース情報の取得用）。 | なし |
+| `--file` | `-f` | 参照元の設定ファイル（ベース情報の取得用）。標準入力を使用する場合、データは Base64 エンコードされている必要があります。 | なし |
 
 ※ `identifier` は含まれるリポジトリのリビジョン情報のハッシュ値から計算されます。
 
@@ -47,7 +47,11 @@ mstl snapshot [options]
 ```mermaid
 flowchart TD
     Start(["開始"]) --> ParseArgs["引数パース"]
-    ParseArgs --> LoadConfig["設定ファイルロード (Optional)"]
+    ParseArgs --> CheckInput{"入力ソース (-f)"}
+    CheckInput -- "File" --> LoadConfig["設定ファイルロード (Optional)"]
+    CheckInput -- "Stdin" --> ReadStdin["標準入力読み込み"]
+    ReadStdin --> Decode["Base64デコード"]
+    Decode --> LoadConfig
     LoadConfig --> ScanDir["カレントディレクトリ走査"]
 
     ScanDir --> Loop["ディレクトリループ"]

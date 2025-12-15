@@ -14,7 +14,7 @@ mstl-gh pr status [options]
 
 | オプション | 短縮形 | 説明 | デフォルト |
 | :--- | :--- | :--- | :--- |
-| `--file` | `-f` | 設定ファイル (JSON) のパス。 | `mistletoe.json` |
+| `--file` | `-f` | 設定ファイル (JSON) のパス。標準入力を使用する場合、データは Base64 エンコードされている必要があります。 | `mistletoe.json` |
 | `--parallel` | `-p` | 並列プロセス数。 | 1 |
 
 ## 3. 出力形式 (Output Format)
@@ -40,7 +40,11 @@ mstl-gh pr status [options]
 
 ```mermaid
 flowchart TD
-    Start(["開始"]) --> LoadConfig["設定ロード"]
+    Start(["開始"]) --> CheckInput{"入力ソース"}
+    CheckInput -- "File" --> LoadConfig["設定ロード"]
+    CheckInput -- "Stdin" --> ReadStdin["標準入力読み込み"]
+    ReadStdin --> Decode["Base64デコード"]
+    Decode --> LoadConfig
     LoadConfig --> ExecLoop["並列実行ループ"]
 
     subgraph "情報収集"
