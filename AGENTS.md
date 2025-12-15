@@ -21,43 +21,7 @@ To run `revive` in the sandbox environment:
     go install github.com/mgechev/revive@latest
     ```
 
-2.  **Create a configuration file** (`revive.toml`) to match the project's settings (enabling standard rules but disabling `error-strings`):
-
-    ```toml
-    ignoreGeneratedHeader = false
-    severity = "warning"
-    confidence = 0.8
-    errorCode = 0
-    warningCode = 0
-
-    [rule.blank-imports]
-    [rule.context-as-argument]
-    [rule.context-keys-type]
-    [rule.dot-imports]
-    [rule.error-return]
-    [rule.error-naming]
-    [rule.exported]
-    [rule.if-return]
-    [rule.increment-decrement]
-    [rule.var-naming]
-    [rule.var-declaration]
-    [rule.package-comments]
-    [rule.range]
-    [rule.receiver-naming]
-    [rule.time-naming]
-    [rule.unexported-return]
-    [rule.indent-error-flow]
-    [rule.errorf]
-    [rule.empty-block]
-    [rule.superfluous-else]
-    [rule.unused-parameter]
-    [rule.unreachable-code]
-    [rule.redefines-builtin-id]
-
-    # Explicitly disabled rules
-    [rule.error-strings]
-    disabled = true
-    ```
+2.  **Use the provided configuration file** (`revive.toml`) in the root directory. This file is configured to match the project's settings (enabling standard rules but disabling `error-strings`).
 
 3.  **Run revive**:
 
