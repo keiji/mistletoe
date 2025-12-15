@@ -1,6 +1,8 @@
 package app
 
 import (
+	"encoding/base64"
+	"os"
 	"strings"
 	"testing"
 )
@@ -124,6 +126,69 @@ func TestResolveCommonValues(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestResolveCommonValues_WithStdin(t *testing.T) {
+	// Backup original stdin
+	oldStdin := os.Stdin
+	defer func() { os.Stdin = oldStdin }()
+
+	// Create a pipe to simulate stdin
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("Failed to create pipe: %v", err)
+	}
+	os.Stdin = r
+
+	// Write Base64 encoded data to the pipe
+	testConfig := "test config data"
+	encodedConfig := base64.StdEncoding.EncodeToString([]byte(testConfig))
+	go func() {
+		defer w.Close()
+		_, _ = w.Write([]byte(encodedConfig))
+	}()
+
+	// Call the function
+	gotConfig, gotParallel, gotData, err := ResolveCommonValues("", "", DefaultParallel, DefaultParallel)
+
+	if err != nil {
+		t.Fatalf("ResolveCommonValues failed: %v", err)
+	}
+	if gotConfig != "" {
+		t.Errorf("Expected empty config file path, got %q", gotConfig)
+	}
+	if gotParallel != DefaultParallel {
+		t.Errorf("Expected default parallel, got %d", gotParallel)
+	}
+	if string(gotData) != testConfig {
+		t.Errorf("Expected config data %q, got %q", testConfig, string(gotData))
+	}
+}
+
+func TestResolveCommonValues_WithInvalidStdin(t *testing.T) {
+	// Backup original stdin
+	oldStdin := os.Stdin
+	defer func() { os.Stdin = oldStdin }()
+
+	// Create a pipe to simulate stdin
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("Failed to create pipe: %v", err)
+	}
+	os.Stdin = r
+
+	// Write INVALID Base64 data
+	go func() {
+		defer w.Close()
+		_, _ = w.Write([]byte("Checking for invalid base64!!!"))
+	}()
+
+	// Call the function
+	_, _, _, err = ResolveCommonValues("", "", DefaultParallel, DefaultParallel)
+
+	if err == nil {
+		t.Errorf("Expected error for invalid base64 input, got nil")
 	}
 }
 
