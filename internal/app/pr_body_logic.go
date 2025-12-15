@@ -55,32 +55,39 @@ func EmbedMistletoeBody(originalBody, newBlock string) string {
 	// Regex for Mistletoe header (any level)
 	headerRe := regexp.MustCompile(`^#+\s+Mistletoe`)
 
-	// Scan for start
+	// Scan for header
 	for i, line := range lines {
-		trimmed := strings.TrimSpace(line)
-		// Check if it matches 4-16 dashes, even number
-		if len(trimmed) >= 4 && len(trimmed) <= 16 && len(trimmed)%2 == 0 && strings.Count(trimmed, "-") == len(trimmed) {
-			// Check next line for header
-			if i+1 < len(lines) && headerRe.MatchString(strings.TrimSpace(lines[i+1])) {
-				startIdx = i
-				// Calculate expected bottom length
-				expectedBottomLen := len(trimmed)*2 + 1
+		if headerRe.MatchString(strings.TrimSpace(line)) {
+			// Found header at i
 
-				// Scan for end
-				for j := i + 2; j < len(lines); j++ {
-					t2 := strings.TrimSpace(lines[j])
-					if len(t2) == expectedBottomLen && strings.Count(t2, "-") == len(t2) {
-						endIdx = j
-						break
-					}
+			// 1. Determine Start Index (Top Separator)
+			// Look at i-1. Is it dashes?
+			startIdx = i // Default to start at header if no top separator found
+			if i > 0 {
+				prev := strings.TrimSpace(lines[i-1])
+				// Allow dashes >= 3 to be flexible (MD HR is usually 3 chars)
+				if len(prev) >= 3 && strings.Count(prev, "-") == len(prev) {
+					startIdx = i - 1
 				}
-				if endIdx != -1 {
-					break // Found complete block
-				}
-				// If we found start but no end, we reset startIdx to continue searching or stop?
-				// To be safe, if we don't find a matching bottom, we assume it's not a valid block or corrupted.
-				startIdx = -1
 			}
+
+			// 2. Determine End Index (Bottom Separator)
+			// Scan from i+1
+			for j := i + 1; j < len(lines); j++ {
+				next := strings.TrimSpace(lines[j])
+				// Allow dashes >= 3
+				if len(next) >= 3 && strings.Count(next, "-") == len(next) {
+					endIdx = j
+					break
+				}
+			}
+
+			if endIdx != -1 {
+				break // Found complete block (Header + Bottom Separator)
+			}
+			// If we found header but no bottom separator, we reset startIdx because
+			// we can't safely identify the end of the block.
+			startIdx = -1
 		}
 	}
 
