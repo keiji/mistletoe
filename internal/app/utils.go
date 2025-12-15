@@ -1,6 +1,7 @@
 package app
 
 import (
+	"encoding/base64"
 	"fmt"
 	"io"
 	"os"
@@ -115,11 +116,17 @@ func ResolveCommonValues(fLong, fShort string, pVal, pValShort int) (string, int
 		stat, _ := os.Stdin.Stat()
 		if (stat.Mode() & os.ModeCharDevice) == 0 {
 			// Data is being piped to stdin
-			var err error
-			configData, err = io.ReadAll(os.Stdin)
+			inputData, err := io.ReadAll(os.Stdin)
 			if err != nil {
 				return "", 0, nil, fmt.Errorf("failed to read from stdin: %w", err)
 			}
+
+			// Decode Base64
+			decoded, err := base64.StdEncoding.DecodeString(string(inputData))
+			if err != nil {
+				return "", 0, nil, fmt.Errorf("failed to decode base64 input: %w", err)
+			}
+			configData = decoded
 		}
 	}
 
