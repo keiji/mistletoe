@@ -26,14 +26,14 @@ mstl status [options]
 | **Repository** | リポジトリ名（ID または ディレクトリ名）。 |
 | **Config** | 設定ファイルで指定されているブランチまたはリビジョン。 |
 | **Local** | ローカルの現在のブランチ名とショートコミットハッシュ（例: `main/a1b2c3d`）。 |
-| **Remote** | リモートの最新状態（`git ls-remote` で取得）。ローカルが遅れている場合は黄色で表示されます。 |
+| **Remote** | リモートの最新状態（`git ls-remote` で取得）。ローカルが遅れている場合は黄色で表示。 |
 | **Status** | 同期状態を示す記号。 |
 
 ### ステータス記号 (Status Symbols)
 
-*   `>` (緑色): **Unpushed**。ローカルに未プッシュのコミットがあります。
-*   `<` (黄色): **Pullable**。リモートに新しいコミットがあり、取り込む必要があります（現在のブランチが設定と一致する場合のみ判定）。
-*   `!` (黄色): **Conflict**。プルすると競合が発生する状態です（Pullable な場合のみ判定）。
+*   `>` (緑色): **Unpushed**。ローカルに未プッシュのコミットがある状態（Ahead）。
+*   `<` (黄色): **Pullable**。リモートに新しいコミットがあり、取り込む必要がある状態（現在のブランチが設定と一致する場合のみ判定）。
+*   `!` (黄色): **Conflict**。プルすると競合が発生する状態（Pullable な場合のみ判定）。
 
 ## 4. 内部ロジック (Internal Logic)
 
@@ -78,18 +78,18 @@ flowchart TD
 ステータス判定は以下の順序で行われます。
 
 1.  **環境検証 (`ValidateRepositoriesIntegrity`)**:
-    *   ディレクトリが存在し、かつ Git リポジトリであることを確認します。
-    *   `remote.origin.url` が設定値と一致するか確認します。
+    *   ディレクトリが存在し、かつ Git リポジトリであることを確認。
+    *   `remote.origin.url` が設定値と一致するかの確認。
 
 2.  **情報収集**:
-    *   **Local**: `git rev-parse --abbrev-ref HEAD` (ブランチ名) および `git rev-parse --short HEAD` (ハッシュ) を取得。
-    *   **Remote**: `git ls-remote origin refs/heads/<current-branch>` を実行し、リモートの最新ハッシュを取得します。
+    *   **Local**: `git rev-parse --abbrev-ref HEAD` (ブランチ名) および `git rev-parse --short HEAD` (ハッシュ) の取得。
+    *   **Remote**: `git ls-remote origin refs/heads/<current-branch>` を実行し、リモートの最新ハッシュの取得。
 
 3.  **状態計算 (`status_logic.go`)**:
     *   **Unpushed (`>`)**: `remote..local` のコミット数が 0 より大きい場合。
-    *   **Pullable (`<`)**: 現在のブランチが設定ファイルの `branch` と一致する場合のみ判定します。`local..remote` のコミット数が 0 より大きい場合。
-        *   リモートオブジェクトがローカルに存在しない場合（`cat-file -e` 失敗）、`git fetch` を試行してから再判定します。
-    *   **Conflict (`!`)**: Pullable である場合、`git merge-base` で共通祖先を特定し、`git merge-tree` を実行してコンフリクトマーカー（`<<<<<<<`）が含まれるかを確認します。
+    *   **Pullable (`<`)**: 現在のブランチが設定ファイルの `branch` と一致する場合のみ判定。`local..remote` のコミット数が 0 より大きい場合。
+        *   リモートオブジェクトがローカルに存在しない場合（`cat-file -e` 失敗）、`git fetch` を試行してから再判定。
+    *   **Conflict (`!`)**: Pullable である場合、`git merge-base` で共通祖先を特定し、`git merge-tree` を実行してコンフリクトマーカー（`<<<<<<<`）が含まれるかの確認。
 
 4.  **表示**:
-    *   `tablewriter` ライブラリを使用し、各リポジトリの計算結果を整形して出力します。
+    *   `tablewriter` ライブラリを使用し、各リポジトリの計算結果を整形して出力。
