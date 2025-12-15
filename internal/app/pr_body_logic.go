@@ -13,12 +13,23 @@ func GenerateMistletoeBody(snapshotData string, snapshotFilename string, related
 	// Seed random number generator
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 
-	// 1. Generate N: random even number [4, 16]
-	// (0..6)*2 + 4 => 0+4=4, 12+4=16
-	n := rng.Intn(7)*2 + 4
+	// Generate N: random number [4, 16]
+	n := rng.Intn(13) + 4
 
 	topSep := strings.Repeat("-", n)
-	bottomSep := strings.Repeat("-", n*2+1)
+
+	// Calculate bottom separator length
+	// Base is n * 2.
+	// If n is odd: n * 2 - 2
+	// If n is even: n * 2 - 1
+	var bottomLen int
+	if n%2 != 0 {
+		bottomLen = n*2 - 2
+	} else {
+		bottomLen = n*2 - 1
+	}
+
+	bottomSep := strings.Repeat("-", bottomLen)
 
 	var sb strings.Builder
 	sb.WriteString("\n\n")
