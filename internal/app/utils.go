@@ -135,11 +135,13 @@ func ResolveCommonValues(fLong, fShort string, pVal, pValShort int) (string, int
 
 // --- Spinner ---
 
+// Spinner shows a simple progress indicator.
 type Spinner struct {
 	stop chan struct{}
 	done chan struct{}
 }
 
+// NewSpinner creates a new Spinner instance.
 func NewSpinner() *Spinner {
 	return &Spinner{
 		stop: make(chan struct{}),
@@ -147,6 +149,7 @@ func NewSpinner() *Spinner {
 	}
 }
 
+// Start starts the spinner in a separate goroutine.
 func (s *Spinner) Start() {
 	go func() {
 		defer close(s.done)
@@ -167,6 +170,7 @@ func (s *Spinner) Start() {
 	}()
 }
 
+// Stop stops the spinner and clears the line.
 func (s *Spinner) Stop() {
 	select {
 	case s.stop <- struct{}{}:
