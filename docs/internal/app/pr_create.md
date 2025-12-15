@@ -16,7 +16,7 @@ mstl-gh pr create [options]
 
 ### オプション
 
-*   `--file`, `-f`: 設定ファイル (デフォルト: `repos.json` または `mistletoe.json` などを解決)
+*   `--file`, `-f`: 設定ファイル (デフォルト: `repos.json` または `mistletoe.json` などを解決)。標準入力も使用可能です。
 *   `--parallel`, `-p`: 並列実行数 (デフォルト: 1)
 *   `--title`, `-t`: Pull Requestのタイトル。指定されない場合、かつ `--body` も指定されていない場合はエディタが起動します。
 *   `--body`, `-b`: Pull Requestの本文 (Description)。指定されない場合、かつ `--title` も指定されていない場合はエディタが起動します。

@@ -23,13 +23,19 @@ func handleSync(args []string, opts GlobalOptions) {
 		os.Exit(1)
 	}
 
-	configFile, parallel, err := ResolveCommonValues(fLong, fShort, pVal, pValShort)
+	configFile, parallel, configData, err := ResolveCommonValues(fLong, fShort, pVal, pValShort)
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
 		os.Exit(1)
 	}
 
-	config, err := loadConfig(configFile)
+	var config *Config
+	if configFile != "" {
+		config, err = loadConfigFile(configFile)
+	} else {
+		config, err = loadConfigData(configData)
+	}
+
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)

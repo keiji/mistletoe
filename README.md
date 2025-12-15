@@ -60,6 +60,13 @@ Global options for most commands:
 *   `-f, --file <path>`: Path to the configuration file (e.g., `repos.json`).
 *   `-p, --parallel <int>`: Number of parallel processes to use (default: 1).
 
+If the `-f` flag is omitted, `mstl` will attempt to read the configuration from **standard input (stdin)**.
+
+Example using pipe:
+```bash
+cat repos.json | mstl init
+```
+
 ### Common Commands (`mstl` & `mstl-gh`)
 
 #### `init`

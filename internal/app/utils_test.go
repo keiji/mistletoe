@@ -110,7 +110,7 @@ func TestResolveCommonValues(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotConfig, gotParallel, err := ResolveCommonValues(tt.fLong, tt.fShort, tt.pVal, tt.pValShort)
+			gotConfig, gotParallel, _, err := ResolveCommonValues(tt.fLong, tt.fShort, tt.pVal, tt.pValShort)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ResolveCommonValues() error = %v, wantErr %v", err, tt.wantErr)
 				return

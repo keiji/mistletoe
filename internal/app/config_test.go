@@ -102,20 +102,20 @@ func TestLoadConfig(t *testing.T) {
 				defer os.Remove(filename)
 			}
 
-			config, err := loadConfig(filename)
+			config, err := loadConfigFile(filename)
 
 			if tt.wantErr != nil {
 				if err == nil {
-					t.Errorf("loadConfig() expected error %v, got nil", tt.wantErr)
+					t.Errorf("loadConfigFile() expected error %v, got nil", tt.wantErr)
 				} else if !errors.Is(err, tt.wantErr) {
-					t.Errorf("loadConfig() error = %v, want %v", err, tt.wantErr)
+					t.Errorf("loadConfigFile() error = %v, want %v", err, tt.wantErr)
 				}
 			} else {
 				if err != nil {
-					t.Errorf("loadConfig() unexpected error: %v", err)
+					t.Errorf("loadConfigFile() unexpected error: %v", err)
 				}
 				if tt.wantConfig && config == nil {
-					t.Error("loadConfig() expected config, got nil")
+					t.Error("loadConfigFile() expected config, got nil")
 				}
 			}
 		})

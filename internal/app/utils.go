@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"strings"
@@ -85,7 +86,8 @@ func RunEditor() (string, error) {
 
 // ResolveCommonValues resolves the configuration file path and parallel count
 // from the various flag inputs.
-func ResolveCommonValues(fLong, fShort string, pVal, pValShort int) (string, int, error) {
+// It also checks for stdin input if no config file is provided.
+func ResolveCommonValues(fLong, fShort string, pVal, pValShort int) (string, int, []byte, error) {
 	// Parallel
 	parallel := DefaultParallel
 	if pVal != DefaultParallel {
@@ -95,10 +97,10 @@ func ResolveCommonValues(fLong, fShort string, pVal, pValShort int) (string, int
 	}
 
 	if parallel < MinParallel {
-		return "", 0, fmt.Errorf("Parallel must be at least %d.", MinParallel)
+		return "", 0, nil, fmt.Errorf("Parallel must be at least %d.", MinParallel)
 	}
 	if parallel > MaxParallel {
-		return "", 0, fmt.Errorf("Parallel must be at most %d.", MaxParallel)
+		return "", 0, nil, fmt.Errorf("Parallel must be at most %d.", MaxParallel)
 	}
 
 	// Config File
@@ -107,7 +109,21 @@ func ResolveCommonValues(fLong, fShort string, pVal, pValShort int) (string, int
 		configFile = fShort
 	}
 
-	return configFile, parallel, nil
+	// If no config file specified, check stdin
+	var configData []byte
+	if configFile == "" {
+		stat, _ := os.Stdin.Stat()
+		if (stat.Mode() & os.ModeCharDevice) == 0 {
+			// Data is being piped to stdin
+			var err error
+			configData, err = io.ReadAll(os.Stdin)
+			if err != nil {
+				return "", 0, nil, fmt.Errorf("failed to read from stdin: %w", err)
+			}
+		}
+	}
+
+	return configFile, parallel, configData, nil
 }
 
 // --- Spinner ---

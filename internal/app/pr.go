@@ -60,7 +60,7 @@ func handlePrStatus(args []string, opts GlobalOptions) {
 	}
 
 	// Resolve common values
-	configPath, parallel, err := ResolveCommonValues(fLong, fShort, pVal, pValShort)
+	configPath, parallel, configData, err := ResolveCommonValues(fLong, fShort, pVal, pValShort)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -73,7 +73,13 @@ func handlePrStatus(args []string, opts GlobalOptions) {
 	}
 
 	// 2. Load Config
-	config, err := loadConfig(configPath)
+	var config *Config
+	if configPath != "" {
+		config, err = loadConfigFile(configPath)
+	} else {
+		config, err = loadConfigData(configData)
+	}
+
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -277,7 +283,7 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 	}
 
 	// Resolve common values
-	configPath, parallel, err := ResolveCommonValues(fLong, fShort, pVal, pValShort)
+	configPath, parallel, configData, err := ResolveCommonValues(fLong, fShort, pVal, pValShort)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -300,7 +306,13 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 	}
 
 	// 2. Load Config
-	config, err := loadConfig(configPath)
+	var config *Config
+	if configPath != "" {
+		config, err = loadConfigFile(configPath)
+	} else {
+		config, err = loadConfigData(configData)
+	}
+
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)

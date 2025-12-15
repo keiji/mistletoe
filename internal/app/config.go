@@ -146,7 +146,22 @@ func GetRepoDir(repo Repository) string {
 	return strings.TrimSuffix(base, ".git")
 }
 
-func loadConfig(configFile string) (*Config, error) {
+// loadConfigData parses configuration from a byte slice.
+func loadConfigData(data []byte) (*Config, error) {
+	config, err := ParseConfig(data)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := validateRepositories(*config.Repositories); err != nil {
+		return nil, fmt.Errorf("Error validating configuration: %v.", err)
+	}
+
+	return config, nil
+}
+
+// loadConfigFile reads a configuration file and returns a Config object.
+func loadConfigFile(configFile string) (*Config, error) {
 	if configFile == "" {
 		return nil, errors.New("Error: Specify configuration file using --file or -f.")
 	}
@@ -159,14 +174,5 @@ func loadConfig(configFile string) (*Config, error) {
 		return nil, fmt.Errorf("Error reading file: %v.", err)
 	}
 
-	config, err := ParseConfig(data)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := validateRepositories(*config.Repositories); err != nil {
-		return nil, fmt.Errorf("Error validating configuration: %v.", err)
-	}
-
-	return config, nil
+	return loadConfigData(data)
 }

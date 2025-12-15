@@ -8,13 +8,15 @@
 
 ```bash
 mstl init --file <path> [options]
+# または
+cat config.json | mstl init [options]
 ```
 
 ### オプション (Options)
 
 | オプション | 短縮形 | 説明 | デフォルト |
 | :--- | :--- | :--- | :--- |
-| `--file` | `-f` | **(必須)** 設定ファイル (JSON) のパス。 | - |
+| `--file` | `-f` | 設定ファイル (JSON) のパス。標準入力を使用する場合は省略可。 | - |
 | `--depth` | | 指定されたコミット数に履歴を切り詰めてシャロークローンを作成します。 | 0 (フルクローン) |
 | `--parallel` | `-p` | クローン/チェックアウトに使用する並列プロセス数。 | 1 |
 
@@ -67,8 +69,11 @@ mstl init --file <path> [options]
 flowchart TD
     Start(["開始"]) --> ParseArgs["引数パース"]
     ParseArgs --> CheckFile{"設定ファイル指定あり？"}
-    CheckFile -- No --> ErrorFile["エラー: ファイル必須"]
-    CheckFile -- Yes --> LoadConfig["設定読み込み"]
+    CheckFile -- No --> CheckStdin{"標準入力あり？"}
+    CheckStdin -- No --> ErrorFile["エラー: 設定必須"]
+    CheckStdin -- Yes --> ReadStdin["標準入力から読み込み"]
+    ReadStdin --> LoadConfig
+    CheckFile -- Yes --> LoadConfig["ファイルから設定読み込み"]
     LoadConfig --> ValidateEnv["環境検証 (全リポジトリ)"]
 
     ValidateEnv -- "エラー (リポジトリ無効, ディレクトリ空でない, URL不一致)" --> ErrorExit(["エラー終了"])
