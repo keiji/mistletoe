@@ -36,7 +36,8 @@ The core of Mistletoe is the configuration file (usually `repos.json`) containin
     {
       "url": "https://github.com/example/repo2.git",
       "revision": "a1b2c3d4",
-      "branch": "feature/new-ui"
+      "branch": "feature/new-ui",
+      "base-branch": "develop"
     }
   ]
 }
@@ -46,6 +47,7 @@ The core of Mistletoe is the configuration file (usually `repos.json`) containin
 *   **id** (Optional): The directory name to clone into. If omitted, the name is derived from the URL.
 *   **branch** (Optional): The branch to checkout or switch to.
 *   **revision** (Optional): A specific commit hash to checkout (primarily used by `init`).
+*   **base-branch** (Optional): The base branch for Pull Requests. If omitted, it defaults to the value of `branch`.
 
 ## Usage
 
@@ -61,10 +63,11 @@ Global options for most commands:
 *   `-p, --parallel <int>`: Number of parallel processes to use (default: 1).
 
 If the `-f` flag is omitted, `mstl` will attempt to read the configuration from **standard input (stdin)**.
+**Note:** Piped input must be **Base64 encoded**.
 
 Example using pipe:
 ```bash
-cat repos.json | mstl init
+cat repos.json | base64 | mstl init
 ```
 
 ### Common Commands (`mstl` & `mstl-gh`)
@@ -138,11 +141,12 @@ Scans the current directory for subdirectories that are Git repositories and gen
 
 **Usage:**
 ```bash
-mstl snapshot -o <output_file>
+mstl snapshot [options]
 ```
 
 **Options:**
 *   `-o, --output-file <path>`: Path for the output configuration file. (Default: `mistletoe-snapshot-[id].json`)
+*   `-f, --file <path>`: Optional configuration file path. Used to resolve the `base-branch` field in the generated snapshot.
 
 #### `version`
 
