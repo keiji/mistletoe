@@ -25,7 +25,8 @@ mstl push [options]
 
 ```mermaid
 flowchart TD
-    Start(["開始"]) --> StatusCheck["ステータス確認 (statusロジック再利用)"]
+    Start(["開始"]) --> LoadConfig["設定ロード (Base64デコード含む)"]
+    LoadConfig --> StatusCheck["ステータス確認 (statusロジック再利用)"]
     StatusCheck --> AnalyzeState{"全体の状態分析"}
 
     AnalyzeState -- "競合あり (Conflict)" --> ErrorConflict["エラー: 競合検出"]

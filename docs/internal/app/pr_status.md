@@ -40,7 +40,7 @@ mstl-gh pr status [options]
 
 ```mermaid
 flowchart TD
-    Start(["開始"]) --> LoadConfig["設定ロード"]
+    Start(["開始"]) --> LoadConfig["設定ロード (Base64デコード含む)"]
     LoadConfig --> ExecLoop["並列実行ループ"]
 
     subgraph "情報収集"

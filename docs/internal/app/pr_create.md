@@ -26,7 +26,8 @@ mstl-gh pr create [options]
 ```mermaid
 flowchart TD
     Start(["開始"]) --> ValidateAuth["gh CLI認証確認"]
-    ValidateAuth --> CheckClean["全リポジトリの状態確認"]
+    ValidateAuth --> LoadConfig["設定ロード (Base64デコード含む)"]
+    LoadConfig --> CheckClean["全リポジトリの状態確認"]
     CheckClean --> VerifyBase["Baseブランチ存在確認"]
 
     VerifyBase -- "未プッシュ/未プル/競合あり/GitHub以外/Baseなし" --> ErrorState["エラー: 状態不整合"]
