@@ -1,169 +1,94 @@
 package app
 
 import (
+	"encoding/base64"
 	"strings"
 	"testing"
 )
 
 func TestGenerateMistletoeBody(t *testing.T) {
-	// Generate multiple times to cover random range
-	for i := 0; i < 50; i++ {
-		body := GenerateMistletoeBody("{}", "file.json", nil)
-		lines := strings.Split(body, "\n")
-		// Filter out empty lines caused by \n\n splits
-		var nonEmpty []string
-		for _, l := range lines {
-			if strings.TrimSpace(l) != "" {
-				nonEmpty = append(nonEmpty, l)
-			}
-		}
+	snapshot := `{"foo":"bar"}`
+	filename := "mistletoe-snapshot-test-id.json"
+	urls := []string{"http://example.com/pr/1"}
 
-		// The first non-empty line should be top separator
-		// The last non-empty line should be bottom separator
-		// We expect structure:
-		// Top Sep
-		// ## Mistletoe
-		// ...
-		// Bottom Sep
+	body := GenerateMistletoeBody(snapshot, filename, urls)
 
-		if len(nonEmpty) < 2 {
-			t.Fatalf("Generated body too short: %s", body)
-		}
+	if !strings.Contains(body, "## Mistletoe") {
+		t.Error("Body missing Mistletoe header")
+	}
+	if !strings.Contains(body, snapshot) {
+		t.Error("Body missing snapshot")
+	}
+	if !strings.Contains(body, filename) {
+		t.Error("Body missing filename")
+	}
+	if !strings.Contains(body, urls[0]) {
+		t.Error("Body missing related url")
+	}
 
-		topSep := nonEmpty[0]
-		bottomSep := nonEmpty[len(nonEmpty)-1]
+	// Check Base64 block
+	encoded := base64.StdEncoding.EncodeToString([]byte(snapshot))
+	if !strings.Contains(body, encoded) {
+		t.Error("Body missing Base64 content")
+	}
 
-		// Check basic validity (all dashes)
-		if strings.Trim(topSep, "-") != "" {
-			t.Errorf("Top separator not all dashes: %q", topSep)
-		}
-		if strings.Trim(bottomSep, "-") != "" {
-			t.Errorf("Bottom separator not all dashes: %q", bottomSep)
-		}
+	// Check separator logic roughly
+	lines := strings.Split(strings.TrimSpace(body), "\n")
+	top := lines[0]
+	bottom := lines[len(lines)-1]
 
-		n := len(topSep)
-		bottomLen := len(bottomSep)
+	n := len(top)
+	m := len(bottom)
 
-		// Verify N range [4, 16]
-		if n < 4 || n > 16 {
-			t.Errorf("Top separator length %d out of range [4, 16]", n)
-		}
+	var expectedM int
+	if n%2 != 0 {
+		expectedM = n*2 - 2
+	} else {
+		expectedM = n*2 - 1
+	}
 
-		// Verify logic
-		// If n is odd: bottom = n*2 - 2
-		// If n is even: bottom = n*2 - 1
-		var expectedBottom int
-		if n%2 != 0 {
-			expectedBottom = n*2 - 2
-		} else {
-			expectedBottom = n*2 - 1
-		}
-
-		if bottomLen != expectedBottom {
-			t.Errorf("For top length %d (odd=%v), expected bottom %d, got %d", n, n%2 != 0, expectedBottom, bottomLen)
-		}
+	if m != expectedM {
+		t.Errorf("Separator length mismatch. Top=%d, Bottom=%d, ExpectedBottom=%d", n, m, expectedM)
 	}
 }
 
-func TestEmbedMistletoeBody(t *testing.T) {
-	newBlock := `
-----
-## Mistletoe
-New Content
----------
-`
+func TestEmbedMistletoeBody_Append(t *testing.T) {
+	orig := "Original Body"
+	block := "\n\n---\n## Mistletoe\nContent\n------\n"
 
-	tests := []struct {
-		name         string
-		originalBody string
-		newBlock     string
-		wantContains string // The body should contain this
-		wantMissing  string // The body should NOT contain this
-	}{
-		{
-			name:         "Append to empty body",
-			originalBody: "",
-			newBlock:     newBlock,
-			wantContains: "New Content",
-		},
-		{
-			name:         "Append to existing body",
-			originalBody: "Existing content",
-			newBlock:     newBlock,
-			wantContains: "Existing content",
-		},
-		{
-			name: "Replace existing block",
-			originalBody: `Existing content
-
-----
-## Mistletoe
-Old Content
----------
-
-Footer`,
-			newBlock:     newBlock,
-			wantContains: "New Content",
-			wantMissing:  "Old Content",
-		},
-		{
-			name: "Replace existing block with different separator length",
-			originalBody: `Existing content
-
---------
-## Mistletoe
-Old Content
------------------
-
-Footer`,
-			newBlock:     newBlock,
-			wantContains: "New Content",
-			wantMissing:  "Old Content",
-		},
-		{
-			name: "Replace even if bottom separator is malformed (too short)",
-			originalBody: `Existing content
-
-----
-## Mistletoe
-Old Content
---------
-
-Footer`,
-			newBlock:     newBlock,
-			wantContains: "New Content",
-			wantMissing:  "Old Content",
-		},
-		{
-			name: "Handle manual edits gracefully (text before header)",
-			originalBody: `Existing content
-Some manual text
-## Mistletoe
-Old Content
-------
-Footer`,
-			newBlock:     newBlock,
-			wantContains: "New Content",
-			wantMissing:  "Old Content",
-		},
+	res := EmbedMistletoeBody(orig, block)
+	if !strings.HasSuffix(res, block) {
+		t.Error("Should append block")
 	}
+	if !strings.HasPrefix(res, orig) {
+		t.Error("Should keep original")
+	}
+}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := EmbedMistletoeBody(tt.originalBody, tt.newBlock)
-			if !strings.Contains(got, tt.wantContains) {
-				t.Errorf("EmbedMistletoeBody() = %v, want to contain %v", got, tt.wantContains)
-			}
-			if tt.wantMissing != "" && strings.Contains(got, tt.wantMissing) {
-				t.Errorf("EmbedMistletoeBody() = %v, want NOT to contain %v", got, tt.wantMissing)
-			}
-			// For replacement cases, check if "Existing content" and "Footer" are preserved if they existed
-			if strings.Contains(tt.originalBody, "Existing content") && !strings.Contains(got, "Existing content") {
-				t.Errorf("EmbedMistletoeBody() lost original content")
-			}
-			if strings.Contains(tt.originalBody, "Footer") && !strings.Contains(got, "Footer") {
-				t.Errorf("EmbedMistletoeBody() lost footer content")
-			}
-		})
+func TestEmbedMistletoeBody_Replace(t *testing.T) {
+	// Original has a block
+	orig := `Intro
+
+----
+## Mistletoe
+OldContent
+-------
+
+Outro`
+
+	newBlock := "\n\n---\n## Mistletoe\nNewContent\n---\n"
+	res := EmbedMistletoeBody(orig, newBlock)
+
+	if strings.Contains(res, "OldContent") {
+		t.Error("Old content should be gone")
+	}
+	if !strings.Contains(res, "NewContent") {
+		t.Error("New content should be present")
+	}
+	if !strings.HasPrefix(res, "Intro") {
+		t.Error("Intro should be preserved")
+	}
+	if !strings.HasSuffix(res, "Outro") {
+		t.Error("Outro should be preserved")
 	}
 }

@@ -1,6 +1,7 @@
 package app
 
 import (
+	"encoding/base64"
 	"fmt"
 	"math/rand"
 	"regexp"
@@ -44,6 +45,11 @@ func GenerateMistletoeBody(snapshotData string, snapshotFilename string, related
 	sb.WriteString(snapshotData)
 	sb.WriteString("\n```\n")
 	sb.WriteString("</details>\n\n")
+
+	// Add Base64 encoded snapshot block
+	sb.WriteString("```\n")
+	sb.WriteString(base64.StdEncoding.EncodeToString([]byte(snapshotData)))
+	sb.WriteString("\n```\n\n")
 
 	sb.WriteString("### Related Pull Request(s)\n\n")
 	// If no related PRs, we leave the section header but no list.
