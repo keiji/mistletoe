@@ -26,7 +26,7 @@ mstl-gh pr create [options]
 ```mermaid
 flowchart TD
     Start(["開始"]) --> ValidateAuth["gh CLI認証確認"]
-    ValidateAuth --> CheckClean["全リポジトリの状態確認"]
+    ValidateAuth --> CheckClean["全リポジトリの状態確認 (Spinner)"]
     CheckClean --> VerifyBase["Baseブランチ存在確認"]
 
     VerifyBase -- "未プッシュ/未プル/競合あり/GitHub以外/Baseなし" --> ErrorState["エラー: 状態不整合"]
@@ -41,7 +41,8 @@ flowchart TD
         CreatePRs --> CallGH["gh pr create ..."]
     end
 
-    CallGH --> ShowStatus["pr status 結果表示"]
+    CallGH --> CollectFinal["最終ステータス取得 (Spinner)"]
+    CollectFinal --> ShowStatus["pr status 結果表示"]
     ErrorState --> Stop(["終了"])
     ShowStatus --> Stop
 ```
