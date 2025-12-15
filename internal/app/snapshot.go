@@ -12,10 +12,17 @@ import (
 )
 
 func handleSnapshot(args []string, opts GlobalOptions) {
-	var oShort, oLong string
+	var (
+		oLong  string
+		oShort string
+		fLong  string
+		fShort string
+	)
 	fs := flag.NewFlagSet("snapshot", flag.ExitOnError)
 	fs.StringVar(&oLong, "output-file", "", "output file path")
 	fs.StringVar(&oShort, "o", "", "output file path (short)")
+	fs.StringVar(&fLong, "file", "", "Configuration file path")
+	fs.StringVar(&fShort, "f", "", "Configuration file path (shorthand)")
 
 	if err := ParseFlagsFlexible(fs, args); err != nil {
 		fmt.Println("Error parsing flags:", err)
@@ -25,6 +32,25 @@ func handleSnapshot(args []string, opts GlobalOptions) {
 	outputFile := oLong
 	if outputFile == "" {
 		outputFile = oShort
+	}
+
+	// Load Config (Optional) to resolve base branches
+	var config *Config
+	if fLong != "" || fShort != "" {
+		configPath, _, configData, err := ResolveCommonValues(fLong, fShort, 0, 0)
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+		if configPath != "" {
+			config, err = loadConfigFile(configPath)
+		} else {
+			config, err = loadConfigData(configData)
+		}
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
 	}
 
 	entries, err := os.ReadDir(".")
@@ -90,11 +116,34 @@ func handleSnapshot(args []string, opts GlobalOptions) {
 		}
 		urlPtr := &url
 
+		// Resolve BaseBranch from Config
+		var baseBranchPtr *string
+		if config != nil && config.Repositories != nil {
+			for _, confRepo := range *config.Repositories {
+				confID := GetRepoDir(confRepo)
+				if confID == dirName {
+					// Found matching repo in config
+					// "If base-branch is specified... uses loaded config's branch as base-branch"
+					// "If base-branch not specified... treat base-branch and branch as same."
+					// Implementation:
+					// If confRepo.BaseBranch exists, use it.
+					// If confRepo.BaseBranch missing, use confRepo.Branch.
+					if confRepo.BaseBranch != nil && *confRepo.BaseBranch != "" {
+						baseBranchPtr = confRepo.BaseBranch
+					} else if confRepo.Branch != nil && *confRepo.Branch != "" {
+						baseBranchPtr = confRepo.Branch
+					}
+					break
+				}
+			}
+		}
+
 		repo := Repository{
-			ID:       &id,
-			URL:      urlPtr,
-			Branch:   branchPtr,
-			Revision: revisionPtr,
+			ID:         &id,
+			URL:        urlPtr,
+			Branch:     branchPtr,
+			Revision:   revisionPtr,
+			BaseBranch: baseBranchPtr,
 		}
 		repos = append(repos, repo)
 	}
@@ -109,11 +158,11 @@ func handleSnapshot(args []string, opts GlobalOptions) {
 		os.Exit(1)
 	}
 
-	config := Config{
+	outputConfig := Config{
 		Repositories: &repos,
 	}
 
-	data, err := json.MarshalIndent(config, "", "  ")
+	data, err := json.MarshalIndent(outputConfig, "", "  ")
 	if err != nil {
 		fmt.Printf("Error generating JSON: %v.\n", err)
 		os.Exit(1)
@@ -184,11 +233,21 @@ func GenerateSnapshot(config *Config, gitPath string) ([]byte, string, error) {
 		}
 		urlPtr := &url
 
+		// Resolve BaseBranch
+		// "pr create: generated snapshot's base-branch uses config's base-branch. If no base-branch, use branch."
+		var baseBranchPtr *string
+		if repo.BaseBranch != nil && *repo.BaseBranch != "" {
+			baseBranchPtr = repo.BaseBranch
+		} else if repo.Branch != nil && *repo.Branch != "" {
+			baseBranchPtr = repo.Branch
+		}
+
 		currentRepos = append(currentRepos, Repository{
-			ID:       &id,
-			URL:      urlPtr,
-			Branch:   branchPtr,
-			Revision: revisionPtr,
+			ID:         &id,
+			URL:        urlPtr,
+			Branch:     branchPtr,
+			Revision:   revisionPtr,
+			BaseBranch: baseBranchPtr,
 		})
 	}
 

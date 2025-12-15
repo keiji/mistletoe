@@ -32,10 +32,11 @@ var (
 )
 
 type Repository struct {
-	ID       *string  `json:"id"`
-	URL      *string  `json:"url"`
-	Branch   *string  `json:"branch,omitempty"`
-	Revision *string  `json:"revision,omitempty"`
+	ID         *string  `json:"id"`
+	URL        *string  `json:"url"`
+	Branch     *string  `json:"branch,omitempty"`
+	Revision   *string  `json:"revision,omitempty"`
+	BaseBranch *string  `json:"base-branch,omitempty"`
 }
 
 type Config struct {
@@ -105,6 +106,13 @@ func validateRepositories(repos []Repository) error {
 		if repo.Branch != nil && *repo.Branch != "" {
 			if !isValidGitRef(*repo.Branch) {
 				return fmt.Errorf("%w: %s", ErrInvalidGitRef, *repo.Branch)
+			}
+		}
+
+		// Validate BaseBranch
+		if repo.BaseBranch != nil && *repo.BaseBranch != "" {
+			if !isValidGitRef(*repo.BaseBranch) {
+				return fmt.Errorf("%w: %s", ErrInvalidGitRef, *repo.BaseBranch)
 			}
 		}
 

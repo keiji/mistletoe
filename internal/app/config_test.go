@@ -250,6 +250,20 @@ func TestIDDerivationAndDuplicates(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "Invalid BaseBranch (Special char)",
+			repos: []Repository{
+				{URL: ptr("u1"), ID: ptr("valid"), BaseBranch: ptr("foo;bar")},
+			},
+			wantErr: true,
+		},
+		{
+			name: "Valid BaseBranch",
+			repos: []Repository{
+				{URL: ptr("u1"), ID: ptr("valid"), BaseBranch: ptr("main")},
+			},
+			wantErr: false,
+		},
+		{
 			name: "Invalid Revision (Start with -)",
 			repos: []Repository{
 				{URL: ptr("u1"), ID: ptr("valid"), Revision: ptr("-flags")},

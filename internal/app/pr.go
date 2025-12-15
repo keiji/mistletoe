@@ -148,8 +148,12 @@ func CollectPrStatus(statusRows []StatusRow, config *Config, parallel int, ghPat
 			conf, ok := repoMap[r.Repo]
 			if ok && conf.URL != nil {
 				baseBranch := ""
-				if conf.Branch != nil && *conf.Branch != "" {
+				if conf.BaseBranch != nil && *conf.BaseBranch != "" {
+					baseBranch = *conf.BaseBranch
+				} else if conf.Branch != nil && *conf.Branch != "" {
 					baseBranch = *conf.Branch
+				}
+				if baseBranch != "" {
 					prRow.Base = baseBranch
 				}
 
@@ -505,23 +509,30 @@ func verifyGithubRequirements(repos []Repository, parallel int, gitPath, ghPath 
 			}
 
 			// 3. Check Base Branch Existence
-			// Only check if explicitly configured in config
-			if r.Branch != nil && *r.Branch != "" {
+			// Resolve Base Branch: base-branch >> branch
+			baseBranch := ""
+			if r.BaseBranch != nil && *r.BaseBranch != "" {
+				baseBranch = *r.BaseBranch
+			} else if r.Branch != nil && *r.Branch != "" {
+				baseBranch = *r.Branch
+			}
+
+			if baseBranch != "" {
 				repoDir := GetRepoDir(r)
 				// We check if the branch exists on remote using git ls-remote.
 				// We need to use origin as the remote name (standard in this tool).
 				// We run this command inside the repo directory.
-				lsCmd := execCommand(gitPath, "-C", repoDir, "ls-remote", "--heads", "origin", *r.Branch)
+				lsCmd := execCommand(gitPath, "-C", repoDir, "ls-remote", "--heads", "origin", baseBranch)
 				lsOut, lsErr := lsCmd.Output()
 				if lsErr != nil {
 					mu.Lock()
-					errs = append(errs, fmt.Sprintf("[%s] Failed to check base branch '%s': %v", repoName, *r.Branch, lsErr))
+					errs = append(errs, fmt.Sprintf("[%s] Failed to check base branch '%s': %v", repoName, baseBranch, lsErr))
 					mu.Unlock()
 					return
 				}
 				if strings.TrimSpace(string(lsOut)) == "" {
 					mu.Lock()
-					errs = append(errs, fmt.Sprintf("[%s] Base branch '%s' does not exist on remote", repoName, *r.Branch))
+					errs = append(errs, fmt.Sprintf("[%s] Base branch '%s' does not exist on remote", repoName, baseBranch))
 					mu.Unlock()
 					return
 				}
@@ -619,8 +630,16 @@ func executePrCreation(repos []Repository, parallel int, gitPath, ghPath string,
 				args = append(args, "--fill")
 			}
 
-			if r.Branch != nil && *r.Branch != "" {
-				args = append(args, "--base", *r.Branch)
+			// Resolve Base Branch: base-branch >> branch
+			baseBranch := ""
+			if r.BaseBranch != nil && *r.BaseBranch != "" {
+				baseBranch = *r.BaseBranch
+			} else if r.Branch != nil && *r.Branch != "" {
+				baseBranch = *r.Branch
+			}
+
+			if baseBranch != "" {
+				args = append(args, "--base", baseBranch)
 			}
 
 			createCmd := execCommand(ghPath, args...)
