@@ -26,11 +26,7 @@ mstl sync --file <path> [options]
 ```mermaid
 flowchart TD
     Start(["開始"]) --> ParseArgs["引数パース"]
-    ParseArgs --> CheckInput{"入力ソース"}
-    CheckInput -- "File" --> LoadConfig["設定読み込み"]
-    CheckInput -- "Stdin" --> ReadStdin["標準入力読み込み"]
-    ReadStdin --> Decode["Base64デコード"]
-    Decode --> LoadConfig
+    ParseArgs --> LoadConfig["設定読み込み"]
     LoadConfig --> ValidateIntegrity["整合性検証"]
 
     ValidateIntegrity -- "エラー" --> ErrorExit(["エラー終了"])
