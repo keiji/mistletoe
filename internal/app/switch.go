@@ -41,7 +41,13 @@ func handleSwitch(args []string, opts GlobalOptions) {
 		createBranchName = createShort
 	}
 
-	config, err := loadConfig(configFile, configData)
+	var config *Config
+	if configFile != "" {
+		config, err = loadConfigFile(configFile)
+	} else {
+		config, err = loadConfigData(configData)
+	}
+
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
