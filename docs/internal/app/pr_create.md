@@ -17,7 +17,7 @@ mstl-gh pr create [options]
 | `--title` | `-t` | PR のタイトル。 | (エディタで入力) |
 | `--body` | `-b` | PR の本文。 | (エディタで入力) |
 | `--draft` | `-d` | ドラフト PR として作成。 | false |
-| `--file` | `-f` | 設定ファイル (JSON) のパス。 | `mistletoe.json` |
+| `--file` | `-f` | 設定ファイル (JSON) のパス。未指定の場合は標準入力からの読み込みを試みます。標準入力を使用する場合、データは Base64 エンコードされている必要があります。 | `mistletoe.json` |
 
 ## 3. ロジックフロー (Logic Flow)
 

@@ -14,7 +14,7 @@ mstl-gh pr status [options]
 
 | オプション | 短縮形 | 説明 | デフォルト |
 | :--- | :--- | :--- | :--- |
-| `--file` | `-f` | 設定ファイル (JSON) のパス。 | `mistletoe.json` |
+| `--file` | `-f` | 設定ファイル (JSON) のパス。未指定の場合は標準入力からの読み込みを試みます。標準入力を使用する場合、データは Base64 エンコードされている必要があります。 | `mistletoe.json` |
 | `--parallel` | `-p` | 並列プロセス数。 | 1 |
 
 ## 3. 出力形式 (Output Format)
