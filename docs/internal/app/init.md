@@ -16,7 +16,7 @@ cat config.json | mstl init [options]
 
 | オプション | 短縮形 | 説明 | デフォルト |
 | :--- | :--- | :--- | :--- |
-| `--file` | `-f` | 設定ファイル (JSON) のパス。標準入力を使用する場合は省略可。標準入力を使用する場合、データは Base64 エンコードされている必要があります。 | - |
+| `--file` | `-f` | 設定ファイル (JSON) のパス。標準入力を使用する場合は省略可。 | - |
 | `--depth` | | 指定されたコミット数に履歴を切り詰めてシャロークローンを作成。 | 0 (フルクローン) |
 | `--parallel` | `-p` | クローン/チェックアウトに使用する並列プロセス数。 | 1 |
 
@@ -72,8 +72,7 @@ flowchart TD
     CheckFile -- No --> CheckStdin{"標準入力あり？"}
     CheckStdin -- No --> ErrorFile["エラー: 設定必須"]
     CheckStdin -- Yes --> ReadStdin["標準入力から読み込み"]
-    ReadStdin --> Decode["Base64デコード"]
-    Decode --> LoadConfig
+    ReadStdin --> LoadConfig
     CheckFile -- Yes --> LoadConfig["ファイルから設定読み込み"]
     LoadConfig --> ValidateEnv["環境検証 (全リポジトリ)"]
 

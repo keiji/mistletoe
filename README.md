@@ -63,11 +63,15 @@ Global options for most commands:
 *   `-p, --parallel <int>`: Number of parallel processes to use (default: 1).
 
 If the `-f` flag is omitted, `mstl` will attempt to read the configuration from **standard input (stdin)**.
-**Note:** Piped input must be **Base64 encoded**.
 
 Example using pipe:
 ```bash
-cat repos.json | base64 | mstl init
+cat repos.json | mstl init
+```
+
+If you have Base64 encoded input, decode it before piping:
+```bash
+echo "Base64String" | base64 -d | mstl init
 ```
 
 ### Common Commands (`mstl` & `mstl-gh`)
