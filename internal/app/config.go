@@ -131,16 +131,6 @@ func isValidGitRef(ref string) bool {
 	return safeGitRefRegex.MatchString(ref)
 }
 
-func hasPathTraversal(path string) bool {
-	parts := strings.Split(strings.ReplaceAll(path, "\\", "/"), "/")
-	for _, part := range parts {
-		if part == ".." {
-			return true
-		}
-	}
-	return false
-}
-
 // GetRepoDir determines the checkout directory name.
 // If ID is present and not empty, it is used. Otherwise, it is derived from the URL.
 func GetRepoDir(repo Repository) string {
