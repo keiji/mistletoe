@@ -43,13 +43,13 @@ func GenerateMistletoeBody(snapshotData string, snapshotFilename string, related
 	sb.WriteString(fmt.Sprintf("<summary>%s</summary>\n\n", snapshotFilename))
 	sb.WriteString("```json\n")
 	sb.WriteString(snapshotData)
-	sb.WriteString("\n```\n")
-	sb.WriteString("</details>\n\n")
+	sb.WriteString("\n```\n\n")
 
 	// Add Base64 encoded snapshot block
 	sb.WriteString("```\n")
 	sb.WriteString(base64.StdEncoding.EncodeToString([]byte(snapshotData)))
-	sb.WriteString("\n```\n\n")
+	sb.WriteString("\n```\n")
+	sb.WriteString("</details>\n\n")
 
 	sb.WriteString("### Related Pull Request(s)\n\n")
 	// If no related PRs, we leave the section header but no list.
