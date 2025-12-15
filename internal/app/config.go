@@ -146,17 +146,24 @@ func GetRepoDir(repo Repository) string {
 	return strings.TrimSuffix(base, ".git")
 }
 
-func loadConfig(configFile string) (*Config, error) {
-	if configFile == "" {
-		return nil, errors.New("Error: Specify configuration file using --file or -f.")
-	}
+func loadConfig(configFile string, configData []byte) (*Config, error) {
+	var data []byte
+	var err error
 
-	data, err := os.ReadFile(configFile)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, ErrConfigFileNotFound
+	if len(configData) > 0 {
+		data = configData
+	} else {
+		if configFile == "" {
+			return nil, errors.New("Error: Specify configuration file using --file or -f.")
 		}
-		return nil, fmt.Errorf("Error reading file: %v.", err)
+
+		data, err = os.ReadFile(configFile)
+		if err != nil {
+			if os.IsNotExist(err) {
+				return nil, ErrConfigFileNotFound
+			}
+			return nil, fmt.Errorf("Error reading file: %v.", err)
+		}
 	}
 
 	config, err := ParseConfig(data)

@@ -111,13 +111,13 @@ func handleInit(args []string, opts GlobalOptions) {
 		os.Exit(1)
 	}
 
-	configFile, parallel, err := ResolveCommonValues(fLong, fShort, pVal, pValShort)
+	configFile, parallel, configData, err := ResolveCommonValues(fLong, fShort, pVal, pValShort)
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
 		os.Exit(1)
 	}
 
-	config, err := loadConfig(configFile)
+	config, err := loadConfig(configFile, configData)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)

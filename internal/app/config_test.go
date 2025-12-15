@@ -102,7 +102,7 @@ func TestLoadConfig(t *testing.T) {
 				defer os.Remove(filename)
 			}
 
-			config, err := loadConfig(filename)
+			config, err := loadConfig(filename, nil)
 
 			if tt.wantErr != nil {
 				if err == nil {
