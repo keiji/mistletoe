@@ -7,6 +7,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
 
@@ -15,6 +16,19 @@ var (
 	ErrInvalidDataFormat  = errors.New("Invalid data format")
 	ErrDuplicateID        = errors.New("Duplicate repository ID")
 	ErrInvalidFilePath    = errors.New("Invalid file path")
+	ErrInvalidID          = errors.New("Invalid repository ID")
+	ErrInvalidURL         = errors.New("Invalid repository URL")
+	ErrInvalidGitRef      = errors.New("Invalid git reference")
+)
+
+var (
+	// idRegex enforces safe characters for directory names.
+	// Alphanumeric, underscore, hyphen, dot.
+	idRegex = regexp.MustCompile(`^[a-zA-Z0-9._-]+$`)
+
+	// safeGitRefRegex allows alphanumeric, slash, dot, underscore, hyphen.
+	// It is a subset of what git allows, but safe for our usage.
+	safeGitRefRegex = regexp.MustCompile(`^[a-zA-Z0-9./_-]+$`)
 )
 
 type Repository struct {
@@ -64,12 +78,41 @@ func validateRepositories(repos []Repository) error {
 			repo.ID = &id
 		}
 
-		if hasPathTraversal(*repo.ID) || filepath.IsAbs(*repo.ID) {
-			return fmt.Errorf("%w: %s", ErrInvalidFilePath, *repo.ID)
+		// Validate ID
+		if !idRegex.MatchString(*repo.ID) {
+			return fmt.Errorf("%w: %s (contains unsafe characters)", ErrInvalidID, *repo.ID)
+		}
+		if *repo.ID == "." || *repo.ID == ".." {
+			return fmt.Errorf("%w: %s (cannot be . or ..)", ErrInvalidID, *repo.ID)
+		}
+		// Redundant check for abs path (idRegex excludes slash/backslash), but kept for clarity
+		if filepath.IsAbs(*repo.ID) {
+			return fmt.Errorf("%w: %s (must be relative)", ErrInvalidFilePath, *repo.ID)
 		}
 
-		if hasPathTraversal(*repo.URL) {
-			return fmt.Errorf("%w: %s", ErrInvalidFilePath, *repo.URL)
+		// Validate URL
+		if repo.URL != nil {
+			if strings.HasPrefix(*repo.URL, "ext::") {
+				return fmt.Errorf("%w: %s (ext:: protocol not allowed)", ErrInvalidURL, *repo.URL)
+			}
+			// Check for control characters
+			if strings.ContainsAny(*repo.URL, "\n\r\t") {
+				return fmt.Errorf("%w: %s (contains control characters)", ErrInvalidURL, *repo.URL)
+			}
+		}
+
+		// Validate Branch
+		if repo.Branch != nil && *repo.Branch != "" {
+			if !isValidGitRef(*repo.Branch) {
+				return fmt.Errorf("%w: %s", ErrInvalidGitRef, *repo.Branch)
+			}
+		}
+
+		// Validate Revision
+		if repo.Revision != nil && *repo.Revision != "" {
+			if !isValidGitRef(*repo.Revision) {
+				return fmt.Errorf("%w: %s", ErrInvalidGitRef, *repo.Revision)
+			}
 		}
 
 		if seenIDs[*repo.ID] {
@@ -78,6 +121,14 @@ func validateRepositories(repos []Repository) error {
 		seenIDs[*repo.ID] = true
 	}
 	return nil
+}
+
+func isValidGitRef(ref string) bool {
+	// Prevent flag injection
+	if strings.HasPrefix(ref, "-") {
+		return false
+	}
+	return safeGitRefRegex.MatchString(ref)
 }
 
 func hasPathTraversal(path string) bool {

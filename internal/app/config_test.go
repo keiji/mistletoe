@@ -186,6 +186,76 @@ func TestIDDerivationAndDuplicates(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{
+			name: "Invalid ID (Special characters)",
+			repos: []Repository{
+				{URL: ptr("u1"), ID: ptr("foo/bar")},
+			},
+			wantErr: true,
+		},
+		{
+			name: "Invalid ID (Special characters 2)",
+			repos: []Repository{
+				{URL: ptr("u1"), ID: ptr("foo*bar")},
+			},
+			wantErr: true,
+		},
+		{
+			name: "Invalid ID (Dot)",
+			repos: []Repository{
+				{URL: ptr("u1"), ID: ptr(".")},
+			},
+			wantErr: true,
+		},
+		{
+			name: "Invalid ID (Double Dot)",
+			repos: []Repository{
+				{URL: ptr("u1"), ID: ptr("..")},
+			},
+			wantErr: true,
+		},
+		{
+			name: "Invalid URL (ext::)",
+			repos: []Repository{
+				{URL: ptr("ext::sh -c evil")},
+			},
+			wantErr: true,
+		},
+		{
+			name: "Invalid URL (Control char)",
+			repos: []Repository{
+				{URL: ptr("https://example.com/repo\n.git")},
+			},
+			wantErr: true,
+		},
+		{
+			name: "Invalid Branch (Start with -)",
+			repos: []Repository{
+				{URL: ptr("u1"), ID: ptr("valid"), Branch: ptr("-flags")},
+			},
+			wantErr: true,
+		},
+		{
+			name: "Invalid Branch (Special char)",
+			repos: []Repository{
+				{URL: ptr("u1"), ID: ptr("valid"), Branch: ptr("foo;bar")},
+			},
+			wantErr: true,
+		},
+		{
+			name: "Valid Branch (Slash OK)",
+			repos: []Repository{
+				{URL: ptr("u1"), ID: ptr("valid"), Branch: ptr("feature/new-ui")},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Invalid Revision (Start with -)",
+			repos: []Repository{
+				{URL: ptr("u1"), ID: ptr("valid"), Revision: ptr("-flags")},
+			},
+			wantErr: true,
+		},
 	}
 
 	for _, tt := range tests {
