@@ -405,7 +405,7 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 	fmt.Printf("Snapshot saved to %s\n", filename)
 
 	// Generate initial Mistletoe block without related PRs
-	initialMistletoeBlock := GenerateMistletoeBody(string(snapshotData), filename, snapshotID, nil)
+	initialMistletoeBlock := GenerateMistletoeBody(string(snapshotData), filename, nil)
 	prBodyWithSnapshot := EmbedMistletoeBody(prBody, initialMistletoeBlock)
 
 	// 7. Execution: Push & Create PR
@@ -648,13 +648,6 @@ func updatePrDescriptions(prURLs []string, parallel int, ghPath string, snapshot
 		return nil
 	}
 
-	// Extract snapshot ID from filename for simplicity, assuming standard format
-	// "mistletoe-snapshot-[ID].json"
-	snapshotID := ""
-	if strings.HasPrefix(snapshotFilename, "mistletoe-snapshot-") && strings.HasSuffix(snapshotFilename, ".json") {
-		snapshotID = strings.TrimSuffix(strings.TrimPrefix(snapshotFilename, "mistletoe-snapshot-"), ".json")
-	}
-
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, parallel)
@@ -687,7 +680,7 @@ func updatePrDescriptions(prURLs []string, parallel int, ghPath string, snapshot
 			}
 
 			// Generate new Mistletoe block
-			newBlock := GenerateMistletoeBody(snapshotData, snapshotFilename, snapshotID, relatedURLs)
+			newBlock := GenerateMistletoeBody(snapshotData, snapshotFilename, relatedURLs)
 
 			// Update body
 			newBody := EmbedMistletoeBody(originalBody, newBlock)

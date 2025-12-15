@@ -57,7 +57,6 @@ PR 本文の末尾に、自動生成された不可視（または折りたた�
 ... JSON Snapshot Data ...
 </details>
 
-snapshot-[identifier]-base64.txt
 ```
 (Base64 encoded JSON data)
 ```
@@ -77,7 +76,6 @@ snapshot-[identifier]-base64.txt
     *   内容: 整形された JSON データ。
 2.  **Base64 エンコードデータ (コードブロック)**:
     *   目的: 自動処理用の機械可読データの提供。
-    *   ファイル名ヘッダ: `snapshot-[identifier]-base64.txt`
     *   内容: スナップショット JSON の Base64 エンコード文字列。
     *   **注記**: `<details>` タグの外側に配置し、コードブロックで囲みます。
 3.  **関連 PR リンク**:

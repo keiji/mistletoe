@@ -10,7 +10,7 @@ import (
 )
 
 // GenerateMistletoeBody creates the structured body content.
-func GenerateMistletoeBody(snapshotData string, snapshotFilename string, snapshotID string, relatedURLs []string) string {
+func GenerateMistletoeBody(snapshotData string, snapshotFilename string, relatedURLs []string) string {
 	// Seed random number generator
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 
@@ -47,7 +47,6 @@ func GenerateMistletoeBody(snapshotData string, snapshotFilename string, snapsho
 	sb.WriteString("</details>\n\n")
 
 	// Add Base64 encoded snapshot block
-	sb.WriteString(fmt.Sprintf("snapshot-%s-base64.txt\n", snapshotID))
 	sb.WriteString("```\n")
 	sb.WriteString(base64.StdEncoding.EncodeToString([]byte(snapshotData)))
 	sb.WriteString("\n```\n\n")

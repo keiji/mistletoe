@@ -2,18 +2,16 @@ package app
 
 import (
 	"encoding/base64"
-	"fmt"
 	"strings"
 	"testing"
 )
 
 func TestGenerateMistletoeBody(t *testing.T) {
 	snapshot := `{"foo":"bar"}`
-	snapshotID := "test-id"
 	filename := "mistletoe-snapshot-test-id.json"
 	urls := []string{"http://example.com/pr/1"}
 
-	body := GenerateMistletoeBody(snapshot, filename, snapshotID, urls)
+	body := GenerateMistletoeBody(snapshot, filename, urls)
 
 	if !strings.Contains(body, "## Mistletoe") {
 		t.Error("Body missing Mistletoe header")
@@ -30,11 +28,6 @@ func TestGenerateMistletoeBody(t *testing.T) {
 
 	// Check Base64 block
 	encoded := base64.StdEncoding.EncodeToString([]byte(snapshot))
-	expectedBase64Header := fmt.Sprintf("snapshot-%s-base64.txt", snapshotID)
-
-	if !strings.Contains(body, expectedBase64Header) {
-		t.Error("Body missing Base64 file header")
-	}
 	if !strings.Contains(body, encoded) {
 		t.Error("Body missing Base64 content")
 	}
