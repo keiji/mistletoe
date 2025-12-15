@@ -27,10 +27,10 @@ mstl-gh pr create [options]
 flowchart TD
     Start(["開始"]) --> ValidateAuth["gh CLI認証確認"]
     ValidateAuth --> CheckClean["全リポジトリの状態確認"]
-    CheckClean --> VerifyBase["Baseブランチ存在確認"]
+    CheckClean --> VerifyBase["Baseブランチ存在確認 (Config参照)"]
 
     VerifyBase -- "未プッシュ/未プル/競合あり/GitHub以外/Baseなし" --> ErrorState["エラー: 状態不整合"]
-    VerifyBase -- "OK" --> GenSnapshot["スナップショット生成"]
+    VerifyBase -- "OK" --> GenSnapshot["スナップショット生成 (ConfigのBase反映)"]
 
     GenSnapshot --> InputContent["タイトル・本文入力 (引数 or エディタ)"]
     InputContent --> EmbedBlock["Mistletoeブロック埋め込み"]
@@ -38,7 +38,7 @@ flowchart TD
     EmbedBlock --> CreatePRs["PR作成ループ (並列)"]
 
     subgraph "PR作成 (gh pr create)"
-        CreatePRs --> CallGH["gh pr create ..."]
+        CreatePRs --> CallGH["gh pr create --base <ConfigBase> ..."]
     end
 
     CallGH --> ShowStatus["pr status 結果表示"]
@@ -74,7 +74,7 @@ PR 本文の末尾に、自動生成された不可視（または折りたた�
 ブロック構成要素:
 1.  **JSON スナップショット (`<details>` 内)**:
     *   ファイル名: `mistletoe-snapshot-[identifier].json`
-    *   内容: 整形された JSON データ。
+    *   内容: 整形された JSON データ。スナップショット内の `base-branch` には設定ファイルの `base-branch`（なければ `branch`）が反映されます。
 2.  **Base64 エンコードデータ (コードブロック)**:
     *   目的: 自動処理用の機械可読データの提供。
     *   内容: スナップショット JSON の Base64 エンコード文字列。
@@ -89,4 +89,4 @@ PR 本文の末尾に、自動生成された不可視（または折りたた�
 *   **GitHub のみ**: URL が GitHub を指していないリポジトリはスキップまたはエラー。
 *   **クリーンな状態**: 全てのリポジトリが最新（Up-to-date）であり、ローカルの変更がないことが推奨されますが、実装上は「プッシュ可能であること」の確認。
 *   **Detached HEAD 禁止**: ブランチ上にいない（Detached HEAD）リポジトリがある場合、PR 作成先が不明確なためエラー。
-*   **Baseブランチの存在**: PRの作成先となるBaseブランチがリモートに存在しない場合、エラーとして終了します。
+*   **Baseブランチの存在**: PRの作成先となるBaseブランチが設定ファイルに指定（`base-branch` 優先、なければ `branch`）されており、かつリモートに存在しない場合、エラーとして終了します。

@@ -15,6 +15,7 @@ mstl snapshot [options]
 | オプション | 短縮形 | 説明 | デフォルト |
 | :--- | :--- | :--- | :--- |
 | `--output-file` | `-o` | 出力する設定ファイルのパス。 | `mistletoe-snapshot-[identifier].json` |
+| `--file` | `-f` | 参照元の設定ファイル（ベース情報の取得用）。 | なし |
 
 ※ `identifier` は含まれるリポジトリのリビジョン情報のハッシュ値から計算されます。
 
@@ -25,6 +26,10 @@ mstl snapshot [options]
 3.  **情報抽出**:
     *   **ID**: ディレクトリ名を ID として使用します。
     *   **URL**: `git remote get-url origin` で取得します。失敗時は `git config --get remote.origin.url` を試行します。
+    *   **Base Branch**:
+        *   オプションで設定ファイル (`-f`) が指定されている場合、その設定ファイルのリポジトリに `base-branch` があれば、その値を書き出すファイルの `base-branch` として採用します。
+        *   `base-branch` がなく、`branch` があれば、書き出すファイルの `base-branch` として `branch` の値を採用します。
+        *   設定ファイルが指定されていない場合は設定されません。
     *   **Branch/Revision**:
         *   現在の HEAD がブランチを指している場合、そのブランチ名を `branch` フィールドに設定します。
         *   **Detached HEAD** 状態の場合（ブランチ名が "HEAD"）、現在のコミットハッシュを `revision` フィールドに設定し、`branch` は設定しません。
@@ -42,7 +47,8 @@ mstl snapshot [options]
 ```mermaid
 flowchart TD
     Start(["開始"]) --> ParseArgs["引数パース"]
-    ParseArgs --> ScanDir["カレントディレクトリ走査"]
+    ParseArgs --> LoadConfig["設定ファイルロード (Optional)"]
+    LoadConfig --> ScanDir["カレントディレクトリ走査"]
 
     ScanDir --> Loop["ディレクトリループ"]
 
@@ -50,7 +56,8 @@ flowchart TD
         Loop --> CheckGit{Is Git Repo?}
         CheckGit -- No --> Skip["スキップ"]
         CheckGit -- Yes --> GetURL["Remote URL取得"]
-        GetURL --> GetHEAD["HEAD状態取得"]
+        GetURL --> ResolveBase["Base Branch解決 (Config参照)"]
+        ResolveBase --> GetHEAD["HEAD状態取得"]
 
         GetHEAD --> CheckDetached{Detached HEAD?}
         CheckDetached -- No --> SetBranch["Branch設定"]
@@ -80,14 +87,18 @@ flowchart TD
 
 ### 4.2. 詳細ロジック
 
-1.  **リポジトリ情報の構築**:
+1.  **設定ファイルのロード**:
+    *   `--file` (`-f`) オプションが指定された場合、設定ファイルを読み込みます。
+    *   各リポジトリの `base-branch` を解決します（`base-branch` 優先、なければ `branch`）。
+2.  **リポジトリ情報の構築**:
     *   `os.ReadDir(".")` でエントリを取得します。
     *   各ディレクトリについて、`rev-parse --abbrev-ref HEAD` を実行します。
         *   戻り値が `HEAD` 文字列そのものであれば、Detached HEAD とみなして `rev-parse HEAD` で完全なハッシュを取得し、`Revision` フィールドに格納します。
         *   それ以外の場合はブランチ名として `Branch` フィールドに格納します。
-2.  **ファイル名決定**:
+    *   設定ファイルから解決した `base-branch` を `BaseBranch` フィールドに設定します。
+3.  **ファイル名決定**:
     *   `--output-file` (`-o`) が指定されていない場合、`CalculateSnapshotIdentifier` 関数を使用して識別子を計算します。
     *   ファイル名を `mistletoe-snapshot-[identifier].json` とします。
-3.  **出力ファイルチェック**: `os.Stat` を使用して出力先ファイルが既に存在するか確認し、存在する場合は誤って上書きしないように終了します。
-4.  **出力**:
-    *   設定ファイルの構造体（`Config`）において、`Branch` と `Revision` はポインタ型（`*string`）であるため、該当しないフィールドは `nil`（JSON 上では省略または null）として扱われます。
+4.  **出力ファイルチェック**: `os.Stat` を使用して出力先ファイルが既に存在するか確認し、存在する場合は誤って上書きしないように終了します。
+5.  **出力**:
+    *   設定ファイルの構造体（`Config`）において、`Branch`, `BaseBranch`, `Revision` はポインタ型（`*string`）であるため、該当しないフィールドは `nil`（JSON 上では省略または null）として扱われます。

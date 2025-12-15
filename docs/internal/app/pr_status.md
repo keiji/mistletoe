@@ -29,7 +29,7 @@ mstl-gh pr status [options]
 +------------+--------+---------------+--------+------------------------------------------+
 ```
 
-*   **BASE**: PR のベースブランチ、または設定上のブランチ。
+*   **BASE**: PR のベースブランチ（設定ファイルの `base-branch`、なければ `branch`）。
 *   **BRANCH/REV**: ローカルの現在のブランチまたはリビジョン。
 *   **STATUS**: ローカル Git ステータス ( `<` Pullable, `>` Unpushed, `!` Conflict )。
 *   **PR**: PR の URL。存在しない場合はハイフン。
@@ -45,7 +45,8 @@ flowchart TD
 
     subgraph "情報収集"
         ExecLoop --> GitStatus["Gitステータス取得 (status同様)"]
-        GitStatus --> GHList["gh pr list --head <current-branch>"]
+        GitStatus --> ResolveBase["Base Branch解決 (Config: base-branch ?? branch)"]
+        ResolveBase --> GHList["gh pr list --base <base> --head <current>"]
         GHList --> Combine["情報統合"]
     end
 
@@ -56,5 +57,6 @@ flowchart TD
 ### 4.2. 統合ロジック
 
 1.  `status` コマンドと同様に、ローカルおよびリモートの Git 情報の収集。
-2.  `gh` CLI を使用して、現在のブランチに関連する PR の検索。
-3.  PR が見つかった場合、その URL を表示。見つからない場合、ハイフンを表示。
+2.  設定ファイルから Base Branch を決定します。`base-branch` キーがある場合はそれを使用し、ない場合は `branch` キーを使用します。
+3.  `gh` CLI を使用して、指定された Base Branch に向けた、現在のブランチからの PR を検索します。
+4.  PR が見つかった場合、その URL を表示。見つからない場合、ハイフンを表示。
