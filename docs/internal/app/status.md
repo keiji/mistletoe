@@ -14,7 +14,7 @@ mstl status [options]
 
 | オプション | 短縮形 | 説明 | デフォルト |
 | :--- | :--- | :--- | :--- |
-| `--file` | `-f` | 設定ファイル (JSON) のパス。未指定の場合は標準入力からの読み込みを試みます。標準入力を使用する場合、データは Base64 エンコードされている必要があります。 | - |
+| `--file` | `-f` | 設定ファイル (JSON) のパス。未指定の場合は標準入力からの読み込みを試みます。 | - |
 | `--parallel` | `-p` | ステータス取得に使用する並列プロセス数。 | 1 |
 
 ## 3. 出力形式 (Output Format)
@@ -45,8 +45,7 @@ flowchart TD
     ParseArgs --> CheckInput{"入力ソース"}
     CheckInput -- "File" --> LoadConfig["設定読み込み"]
     CheckInput -- "Stdin" --> ReadStdin["標準入力読み込み"]
-    ReadStdin --> Decode["Base64デコード"]
-    Decode --> LoadConfig
+    ReadStdin --> LoadConfig
     LoadConfig --> ValidateEnv["環境検証 (全リポジトリ)"]
     ValidateEnv -- "エラー" --> ErrorExit(["エラー終了"])
     ValidateEnv -- "成功" --> InitSpinner["スピナー開始"]

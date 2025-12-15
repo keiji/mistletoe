@@ -14,7 +14,7 @@ mstl push [options]
 
 | オプション | 短縮形 | 説明 | デフォルト |
 | :--- | :--- | :--- | :--- |
-| `--file` | `-f` | 設定ファイル (JSON) のパス。標準入力を使用する場合、データは Base64 エンコードされている必要があります。 | `mistletoe.json` |
+| `--file` | `-f` | 設定ファイル (JSON) のパス。 | `mistletoe.json` |
 | `--parallel` | `-p` | 並列プロセス数。 | 1 |
 
 ## 3. ロジックフロー (Logic Flow)
@@ -25,7 +25,7 @@ mstl push [options]
 
 ```mermaid
 flowchart TD
-    Start(["開始"]) --> LoadConfigSub[["設定読み込み (Base64デコード)"]]
+    Start(["開始"]) --> LoadConfigSub[["設定読み込み"]]
     LoadConfigSub --> StatusCheck["ステータス確認 (statusロジック再利用)"]
     StatusCheck --> AnalyzeState{"全体の状態分析"}
 
