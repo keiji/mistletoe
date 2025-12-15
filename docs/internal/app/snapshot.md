@@ -27,8 +27,8 @@ mstl snapshot [options]
     *   **ID**: ディレクトリ名を ID として使用します。
     *   **URL**: `git remote get-url origin` で取得します。失敗時は `git config --get remote.origin.url` を試行します。
     *   **Base Branch**:
-        *   オプションで設定ファイル (`-f`) が指定されている場合、その設定にある `base-branch` を使用します。
-        *   設定ファイルに `base-branch` がない場合、`branch` の値を `base-branch` として扱います。
+        *   オプションで設定ファイル (`-f`) が指定されている場合、その設定ファイルのリポジトリに `base-branch` があれば、その値を書き出すファイルの `base-branch` として採用します。
+        *   `base-branch` がなく、`branch` があれば、書き出すファイルの `base-branch` として `branch` の値を採用します。
         *   設定ファイルが指定されていない場合は設定されません。
     *   **Branch/Revision**:
         *   現在の HEAD がブランチを指している場合、そのブランチ名を `branch` フィールドに設定します。
