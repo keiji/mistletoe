@@ -109,6 +109,7 @@ func handlePrStatus(args []string, opts GlobalOptions) {
 	RenderPrStatusTable(prRows)
 }
 
+// PrInfo holds information about a Pull Request.
 type PrInfo struct {
 	Number      int    `json:"number"`
 	State       string `json:"state"`
@@ -117,6 +118,7 @@ type PrInfo struct {
 	BaseRefName string `json:"baseRefName"`
 }
 
+// PrStatusRow represents a row in the PR status table.
 type PrStatusRow struct {
 	StatusRow
 	PrNumber string
@@ -125,6 +127,7 @@ type PrStatusRow struct {
 	Base     string
 }
 
+// CollectPrStatus collects Pull Request status for the given repositories.
 func CollectPrStatus(statusRows []StatusRow, config *Config, parallel int, ghPath string) []PrStatusRow {
 	repoMap := make(map[string]Repository)
 	for _, r := range *config.Repositories {
@@ -202,6 +205,7 @@ func CollectPrStatus(statusRows []StatusRow, config *Config, parallel int, ghPat
 	return prRows
 }
 
+// RenderPrStatusTable renders the PR status table.
 func RenderPrStatusTable(rows []PrStatusRow) {
 	table := tablewriter.NewTable(os.Stdout,
 		tablewriter.WithHeaderAutoFormat(tw.Off),
@@ -331,7 +335,10 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 
 	// 4. Collect Status
 	fmt.Println("Collecting repository status...")
+	spinner := NewSpinner()
+	spinner.Start()
 	rows := CollectStatus(config, parallel, opts.GitPath)
+	spinner.Stop()
 	RenderStatusTable(rows)
 
 	// 5. Check Pushability & Detached HEAD
@@ -442,9 +449,12 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 
 	// 9. Show Status
 	fmt.Println("Collecting final status...")
+	spinner = NewSpinner()
+	spinner.Start()
 	// We re-collect status to show the most up-to-date information including new PRs
 	finalRows := CollectStatus(config, parallel, opts.GitPath)
 	finalPrRows := CollectPrStatus(finalRows, config, parallel, opts.GhPath)
+	spinner.Stop()
 	RenderPrStatusTable(finalPrRows)
 
 	fmt.Println("Done.")
