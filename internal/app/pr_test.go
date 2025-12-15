@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"testing"
+	"strings"
 )
 
 // Mock execCommand
@@ -16,7 +17,10 @@ func fakeExecCommand(command string, args ...string) *exec.Cmd {
 	cs = append(cs, args...)
 	cmd := exec.Command(os.Args[0], cs...)
 	// Pass environment variables to identify specific test cases
-	cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1"}
+	// Important: Append to os.Environ() to preserve PATH and other settings
+	cmd.Env = append(os.Environ(), "GO_WANT_HELPER_PROCESS=1", "MOCK_GIT_LS_REMOTE_MISSING="+os.Getenv("MOCK_GIT_LS_REMOTE_MISSING"))
+	// Pipe stderr to see errors from the helper process during debugging
+	cmd.Stderr = os.Stderr
 	return cmd
 }
 
@@ -45,6 +49,8 @@ func TestHelperProcess(t *testing.T) {
 	switch cmd {
 	case "gh":
 		handleGhMock(subargs)
+	case "git":
+		handleGitMock(subargs)
 	default:
 		fmt.Fprintf(os.Stderr, "Unknown command %q\n", cmd)
 		os.Exit(2)
@@ -100,8 +106,27 @@ func handleGhMock(args []string) {
 	os.Exit(1)
 }
 
+func handleGitMock(args []string) {
+	// We only mock git ls-remote in this helper, as other git commands are executed via RunGit (utils.go) which uses real git.
+	// But in verifyGithubRequirements, we explicitly call execCommand for ls-remote, so it comes here.
+	if len(args) >= 4 && args[2] == "ls-remote" {
+		// git -C repoDir ls-remote --heads origin <branch>
+		// args: -C repoDir ls-remote --heads origin <branch>
+		if os.Getenv("MOCK_GIT_LS_REMOTE_MISSING") == "1" {
+			// Return empty
+			os.Exit(0)
+		}
+		// Return dummy ref
+		fmt.Println("hash\trefs/heads/branch")
+		os.Exit(0)
+	}
+	// Fallback to real git? No, we shouldn't execute real git from the mock if we don't intend to.
+	// If verifyGithubRequirements called execCommand for other git commands, we would need to handle them.
+	// But it only uses it for ls-remote.
+	os.Exit(1)
+}
+
 func TestCheckGhAvailability(t *testing.T) {
-	t.Skip("Skipping exec mock test due to environment issues")
 	oldExec := execCommand
 	execCommand = fakeExecCommand
 	oldLookPath := lookPath
@@ -118,23 +143,9 @@ func TestCheckGhAvailability(t *testing.T) {
 }
 
 func TestVerifyGithubRequirements_Success(t *testing.T) {
-	t.Skip("Skipping exec mock test due to environment issues")
 	oldExec := execCommand
 	execCommand = fakeExecCommand
 	defer func() { execCommand = oldExec }()
-
-	// Need to use RunGit which uses real git... verifyGithubRequirements uses RunGit to get branch.
-	// But `RunGit` uses `exec.Command` directly in `utils.go`.
-	// We cannot mock `RunGit` easily unless we refactor `utils.go` too or use a dummy repo.
-	// `pr.go` imports `RunGit` from same package `app`.
-
-	// Since we are in the same package `app`, we can't shadow `RunGit` unless we define it as a var.
-	// `RunGit` is a function.
-	// But `verifyGithubRequirements` takes `gitPath`.
-	// If we provide a fake git path, `RunGit` will fail unless that fake path is executable.
-
-	// Strategy: Create a dummy git repo for the test, so real `git` works.
-	// We only need `rev-parse --abbrev-ref HEAD` to work.
 
 	tmpDir := t.TempDir()
 	_, err := exec.Command("git", "init", tmpDir).Output()
@@ -165,7 +176,6 @@ func TestVerifyGithubRequirements_Success(t *testing.T) {
 }
 
 func TestVerifyGithubRequirements_ExistingPR(t *testing.T) {
-	t.Skip("Skipping exec mock test due to environment issues")
 	oldExec := execCommand
 	execCommand = fakeExecCommand
 	defer func() { execCommand = oldExec }()
@@ -191,5 +201,35 @@ func TestVerifyGithubRequirements_ExistingPR(t *testing.T) {
 	}
 	if url, ok := existing[tmpDir]; !ok || url != "https://github.com/user/repo/pull/1" {
 		t.Errorf("Expected existing PR URL, got %v", existing)
+	}
+}
+
+func TestVerifyGithubRequirements_MissingBaseBranch(t *testing.T) {
+	oldExec := execCommand
+	execCommand = fakeExecCommand
+	defer func() { execCommand = oldExec }()
+
+	tmpDir := t.TempDir()
+	exec.Command("git", "init", tmpDir).Run()
+	cmd := exec.Command("git", "-C", tmpDir, "commit", "--allow-empty", "-m", "init")
+	cmd.Env = append(os.Environ(), "GIT_AUTHOR_NAME=test", "GIT_AUTHOR_EMAIL=test@example.com", "GIT_COMMITTER_NAME=test", "GIT_COMMITTER_EMAIL=test@example.com")
+	cmd.Run()
+
+	url := "https://github.com/user/repo.git"
+	id := tmpDir
+	branch := "missing-branch"
+	repo := Repository{ID: &id, URL: &url, Branch: &branch}
+	repos := []Repository{repo}
+
+	// Set env to mock missing base branch for ls-remote
+	os.Setenv("MOCK_GIT_LS_REMOTE_MISSING", "1")
+	defer os.Unsetenv("MOCK_GIT_LS_REMOTE_MISSING")
+
+	_, err := verifyGithubRequirements(repos, 1, "git", "gh")
+	if err == nil {
+		t.Error("Expected error due to missing base branch, got nil")
+	}
+	if err != nil && !strings.Contains(err.Error(), "does not exist on remote") {
+		t.Errorf("Expected error message about missing base branch, got: %v", err)
 	}
 }

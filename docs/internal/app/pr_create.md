@@ -27,9 +27,10 @@ mstl-gh pr create [options]
 flowchart TD
     Start(["開始"]) --> ValidateAuth["gh CLI認証確認"]
     ValidateAuth --> CheckClean["全リポジトリの状態確認"]
+    CheckClean --> VerifyBase["Baseブランチ存在確認"]
 
-    CheckClean -- "未プッシュ/未プル/競合あり/GitHub以外" --> ErrorState["エラー: 状態不整合"]
-    CheckClean -- "OK" --> GenSnapshot["スナップショット生成"]
+    VerifyBase -- "未プッシュ/未プル/競合あり/GitHub以外/Baseなし" --> ErrorState["エラー: 状態不整合"]
+    VerifyBase -- "OK" --> GenSnapshot["スナップショット生成"]
 
     GenSnapshot --> InputContent["タイトル・本文入力 (引数 or エディタ)"]
     InputContent --> EmbedBlock["Mistletoeブロック埋め込み"]
@@ -40,9 +41,9 @@ flowchart TD
         CreatePRs --> CallGH["gh pr create ..."]
     end
 
-    CallGH --> Report["作成されたPR URLを表示"]
+    CallGH --> ShowStatus["pr status 結果表示"]
     ErrorState --> Stop(["終了"])
-    Report --> Stop
+    ShowStatus --> Stop
 ```
 
 ### 3.2. Mistletoe ブロック (Mistletoe Block)
@@ -88,3 +89,4 @@ PR 本文の末尾に、自動生成された不可視（または折りたた�
 *   **GitHub のみ**: URL が GitHub を指していないリポジトリはスキップまたはエラー。
 *   **クリーンな状態**: 全てのリポジトリが最新（Up-to-date）であり、ローカルの変更がないことが推奨されますが、実装上は「プッシュ可能であること」の確認。
 *   **Detached HEAD 禁止**: ブランチ上にいない（Detached HEAD）リポジトリがある場合、PR 作成先が不明確なためエラー。
+*   **Baseブランチの存在**: PRの作成先となるBaseブランチがリモートに存在しない場合、エラーとして終了します。

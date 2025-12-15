@@ -216,7 +216,8 @@ func RenderPrStatusTable(rows []PrStatusRow) {
 				WithBottomMid("-"),
 		}),
 	)
-	table.Header("Repository", "PR", "Base", "Branch/Rev", "Status")
+	// Change Header Order: Repository, Base, Branch/Rev, Status, PR
+	table.Header("Repository", "Base", "Branch/Rev", "Status", "PR")
 
 	const (
 		Reset    = "\033[0m"
@@ -241,12 +242,12 @@ func RenderPrStatusTable(rows []PrStatusRow) {
 			statusStr = "-"
 		}
 
-		prStr := row.PrNumber
-		if row.PrState != "" {
-			prStr += " - " + row.PrState
+		prContent := row.PrURL
+		if prContent == "" {
+			prContent = "-"
 		}
 
-		_ = table.Append(row.Repo, prStr, row.Base, row.LocalBranchRev, statusStr)
+		_ = table.Append(row.Repo, row.Base, row.LocalBranchRev, statusStr, prContent)
 	}
 	if err := table.Render(); err != nil {
 		fmt.Printf("Error rendering table: %v\n", err)
@@ -371,11 +372,6 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 
 	// 6. Check GitHub Management & Permissions & Existing PRs
 	// Since we aborted on detached HEADs, we process all repositories in config that exist.
-	// We can't filter out ignored repos anymore as we don't ignore any.
-	// However, filterRepositories was filtering based on ignoredRepos map.
-	// We just pass the config repositories dereferenced.
-	// But Wait, filterRepositories also handled checking if the repo is in the ignore list.
-	// Now ignore list is empty. So we can just convert *config.Repositories to []Repository.
 	activeRepos := *config.Repositories
 
 	if len(activeRepos) == 0 {
@@ -383,7 +379,7 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 		return
 	}
 
-	fmt.Println("Verifying GitHub permissions and checking existing PRs...")
+	fmt.Println("Verifying GitHub permissions, base branches, and checking existing PRs...")
 	existingPrURLs, err := verifyGithubRequirements(activeRepos, parallel, opts.GitPath, opts.GhPath)
 	if err != nil {
 		fmt.Println(err)
@@ -440,6 +436,13 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 		os.Exit(1)
 	}
 
+	// 9. Show Status
+	fmt.Println("Collecting final status...")
+	// We re-collect status to show the most up-to-date information including new PRs
+	finalRows := CollectStatus(config, parallel, opts.GitPath)
+	finalPrRows := CollectPrStatus(finalRows, config, parallel, opts.GhPath)
+	RenderPrStatusTable(finalPrRows)
+
 	fmt.Println("Done.")
 }
 
@@ -458,7 +461,7 @@ func checkGhAvailability(ghPath string) error {
 	return nil
 }
 
-// verifyGithubRequirements checks GitHub URL, permissions, and existing PRs.
+// verifyGithubRequirements checks GitHub URL, permissions, base branch existence, and existing PRs.
 // It returns a map of RepoName -> Existing PR URL.
 func verifyGithubRequirements(repos []Repository, parallel int, gitPath, ghPath string) (map[string]string, error) {
 	var mu sync.Mutex
@@ -501,7 +504,30 @@ func verifyGithubRequirements(repos []Repository, parallel int, gitPath, ghPath 
 				return
 			}
 
-			// 3. Check for existing PR
+			// 3. Check Base Branch Existence
+			// Only check if explicitly configured in config
+			if r.Branch != nil && *r.Branch != "" {
+				repoDir := GetRepoDir(r)
+				// We check if the branch exists on remote using git ls-remote.
+				// We need to use origin as the remote name (standard in this tool).
+				// We run this command inside the repo directory.
+				lsCmd := execCommand(gitPath, "-C", repoDir, "ls-remote", "--heads", "origin", *r.Branch)
+				lsOut, lsErr := lsCmd.Output()
+				if lsErr != nil {
+					mu.Lock()
+					errs = append(errs, fmt.Sprintf("[%s] Failed to check base branch '%s': %v", repoName, *r.Branch, lsErr))
+					mu.Unlock()
+					return
+				}
+				if strings.TrimSpace(string(lsOut)) == "" {
+					mu.Lock()
+					errs = append(errs, fmt.Sprintf("[%s] Base branch '%s' does not exist on remote", repoName, *r.Branch))
+					mu.Unlock()
+					return
+				}
+			}
+
+			// 4. Check for existing PR
 			// We need the branch name to check for existing PR
 			repoDir := GetRepoDir(r)
 			branchName, err := RunGit(repoDir, gitPath, "rev-parse", "--abbrev-ref", "HEAD")
