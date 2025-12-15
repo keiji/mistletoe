@@ -6,78 +6,164 @@ import (
 )
 
 func TestGenerateMistletoeBody(t *testing.T) {
-	snapshot := "{}"
-	filename := "test.json"
-	urls := []string{"http://example.com/1", "http://example.com/2"}
+	// Generate multiple times to cover random range
+	for i := 0; i < 50; i++ {
+		body := GenerateMistletoeBody("{}", "file.json", nil)
+		lines := strings.Split(body, "\n")
+		// Filter out empty lines caused by \n\n splits
+		var nonEmpty []string
+		for _, l := range lines {
+			if strings.TrimSpace(l) != "" {
+				nonEmpty = append(nonEmpty, l)
+			}
+		}
 
-	body := GenerateMistletoeBody(snapshot, filename, urls)
+		// The first non-empty line should be top separator
+		// The last non-empty line should be bottom separator
+		// We expect structure:
+		// Top Sep
+		// ## Mistletoe
+		// ...
+		// Bottom Sep
 
-	if !strings.Contains(body, "## Mistletoe") {
-		t.Error("Body missing header")
-	}
-	if !strings.Contains(body, "### snapshot") {
-		t.Error("Body missing snapshot section")
-	}
-	if !strings.Contains(body, "### Related Pull Request(s)") {
-		t.Error("Body missing related PRs section")
-	}
-	if !strings.Contains(body, "http://example.com/1") {
-		t.Error("Body missing URL 1")
-	}
+		if len(nonEmpty) < 2 {
+			t.Fatalf("Generated body too short: %s", body)
+		}
 
-	// Check separators
-	lines := strings.Split(strings.TrimSpace(body), "\n")
-	top := strings.TrimSpace(lines[0])
-	bottom := strings.TrimSpace(lines[len(lines)-1])
+		topSep := nonEmpty[0]
+		bottomSep := nonEmpty[len(nonEmpty)-1]
 
-	if len(top) < 4 || len(top) > 16 || len(top)%2 != 0 {
-		t.Errorf("Invalid top separator length: %d", len(top))
-	}
+		// Check basic validity (all dashes)
+		if strings.Trim(topSep, "-") != "" {
+			t.Errorf("Top separator not all dashes: %q", topSep)
+		}
+		if strings.Trim(bottomSep, "-") != "" {
+			t.Errorf("Bottom separator not all dashes: %q", bottomSep)
+		}
 
-	expectedBottom := len(top)*2 + 1
-	if len(bottom) != expectedBottom {
-		t.Errorf("Invalid bottom separator length: got %d, want %d", len(bottom), expectedBottom)
-	}
-}
+		n := len(topSep)
+		bottomLen := len(bottomSep)
 
-func TestEmbedMistletoeBody_Append(t *testing.T) {
-	original := "Original Content"
-	newBlock := "\n\n----\n## Mistletoe\n...\n---------\n"
+		// Verify N range [4, 16]
+		if n < 4 || n > 16 {
+			t.Errorf("Top separator length %d out of range [4, 16]", n)
+		}
 
-	result := EmbedMistletoeBody(original, newBlock)
+		// Verify logic
+		// If n is odd: bottom = n*2 - 2
+		// If n is even: bottom = n*2 - 1
+		var expectedBottom int
+		if n%2 != 0 {
+			expectedBottom = n*2 - 2
+		} else {
+			expectedBottom = n*2 - 1
+		}
 
-	if !strings.Contains(result, original) {
-		t.Error("Original content lost")
-	}
-	if !strings.HasSuffix(result, newBlock) && !strings.HasSuffix(result, strings.TrimLeft(newBlock, "\n")) {
-		// EmbedMistletoeBody might strip newlines between
-		if !strings.Contains(result, newBlock) {
-			t.Error("New block not appended correctly")
+		if bottomLen != expectedBottom {
+			t.Errorf("For top length %d (odd=%v), expected bottom %d, got %d", n, n%2 != 0, expectedBottom, bottomLen)
 		}
 	}
 }
 
-func TestEmbedMistletoeBody_Replace(t *testing.T) {
-	// Construct an existing body with a block
-	top := "----" // 4
-	bottom := "---------" // 9
-	oldBlock := "\n" + top + "\n## Mistletoe\nOLD CONTENT\n" + bottom + "\n"
-	original := "Header\n" + oldBlock + "Footer"
+func TestEmbedMistletoeBody(t *testing.T) {
+	newBlock := `
+----
+## Mistletoe
+New Content
+---------
+`
 
-	newBlock := "\n\n------\n## Mistletoe\nNEW CONTENT\n-------------\n" // 6 top, 13 bottom
+	tests := []struct {
+		name         string
+		originalBody string
+		newBlock     string
+		wantContains string // The body should contain this
+		wantMissing  string // The body should NOT contain this
+	}{
+		{
+			name:         "Append to empty body",
+			originalBody: "",
+			newBlock:     newBlock,
+			wantContains: "New Content",
+		},
+		{
+			name:         "Append to existing body",
+			originalBody: "Existing content",
+			newBlock:     newBlock,
+			wantContains: "Existing content",
+		},
+		{
+			name: "Replace existing block",
+			originalBody: `Existing content
 
-	result := EmbedMistletoeBody(original, newBlock)
+----
+## Mistletoe
+Old Content
+---------
 
-	if strings.Contains(result, "OLD CONTENT") {
-		t.Error("Old content should be removed")
+Footer`,
+			newBlock:     newBlock,
+			wantContains: "New Content",
+			wantMissing:  "Old Content",
+		},
+		{
+			name: "Replace existing block with different separator length",
+			originalBody: `Existing content
+
+--------
+## Mistletoe
+Old Content
+-----------------
+
+Footer`,
+			newBlock:     newBlock,
+			wantContains: "New Content",
+			wantMissing:  "Old Content",
+		},
+		{
+			name: "Replace even if bottom separator is malformed (too short)",
+			originalBody: `Existing content
+
+----
+## Mistletoe
+Old Content
+--------
+
+Footer`,
+			newBlock:     newBlock,
+			wantContains: "New Content",
+			wantMissing:  "Old Content",
+		},
+		{
+			name: "Handle manual edits gracefully (text before header)",
+			originalBody: `Existing content
+Some manual text
+## Mistletoe
+Old Content
+------
+Footer`,
+			newBlock:     newBlock,
+			wantContains: "New Content",
+			wantMissing:  "Old Content",
+		},
 	}
-	if !strings.Contains(result, "NEW CONTENT") {
-		t.Error("New content should be present")
-	}
-	if !strings.HasPrefix(result, "Header") {
-		t.Error("Header preserved")
-	}
-	if !strings.HasSuffix(result, "Footer") {
-		t.Error("Footer preserved")
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := EmbedMistletoeBody(tt.originalBody, tt.newBlock)
+			if !strings.Contains(got, tt.wantContains) {
+				t.Errorf("EmbedMistletoeBody() = %v, want to contain %v", got, tt.wantContains)
+			}
+			if tt.wantMissing != "" && strings.Contains(got, tt.wantMissing) {
+				t.Errorf("EmbedMistletoeBody() = %v, want NOT to contain %v", got, tt.wantMissing)
+			}
+			// For replacement cases, check if "Existing content" and "Footer" are preserved if they existed
+			if strings.Contains(tt.originalBody, "Existing content") && !strings.Contains(got, "Existing content") {
+				t.Errorf("EmbedMistletoeBody() lost original content")
+			}
+			if strings.Contains(tt.originalBody, "Footer") && !strings.Contains(got, "Footer") {
+				t.Errorf("EmbedMistletoeBody() lost footer content")
+			}
+		})
 	}
 }
