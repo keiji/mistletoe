@@ -17,7 +17,7 @@ mstl-gh pr create [options]
 | `--title` | `-t` | PR のタイトル。 | (エディタで入力) |
 | `--body` | `-b` | PR の本文。 | (エディタで入力) |
 | `--draft` | `-d` | ドラフト PR として作成。 | false |
-| `--file` | `-f` | 設定ファイル (JSON) のパス。 | `mistletoe.json` |
+| `--file` | `-f` | 設定ファイル (JSON) のパス。標準入力を使用する場合、データは Base64 エンコードされている必要があります。 | `mistletoe.json` |
 
 ## 3. ロジックフロー (Logic Flow)
 
@@ -25,7 +25,8 @@ mstl-gh pr create [options]
 
 ```mermaid
 flowchart TD
-    Start(["開始"]) --> ValidateAuth["gh CLI認証確認"]
+    Start(["開始"]) --> LoadConfigSub[["設定読み込み (Base64デコード)"]]
+    LoadConfigSub --> ValidateAuth["gh CLI認証確認"]
     ValidateAuth --> CheckClean["全リポジトリの状態確認"]
     CheckClean --> VerifyBase["Baseブランチ存在確認 (Config参照)"]
 

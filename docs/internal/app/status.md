@@ -42,7 +42,11 @@ mstl status [options]
 ```mermaid
 flowchart TD
     Start(["開始"]) --> ParseArgs["引数パース"]
-    ParseArgs --> LoadConfig["設定読み込み"]
+    ParseArgs --> CheckInput{"入力ソース"}
+    CheckInput -- "File" --> LoadConfig["設定読み込み"]
+    CheckInput -- "Stdin" --> ReadStdin["標準入力読み込み"]
+    ReadStdin --> Decode["Base64デコード"]
+    Decode --> LoadConfig
     LoadConfig --> ValidateEnv["環境検証 (全リポジトリ)"]
     ValidateEnv -- "エラー" --> ErrorExit(["エラー終了"])
     ValidateEnv -- "成功" --> InitSpinner["スピナー開始"]

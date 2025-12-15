@@ -72,7 +72,8 @@ flowchart TD
     CheckFile -- No --> CheckStdin{"標準入力あり？"}
     CheckStdin -- No --> ErrorFile["エラー: 設定必須"]
     CheckStdin -- Yes --> ReadStdin["標準入力から読み込み"]
-    ReadStdin --> LoadConfig
+    ReadStdin --> Decode["Base64デコード"]
+    Decode --> LoadConfig
     CheckFile -- Yes --> LoadConfig["ファイルから設定読み込み"]
     LoadConfig --> ValidateEnv["環境検証 (全リポジトリ)"]
 
