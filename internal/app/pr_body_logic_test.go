@@ -129,6 +129,23 @@ func TestGenerateMistletoeBody_WithDependencyContent(t *testing.T) {
 	}
 }
 
+func TestGenerateMistletoeBody_WithDependencyContent_AlreadyWrapped(t *testing.T) {
+	snapshot := "{}"
+	filename := "snap.json"
+	depContent := "```mermaid\ngraph TD\nA-->B\n```"
+	body := GenerateMistletoeBody(snapshot, filename, "A", nil, nil, depContent)
+
+	if !strings.Contains(body, "<summary>dependencies.mmd</summary>") {
+		t.Error("Missing dependencies summary")
+	}
+	if !strings.Contains(body, depContent) {
+		t.Error("Missing content")
+	}
+	if strings.Contains(body, "```mermaid\n```mermaid") {
+		t.Error("Double wrapping detected")
+	}
+}
+
 func TestEmbedMistletoeBody_Append(t *testing.T) {
 	orig := "Original Body"
 	block := "\n\n---\n## Mistletoe\nContent\n------\n"

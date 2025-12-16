@@ -57,12 +57,21 @@ func GenerateMistletoeBody(snapshotData string, snapshotFilename string, current
 	if dependencyContent != "" {
 		sb.WriteString("<details>\n")
 		sb.WriteString("<summary>dependencies.mmd</summary>\n\n")
-		sb.WriteString("```mermaid\n")
-		sb.WriteString(dependencyContent)
-		if !strings.HasSuffix(dependencyContent, "\n") {
-			sb.WriteString("\n")
+
+		trimmed := strings.TrimSpace(dependencyContent)
+		if strings.HasPrefix(trimmed, "```mermaid") {
+			sb.WriteString(dependencyContent)
+			if !strings.HasSuffix(dependencyContent, "\n") {
+				sb.WriteString("\n")
+			}
+		} else {
+			sb.WriteString("```mermaid\n")
+			sb.WriteString(dependencyContent)
+			if !strings.HasSuffix(dependencyContent, "\n") {
+				sb.WriteString("\n")
+			}
+			sb.WriteString("```\n")
 		}
-		sb.WriteString("```\n")
 		sb.WriteString("</details>\n\n")
 	}
 
