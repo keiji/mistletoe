@@ -96,8 +96,6 @@ func handlePrStatus(args []string, opts GlobalOptions) {
 	spinner.Start()
 
 	// 4. Collect Status
-	// We call CollectStatus internally. It does not show a spinner itself.
-	// We wrap it here to provide feedback.
 	rows := CollectStatus(config, parallel, opts.GitPath)
 
 	// 5. Collect PR Status
@@ -186,7 +184,6 @@ func CollectPrStatus(statusRows []StatusRow, config *Config, parallel int, ghPat
 							prRow.PrNumber = "N/A"
 						}
 					} else {
-						// On error (e.g. network), we might want to show error or just N/A.
 						prRow.PrNumber = "N/A"
 					}
 				} else {
@@ -365,13 +362,14 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 		os.Exit(1)
 	}
 
-	// 5. Collect Status
-	fmt.Println("Collecting repository status...")
+	// 5. Collect Status & PR Status (Moved Up)
+	fmt.Println("Collecting repository status and checking for existing Pull Requests...")
 	spinner := NewSpinner()
 	spinner.Start()
 	rows := CollectStatus(config, parallel, opts.GitPath)
+	prRows := CollectPrStatus(rows, config, parallel, opts.GhPath)
 	spinner.Stop()
-	RenderStatusTable(rows)
+	RenderPrStatusTable(prRows)
 
 	// 6. Check Pushability & Detached HEAD
 	for _, row := range rows {
@@ -389,39 +387,79 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 		}
 	}
 
-	// Confirmation Prompt
-	fmt.Print("Proceed with Push and Pull Request creation? (yes/no): ")
-	reader := bufio.NewReader(os.Stdin)
-	input, _ := reader.ReadString('\n')
-	input = strings.TrimSpace(strings.ToLower(input))
-	if input != "y" && input != "yes" {
-		fmt.Println("Aborted.")
-		os.Exit(1)
+	// 7. Check for All Existing PRs & Prompt
+	allExist := true
+	knownPRs := make(map[string]string)
+
+	// Determine if all repositories have existing PRs
+	// Also populate knownPRs for optimization
+	// Note: We need to handle the case where some repos in config might not be in rows (if filtered? status check iterates config repos).
+	// CollectStatus returns rows for all configured repos.
+
+	countPRs := 0
+	for _, row := range prRows {
+		if row.PrURL != "" && row.PrURL != "-" {
+			knownPRs[row.Repo] = row.PrURL
+			countPRs++
+		}
+	}
+
+	if countPRs < len(*config.Repositories) {
+		allExist = false
+	}
+
+	var skipEditor bool
+
+	if allExist {
+		fmt.Print("All repositories have existing Pull Requests. Do you want to update the description? (yes/no): ")
+		reader := bufio.NewReader(os.Stdin)
+		input, _ := reader.ReadString('\n')
+		input = strings.TrimSpace(strings.ToLower(input))
+		if input == "y" || input == "yes" {
+			skipEditor = true
+		} else {
+			fmt.Println("Aborted.")
+			os.Exit(1)
+		}
+	} else {
+		fmt.Print("Proceed with Push and Pull Request creation? (yes/no): ")
+		reader := bufio.NewReader(os.Stdin)
+		input, _ := reader.ReadString('\n')
+		input = strings.TrimSpace(strings.ToLower(input))
+		if input == "y" || input == "yes" {
+			skipEditor = false
+		} else {
+			fmt.Println("Aborted.")
+			os.Exit(1)
+		}
 	}
 
 	// Input Message if needed
-	if prTitle == "" && prBody == "" {
-		content, err := RunEditor()
-		if err != nil {
-			fmt.Printf("Error getting message: %v\n", err)
-			os.Exit(1)
-		}
-		lines := strings.Split(content, "\n")
-		if len(lines) > 0 {
-			prTitle = lines[0]
-			prBody = content
+	if !skipEditor {
+		if prTitle == "" && prBody == "" {
+			content, err := RunEditor()
+			if err != nil {
+				fmt.Printf("Error getting message: %v\n", err)
+				os.Exit(1)
+			}
+			lines := strings.Split(content, "\n")
+			if len(lines) > 0 {
+				prTitle = lines[0]
+				prBody = content
+			}
 		}
 	}
 
-	// 7. Check GitHub Management & Permissions & Existing PRs
+	// 8. Check GitHub Management & Permissions & Existing PRs
 	activeRepos := *config.Repositories
 	if len(activeRepos) == 0 {
 		fmt.Println("No repositories to process.")
 		return
 	}
 
-	fmt.Println("Verifying GitHub permissions, base branches, and checking existing PRs...")
-	existingPrURLs, err := verifyGithubRequirements(activeRepos, parallel, opts.GitPath, opts.GhPath)
+	fmt.Println("Verifying GitHub permissions and base branches...")
+	// Pass knownPRs to optimize check
+	existingPrURLs, err := verifyGithubRequirements(activeRepos, parallel, opts.GitPath, opts.GhPath, knownPRs)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -445,7 +483,7 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 	initialMistletoeBlock := GenerateMistletoeBody(string(snapshotData), filename, "", make(map[string]string), deps, depContent)
 	prBodyWithSnapshot := EmbedMistletoeBody(prBody, initialMistletoeBlock)
 
-	// 8. Execution: Push & Create PR
+	// 9. Execution: Push & Create PR
 	fmt.Println("Pushing changes and creating Pull Requests...")
 	// executePrCreation returns a map of [RepoID] -> URL
 	prMap, err := executePrCreation(activeRepos, parallel, opts.GitPath, opts.GhPath, existingPrURLs, prTitle, prBodyWithSnapshot)
@@ -454,14 +492,14 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 		os.Exit(1)
 	}
 
-	// 9. Post-processing: Update Descriptions
+	// 10. Post-processing: Update Descriptions
 	fmt.Println("Updating Pull Request descriptions...")
 	if err := updatePrDescriptions(prMap, parallel, opts.GhPath, string(snapshotData), filename, deps, depContent); err != nil {
 		fmt.Printf("Error updating descriptions: %v\n", err)
 		os.Exit(1)
 	}
 
-	// 10. Show Status
+	// 11. Show Status (Final)
 	fmt.Println("Collecting final status...")
 	spinner = NewSpinner()
 	spinner.Start()
@@ -491,7 +529,8 @@ func checkGhAvailability(ghPath string) error {
 
 // verifyGithubRequirements checks GitHub URL, permissions, base branch existence, and existing PRs.
 // It returns a map of RepoName -> Existing PR URL.
-func verifyGithubRequirements(repos []Repository, parallel int, gitPath, ghPath string) (map[string]string, error) {
+// Accepts knownPRs map[string]string (ID -> URL) to optimize existing PR check.
+func verifyGithubRequirements(repos []Repository, parallel int, gitPath, ghPath string, knownPRs map[string]string) (map[string]string, error) {
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, parallel)
@@ -563,7 +602,17 @@ func verifyGithubRequirements(repos []Repository, parallel int, gitPath, ghPath 
 			}
 
 			// 4. Check for existing PR
-			// We need the branch name to check for existing PR
+			// Use knownPRs if available
+			if knownPRs != nil {
+				if url, ok := knownPRs[repoName]; ok && url != "" {
+					mu.Lock()
+					existingPRs[repoName] = url
+					mu.Unlock()
+					return
+				}
+			}
+
+			// Fallback to query
 			repoDir := GetRepoDir(r)
 			branchName, err := RunGit(repoDir, gitPath, "rev-parse", "--abbrev-ref", "HEAD")
 			if err != nil {
