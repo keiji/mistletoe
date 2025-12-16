@@ -195,6 +195,28 @@ mstl-gh pr create -f <config_file> [options]
 
 If `--dependencies` is provided, the graph content is embedded in the PR body (hidden in a details block with a Mermaid preview), and related PRs are categorized based on the graph.
 
+**Example dependencies file (`dependencies.md`):**
+
+````markdown
+```mermaid
+graph TD
+    repo-a --> repo-b
+    repo-b --> repo-c
+    repo-a -.-> repo-c
+```
+````
+
+**Visualization:**
+
+```mermaid
+graph TD
+    repo-a --> repo-b
+    repo-b --> repo-c
+    repo-a -.-> repo-c
+```
+
+You can define dependencies as a Mermaid graph.
+
 #### `pr status`
 
 Displays the status of Pull Requests associated with the current branches of the configured repositories.
