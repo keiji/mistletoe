@@ -9,9 +9,15 @@ import (
 func TestGenerateMistletoeBody(t *testing.T) {
 	snapshot := `{"foo":"bar"}`
 	filename := "mistletoe-snapshot-test-id.json"
-	urls := []string{"http://example.com/pr/1"}
 
-	body := GenerateMistletoeBody(snapshot, filename, urls)
+	currentID := "repo-a"
+	allPRs := map[string]string{
+		"repo-a": "http://example.com/pr/a",
+		"repo-b": "http://example.com/pr/b",
+	}
+
+	// Test without dependencies (legacy/default behavior)
+	body := GenerateMistletoeBody(snapshot, filename, currentID, allPRs, nil)
 
 	if !strings.Contains(body, "## Mistletoe") {
 		t.Error("Body missing Mistletoe header")
@@ -22,8 +28,11 @@ func TestGenerateMistletoeBody(t *testing.T) {
 	if !strings.Contains(body, filename) {
 		t.Error("Body missing filename")
 	}
-	if !strings.Contains(body, urls[0]) {
+	if !strings.Contains(body, "http://example.com/pr/b") {
 		t.Error("Body missing related url")
+	}
+	if strings.Contains(body, "http://example.com/pr/a") {
+		t.Error("Body should not contain self url")
 	}
 
 	// Check Base64 block
@@ -49,6 +58,60 @@ func TestGenerateMistletoeBody(t *testing.T) {
 
 	if m != expectedM {
 		t.Errorf("Separator length mismatch. Top=%d, Bottom=%d, ExpectedBottom=%d", n, m, expectedM)
+	}
+}
+
+func TestGenerateMistletoeBody_WithDependencies(t *testing.T) {
+	snapshot := `{"foo":"bar"}`
+	filename := "test.json"
+	currentID := "repo-main"
+
+	allPRs := map[string]string{
+		"repo-main": "url-main",
+		"repo-dep1": "url-dep1",
+		"repo-dep2": "url-dep2", // Depended by main
+		"repo-lib":  "url-lib",  // Main depends on lib
+		"repo-other": "url-other",
+	}
+
+	deps := &DependencyGraph{
+		Forward: map[string][]string{
+			"repo-main": {"repo-lib"},
+		},
+		Reverse: map[string][]string{
+			"repo-main": {"repo-dep2"},
+		},
+	}
+	// repo-dep1 is not in graph -> Others
+
+	body := GenerateMistletoeBody(snapshot, filename, currentID, allPRs, deps)
+
+	if !strings.Contains(body, "#### Dependencies") {
+		t.Error("Missing Dependencies section")
+	}
+	if !strings.Contains(body, "url-lib") {
+		t.Error("Missing url-lib in body")
+	}
+
+	if !strings.Contains(body, "#### Dependents") {
+		t.Error("Missing Dependents section")
+	}
+	if !strings.Contains(body, "url-dep2") {
+		t.Error("Missing url-dep2 in body")
+	}
+
+	if !strings.Contains(body, "#### Others") {
+		t.Error("Missing Others section")
+	}
+	if !strings.Contains(body, "url-other") {
+		t.Error("Missing url-other in body")
+	}
+	if !strings.Contains(body, "url-dep1") {
+		t.Error("Missing url-dep1 in body")
+	}
+
+	if strings.Contains(body, "url-main") {
+		t.Error("Should not contain self url")
 	}
 }
 

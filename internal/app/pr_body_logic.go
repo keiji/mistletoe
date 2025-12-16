@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"math/rand"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 )
 
 // GenerateMistletoeBody creates the structured body content.
-func GenerateMistletoeBody(snapshotData string, snapshotFilename string, relatedURLs []string) string {
+// It accepts a map of all related PRs (RepoID -> URL) and an optional dependency graph.
+func GenerateMistletoeBody(snapshotData string, snapshotFilename string, currentRepoID string, allPRs map[string]string, deps *DependencyGraph) string {
 	// Seed random number generator
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 
@@ -52,10 +54,88 @@ func GenerateMistletoeBody(snapshotData string, snapshotFilename string, related
 	sb.WriteString("</details>\n\n")
 
 	sb.WriteString("### Related Pull Request(s)\n\n")
-	// If no related PRs, we leave the section header but no list.
-	if len(relatedURLs) > 0 {
-		for _, u := range relatedURLs {
-			sb.WriteString(fmt.Sprintf(" * %s\n", u))
+
+	// Filter out self
+	targets := make(map[string]string)
+	for id, url := range allPRs {
+		if id != currentRepoID {
+			targets[id] = url
+		}
+	}
+
+	if deps == nil {
+		var urls []string
+		for _, u := range targets {
+			urls = append(urls, u)
+		}
+		sort.Strings(urls)
+
+		if len(urls) > 0 {
+			for _, u := range urls {
+				sb.WriteString(fmt.Sprintf(" * %s\n", u))
+			}
+		}
+	} else {
+		// Categorize
+		var dependencies []string // Depends on
+		var dependents []string   // Depended by
+		var others []string
+
+		// Prepare sets for fast lookup
+		forwardDeps := make(map[string]bool)
+		if list, ok := deps.Forward[currentRepoID]; ok {
+			for _, id := range list {
+				forwardDeps[id] = true
+			}
+		}
+
+		reverseDeps := make(map[string]bool)
+		if list, ok := deps.Reverse[currentRepoID]; ok {
+			for _, id := range list {
+				reverseDeps[id] = true
+			}
+		}
+
+		for id, url := range targets {
+			isDep := forwardDeps[id]
+			isDeper := reverseDeps[id]
+
+			if isDep {
+				dependencies = append(dependencies, url)
+			}
+			if isDeper {
+				dependents = append(dependents, url)
+			}
+			if !isDep && !isDeper {
+				others = append(others, url)
+			}
+		}
+
+		sort.Strings(dependencies)
+		sort.Strings(dependents)
+		sort.Strings(others)
+
+		if len(dependencies) > 0 {
+			sb.WriteString("#### Dependencies\n")
+			for _, u := range dependencies {
+				sb.WriteString(fmt.Sprintf(" * %s\n", u))
+			}
+			sb.WriteString("\n")
+		}
+
+		if len(dependents) > 0 {
+			sb.WriteString("#### Dependents\n")
+			for _, u := range dependents {
+				sb.WriteString(fmt.Sprintf(" * %s\n", u))
+			}
+			sb.WriteString("\n")
+		}
+
+		if len(others) > 0 {
+			sb.WriteString("#### Others\n")
+			for _, u := range others {
+				sb.WriteString(fmt.Sprintf(" * %s\n", u))
+			}
 		}
 	}
 

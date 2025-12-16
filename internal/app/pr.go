@@ -275,6 +275,8 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 		tShort     string
 		bLong      string
 		bShort     string
+		dLong      string
+		dShort     string
 	)
 
 	fs.StringVar(&fLong, "file", "", "Configuration file path")
@@ -285,6 +287,8 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 	fs.StringVar(&tShort, "t", "", "Pull Request title (shorthand)")
 	fs.StringVar(&bLong, "body", "", "Pull Request body")
 	fs.StringVar(&bShort, "b", "", "Pull Request body (shorthand)")
+	fs.StringVar(&dLong, "dependencies", "", "Dependency graph file path")
+	fs.StringVar(&dShort, "d", "", "Dependency graph file path (shorthand)")
 
 	if err := ParseFlagsFlexible(fs, args); err != nil {
 		fmt.Println(err)
@@ -298,7 +302,7 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 		os.Exit(1)
 	}
 
-	// Resolve title and body
+	// Resolve title, body, dependency file
 	prTitle := tLong
 	if prTitle == "" {
 		prTitle = tShort
@@ -306,6 +310,10 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 	prBody := bLong
 	if prBody == "" {
 		prBody = bShort
+	}
+	depPath := dLong
+	if depPath == "" {
+		depPath = dShort
 	}
 
 	// 1. Check gh availability
@@ -327,13 +335,29 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 		os.Exit(1)
 	}
 
-	// 3. Validate Integrity
+	// 3. Load Dependencies (if specified)
+	var deps *DependencyGraph
+	if depPath != "" {
+		var validIDs []string
+		for _, r := range *config.Repositories {
+			validIDs = append(validIDs, getRepoName(r))
+		}
+		var errDep error
+		deps, errDep = LoadDependencies(depPath, validIDs)
+		if errDep != nil {
+			fmt.Printf("Error loading dependencies: %v\n", errDep)
+			os.Exit(1)
+		}
+		fmt.Println("Dependency graph loaded successfully.")
+	}
+
+	// 4. Validate Integrity
 	if err := ValidateRepositoriesIntegrity(config, opts.GitPath); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
 
-	// 4. Collect Status
+	// 5. Collect Status
 	fmt.Println("Collecting repository status...")
 	spinner := NewSpinner()
 	spinner.Start()
@@ -341,7 +365,7 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 	spinner.Stop()
 	RenderStatusTable(rows)
 
-	// 5. Check Pushability & Detached HEAD
+	// 6. Check Pushability & Detached HEAD
 	for _, row := range rows {
 		if row.IsPullable {
 			fmt.Printf("Error: Repository '%s' has unpulled commits (sync required). Cannot proceed.\n", row.Repo)
@@ -381,10 +405,8 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 		}
 	}
 
-	// 6. Check GitHub Management & Permissions & Existing PRs
-	// Since we aborted on detached HEADs, we process all repositories in config that exist.
+	// 7. Check GitHub Management & Permissions & Existing PRs
 	activeRepos := *config.Repositories
-
 	if len(activeRepos) == 0 {
 		fmt.Println("No repositories to process.")
 		return
@@ -411,43 +433,27 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 	}
 	fmt.Printf("Snapshot saved to %s\n", filename)
 
-	// Generate initial Mistletoe block without related PRs
-	initialMistletoeBlock := GenerateMistletoeBody(string(snapshotData), filename, nil)
+	// Generate initial Mistletoe block without related PRs (pass empty map)
+	initialMistletoeBlock := GenerateMistletoeBody(string(snapshotData), filename, "", make(map[string]string), deps)
 	prBodyWithSnapshot := EmbedMistletoeBody(prBody, initialMistletoeBlock)
 
-	// 7. Execution: Push & Create PR
+	// 8. Execution: Push & Create PR
 	fmt.Println("Pushing changes and creating Pull Requests...")
-	prURLs, err := executePrCreation(activeRepos, parallel, opts.GitPath, opts.GhPath, existingPrURLs, prTitle, prBodyWithSnapshot)
+	// executePrCreation returns a map of [RepoID] -> URL
+	prMap, err := executePrCreation(activeRepos, parallel, opts.GitPath, opts.GhPath, existingPrURLs, prTitle, prBodyWithSnapshot)
 	if err != nil {
 		fmt.Printf("Error during execution: %v\n", err)
 		os.Exit(1)
 	}
 
-	// Add already existing URLs to the list for description updating
-	for _, url := range existingPrURLs {
-		if url != "" {
-			// Avoid duplicates if executePrCreation somehow added it (it shouldn't if we pass it)
-			found := false
-			for _, p := range prURLs {
-				if p == url {
-					found = true
-					break
-				}
-			}
-			if !found {
-				prURLs = append(prURLs, url)
-			}
-		}
-	}
-
-	// 8. Post-processing: Update Descriptions
+	// 9. Post-processing: Update Descriptions
 	fmt.Println("Updating Pull Request descriptions...")
-	if err := updatePrDescriptions(prURLs, parallel, opts.GhPath, string(snapshotData), filename); err != nil {
+	if err := updatePrDescriptions(prMap, parallel, opts.GhPath, string(snapshotData), filename, deps); err != nil {
 		fmt.Printf("Error updating descriptions: %v\n", err)
 		os.Exit(1)
 	}
 
-	// 9. Show Status
+	// 10. Show Status
 	fmt.Println("Collecting final status...")
 	spinner = NewSpinner()
 	spinner.Start()
@@ -585,12 +591,19 @@ func verifyGithubRequirements(repos []Repository, parallel int, gitPath, ghPath 
 	return existingPRs, nil
 }
 
-func executePrCreation(repos []Repository, parallel int, gitPath, ghPath string, existingPRs map[string]string, title, body string) ([]string, error) {
+// executePrCreation pushes changes and creates PRs.
+// Returns a map of RepoName -> PR URL.
+func executePrCreation(repos []Repository, parallel int, gitPath, ghPath string, existingPRs map[string]string, title, body string) (map[string]string, error) {
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, parallel)
 	var errs []string
-	var prURLs []string
+	prMap := make(map[string]string)
+
+	// Pre-populate prMap with existing PRs
+	for k, v := range existingPRs {
+		prMap[k] = v
+	}
 
 	for _, repo := range repos {
 		wg.Add(1)
@@ -622,6 +635,7 @@ func executePrCreation(repos []Repository, parallel int, gitPath, ghPath string,
 			// 2. Create PR
 			if url, ok := existingPRs[repoName]; ok {
 				fmt.Printf("[%s] Pull Request already exists: %s (skipping creation)\n", repoName, url)
+				// Already added to prMap
 				return
 			}
 
@@ -665,7 +679,7 @@ func executePrCreation(repos []Repository, parallel int, gitPath, ghPath string,
 						if prURL != "" {
 							fmt.Printf("[%s] Pull Request already exists: %s\n", repoName, prURL)
 							mu.Lock()
-							prURLs = append(prURLs, prURL)
+							prMap[repoName] = prURL
 							mu.Unlock()
 							return
 						}
@@ -685,7 +699,7 @@ func executePrCreation(repos []Repository, parallel int, gitPath, ghPath string,
 			prURL := lines[len(lines)-1]
 
 			mu.Lock()
-			prURLs = append(prURLs, prURL)
+			prMap[repoName] = prURL
 			mu.Unlock()
 
 		}(repo)
@@ -695,11 +709,11 @@ func executePrCreation(repos []Repository, parallel int, gitPath, ghPath string,
 	if len(errs) > 0 {
 		return nil, fmt.Errorf("Errors occurred:\n%s", strings.Join(errs, "\n"))
 	}
-	return prURLs, nil
+	return prMap, nil
 }
 
-func updatePrDescriptions(prURLs []string, parallel int, ghPath string, snapshotData, snapshotFilename string) error {
-	if len(prURLs) == 0 {
+func updatePrDescriptions(prMap map[string]string, parallel int, ghPath string, snapshotData, snapshotFilename string, deps *DependencyGraph) error {
+	if len(prMap) == 0 {
 		return nil
 	}
 
@@ -708,9 +722,9 @@ func updatePrDescriptions(prURLs []string, parallel int, ghPath string, snapshot
 	sem := make(chan struct{}, parallel)
 	var errs []string
 
-	for _, url := range prURLs {
+	for id, url := range prMap {
 		wg.Add(1)
-		go func(targetURL string) {
+		go func(repoID, targetURL string) {
 			defer wg.Done()
 			sem <- struct{}{}
 			defer func() { <-sem }()
@@ -726,16 +740,8 @@ func updatePrDescriptions(prURLs []string, parallel int, ghPath string, snapshot
 			}
 			originalBody := strings.TrimSpace(string(bodyOut))
 
-			// Add Related Pull Requests, excluding self
-			var relatedURLs []string
-			for _, u := range prURLs {
-				if u != targetURL {
-					relatedURLs = append(relatedURLs, u)
-				}
-			}
-
 			// Generate new Mistletoe block
-			newBlock := GenerateMistletoeBody(snapshotData, snapshotFilename, relatedURLs)
+			newBlock := GenerateMistletoeBody(snapshotData, snapshotFilename, repoID, prMap, deps)
 
 			// Update body
 			newBody := EmbedMistletoeBody(originalBody, newBlock)
@@ -748,7 +754,7 @@ func updatePrDescriptions(prURLs []string, parallel int, ghPath string, snapshot
 				mu.Unlock()
 				return
 			}
-		}(url)
+		}(id, url)
 	}
 	wg.Wait()
 
