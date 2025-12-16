@@ -3,6 +3,7 @@
 ## 1. 概要 (Overview)
 
 `pr create` サブコマンドは、複数のリポジトリに対して一括でプルリクエスト (PR) を作成します。PR の本文には、全リポジトリの状態を記録したスナップショット情報が自動的に埋め込まれます。
+また、依存関係グラフ（Mermaid形式）を指定することで、各PRの本文に関連するPRへのリンクを依存関係（依存・被依存）に基づいて分類して記載することができます。
 
 ## 2. 使用方法 (Usage)
 
@@ -16,8 +17,8 @@ mstl-gh pr create [options]
 | :--- | :--- | :--- | :--- |
 | `--title` | `-t` | PR のタイトル。 | (エディタで入力) |
 | `--body` | `-b` | PR の本文。 | (エディタで入力) |
-| `--draft` | `-d` | ドラフト PR として作成。 | false |
 | `--file` | `-f` | 設定ファイル (JSON) のパス。 | `mistletoe.json` |
+| `--dependencies` | `-d` | 依存関係グラフ（Mermaid形式）のMarkdownファイルパス。 | (なし) |
 
 ## 3. ロジックフロー (Logic Flow)
 
@@ -26,7 +27,8 @@ mstl-gh pr create [options]
 ```mermaid
 flowchart TD
     Start(["開始"]) --> LoadConfigSub[["設定読み込み"]]
-    LoadConfigSub --> ValidateAuth["gh CLI認証確認"]
+    LoadConfigSub --> LoadDep[["依存関係グラフ読み込み (Optional)"]]
+    LoadDep --> ValidateAuth["gh CLI認証確認"]
     ValidateAuth --> CheckClean["全リポジトリの状態確認 (Spinner)"]
     CheckClean --> VerifyBase["Baseブランチ存在確認 (Config参照)"]
 
@@ -42,12 +44,22 @@ flowchart TD
         CreatePRs --> CallGH["gh pr create --base <ConfigBase> ..."]
     end
 
-    CallGH --> ShowStatus["pr status 結果表示 (Spinner)"]
+    CallGH --> UpdateDesc["PR本文更新 (関連PRリンク追記・分類)"]
+    UpdateDesc --> ShowStatus["pr status 結果表示 (Spinner)"]
     ErrorState --> Stop(["終了"])
     ShowStatus --> Stop
 ```
 
-### 3.2. Mistletoe ブロック (Mistletoe Block)
+### 3.2. 依存関係の解析 (Dependency Parsing)
+
+`--dependencies` オプションで指定されたファイルは以下のルールで解析されます：
+*   **形式**: Markdownファイル内のMermaidグラフ（`graph` または `flowchart`）。
+*   **矢印**:
+    *   `A --> B` または `A -.-> B`: A は B に依存する (Dependency)。
+    *   `A <--> B`: 相互依存。AはBに依存し、かつBはAに依存する。
+*   **検証**: グラフ内のノードIDは、設定ファイル (`repositories` 内の `id`) と一致する必要があります。一致しないIDが含まれる場合はエラーとして終了します。
+
+### 3.3. Mistletoe ブロック (Mistletoe Block)
 
 PR 本文の末尾に、自動生成された不可視（または折りたたみ）ブロックを追加します。
 
@@ -82,10 +94,15 @@ PR 本文の末尾に、自動生成された不可視（または折りたた�
     *   **注記**: `<details>` タグの外側に配置し、コードブロックで囲みます。
 3.  **関連 PR リンク**:
     *   他のリポジトリで作成された関連 PR へのリンク一覧。
+    *   `--dependencies` が指定された場合、以下のセクションに分類して記載されます：
+        *   **Dependencies**: このリポジトリが依存している先のリポジトリのPR。
+        *   **Dependents**: このリポジトリに依存している元のリポジトリのPR。
+        *   **Others**: 依存関係がない、またはグラフに含まれないリポジトリのPR。
+    *   指定がない場合は、単一のリストとして全関連PRを表示します。
 
 これにより、レビュー担当者はスナップショット情報を参照でき、将来的な自動検証やリンク連携が可能になります。
 
-### 3.3. 制約事項 (Constraints)
+### 3.4. 制約事項 (Constraints)
 
 *   **GitHub のみ**: URL が GitHub を指していないリポジトリはスキップまたはエラー。
 *   **クリーンな状態**: 全てのリポジトリが最新（Up-to-date）であり、ローカルの変更がないことが推奨されますが、実装上は「プッシュ可能であること」の確認。
