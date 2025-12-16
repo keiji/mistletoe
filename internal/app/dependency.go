@@ -43,13 +43,20 @@ func ParseDependencies(content string, validIDs []string) (*DependencyGraph, err
 
 	scanner := bufio.NewScanner(strings.NewReader(content))
 
-	// Regex to split by arrows: -->, -.->, <-->
-	// We capture the arrow to know the type (specifically for <-->)
-	arrowRe := regexp.MustCompile(`\s*(<-->|-->|-\.->)\s*`)
+	// Regex to split by arrows.
+	// Matches:
+	// 1. Mutual arrows: <...>
+	// 2. Simple directed arrows: -->, ==>, -.->, etc. ([-=.]+>)
+	// 3. Labeled directed arrows: -- text -->, == text ==>, etc.
+	//    Starts with --, ==, -.
+	//    Middle is quoted string or non-greedy chars.
+	//    Ends with >, preceded by --, ==, -., -..
+	// Note: We ignore undirected arrows like --o, --x, ---
+	arrowRe := regexp.MustCompile(`\s*(<[-=.]+>|[-=.]+>|(?:--|==|-\.)\s*(?:".*?"|.+?)\s*(?:--|==|-\.|-\.\.)>)\s*`)
 
 	// Regex to extract ID: start of string, take valid chars
 	// Valid mstl IDs: ^[a-zA-Z0-9._-]+$
-	// Mermaid nodes might be: ID["Label"] or ID
+	// Mermaid nodes might be: ID["Label"], ID{Label}, ID(Label), etc.
 	// We take the first continuous sequence of valid ID characters.
 	idRe := regexp.MustCompile(`^([a-zA-Z0-9._-]+)`)
 
@@ -95,7 +102,9 @@ func ParseDependencies(content string, validIDs []string) (*DependencyGraph, err
 		// Forward: A -> B
 		addDependency(graph, leftID, rightID)
 
-		if arrowStr == "<-->" {
+		// Check if mutual
+		// Starts with <
+		if strings.HasPrefix(arrowStr, "<") {
 			// B -> A
 			addDependency(graph, rightID, leftID)
 		}

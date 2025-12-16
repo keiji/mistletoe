@@ -7,7 +7,7 @@ import (
 )
 
 func TestParseDependencies(t *testing.T) {
-	validIDs := []string{"mstl-core", "mstl-ui", "mstl-api", "mstl-db", "other"}
+	validIDs := []string{"mstl-core", "mstl-ui", "mstl-api", "mstl-db", "other", "mstl1", "mstl2", "mstl3", "A", "B"}
 
 	tests := []struct {
 		name    string
@@ -85,6 +85,56 @@ mstl-api --> mstl-db
 			wantErr: false,
 		},
 		{
+			name: "Complex graph with labels and decorations",
+			content: `
+graph TD
+    mstl1["frontend"] -- "entity" --> mstl2{backend}
+    mstl2 -.-> mstl3("common")
+    mstl1 ==> mstl3
+`,
+			want: &DependencyGraph{
+				Forward: map[string][]string{
+					"mstl1": {"mstl2", "mstl3"},
+					"mstl2": {"mstl3"},
+				},
+				Reverse: map[string][]string{
+					"mstl2": {"mstl1"},
+					"mstl3": {"mstl1", "mstl2"},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Ignore undirected arrows",
+			content: `
+mstl1 --o mstl2
+mstl1 --x mstl2
+mstl1 --- mstl2
+`,
+			want: &DependencyGraph{
+				Forward: map[string][]string{},
+				Reverse: map[string][]string{},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Labeled arrows variations",
+			content: `
+A -- label --> B
+A -. label .-> B
+A == label ==> B
+`,
+			want: &DependencyGraph{
+				Forward: map[string][]string{
+					"A": {"B"},
+				},
+				Reverse: map[string][]string{
+					"B": {"A"},
+				},
+			},
+			wantErr: false,
+		},
+		{
 			name: "Invalid ID",
 			content: `
 mstl-ui --> unknown-repo
@@ -152,6 +202,9 @@ func normalizeGraph(g *DependencyGraph) {
 		g.Reverse = make(map[string][]string)
 	}
 	for k, v := range g.Forward {
+		// Remove duplicates before sort (ParseDependencies logic prevents duplicates but test manual construction might not)
+		// But addDependency checks duplicates.
+		// Just sort.
 		sort.Strings(v)
 		g.Forward[k] = v
 	}
