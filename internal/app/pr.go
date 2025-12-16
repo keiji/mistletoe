@@ -561,23 +561,73 @@ func filterPushableRepos(repos []Repository, parallel int, gitPath string) ([]Re
 
 			keep := true
 			if baseBranch != "" {
-				// Verify if base branch exists on remote.
-				// If missing, we default to KEEP, so verifyGithubRequirements can catch it with a proper error.
-				// But to check commits, we need it.
+				// We want to check if the local branch has any commits not present in the remote base branch.
+				// To do this without fetching (to avoid changing local state), we use git ls-remote to get the hash of the remote base branch.
 
-				// Ensure origin is up-to-date for the base branch to avoid stale comparisons
-				_ = execCommand(gitPath, "-C", repoDir, "fetch", "origin", baseBranch).Run()
+				// 1. Get Remote Hash for baseBranch
+				lsOut, err := RunGit(repoDir, gitPath, "ls-remote", "origin", baseBranch)
+				// ls-remote output format: <hash>\trefs/heads/<branch>\n
+				// We expect one line if it matches exactly, or we need to parse carefully.
+				// Since baseBranch is usually simple name (main), ls-remote origin main matches refs/heads/main usually.
 
-				// Check origin/<base> existence
-				err := execCommand(gitPath, "-C", repoDir, "rev-parse", "--verify", "origin/"+baseBranch).Run()
-				if err == nil {
-					// Check commit count
-					out, err := RunGit(repoDir, gitPath, "rev-list", "--count", fmt.Sprintf("origin/%s..HEAD", baseBranch))
-					if err == nil {
-						if strings.TrimSpace(out) == "0" {
+				var remoteHash string
+				if err == nil && lsOut != "" {
+					lines := strings.Split(lsOut, "\n")
+					for _, line := range lines {
+						parts := strings.Fields(line)
+						if len(parts) >= 2 {
+							// Check if ref matches exact branch (refs/heads/baseBranch)
+							// Or if we just trust the first one if exact match wasn't enforced by ls-remote arg?
+							// "git ls-remote origin baseBranch" usually returns refs/heads/baseBranch if ambiguous,
+							// or just that ref.
+							if strings.HasSuffix(parts[1], "/"+baseBranch) {
+								remoteHash = parts[0]
+								break
+							}
+						}
+					}
+				}
+
+				if remoteHash != "" {
+					// 2. Check if we have this object locally
+					err := execCommand(gitPath, "-C", repoDir, "cat-file", "-e", remoteHash).Run()
+					if err != nil {
+						// Remote object missing locally. This means remote has advanced (we are behind or diverged)
+						// and we haven't fetched it.
+						// In this case, we definitely cannot do a clean push or PR creation without pulling/fetching.
+						// So we consider this "not pushable/PR-ready" in the context of "just creating PR for local changes".
+						// We skip it.
+						keep = false
+					} else {
+						// 3. Object exists. Check ancestry.
+						// Is remoteHash an ancestor of HEAD?
+						// git merge-base --is-ancestor <remote> <local>
+						// If exit 0: Yes, remote is ancestor. (Local is ahead or same)
+						// If exit 1: No. (Diverged or Local is behind)
+
+						err := execCommand(gitPath, "-C", repoDir, "merge-base", "--is-ancestor", remoteHash, "HEAD").Run()
+						if err == nil {
+							// Remote is ancestor.
+							// Check if they are the same commit.
+							headHash, _ := RunGit(repoDir, gitPath, "rev-parse", "HEAD")
+							if remoteHash == headHash {
+								// Identical. No new commits.
+								keep = false
+							} else {
+								// Ahead. Keep.
+								keep = true
+							}
+						} else {
+							// Diverged or Behind. Skip.
 							keep = false
 						}
 					}
+				} else {
+					// Remote branch not found?
+					// If verifyGithubRequirements doesn't catch it, we default to keep?
+					// Or if remote branch missing, then everything is new?
+					// Let's Keep.
+					keep = true
 				}
 			}
 
