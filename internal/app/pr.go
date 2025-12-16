@@ -564,6 +564,10 @@ func filterPushableRepos(repos []Repository, parallel int, gitPath string) ([]Re
 				// Verify if base branch exists on remote.
 				// If missing, we default to KEEP, so verifyGithubRequirements can catch it with a proper error.
 				// But to check commits, we need it.
+
+				// Ensure origin is up-to-date for the base branch to avoid stale comparisons
+				_ = execCommand(gitPath, "-C", repoDir, "fetch", "origin", baseBranch).Run()
+
 				// Check origin/<base> existence
 				err := execCommand(gitPath, "-C", repoDir, "rev-parse", "--verify", "origin/"+baseBranch).Run()
 				if err == nil {
