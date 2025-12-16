@@ -29,25 +29,33 @@ flowchart TD
     Start(["開始"]) --> LoadConfigSub[["設定読み込み"]]
     LoadConfigSub --> LoadDep[["依存関係グラフ読み込み (Optional)"]]
     LoadDep --> ValidateAuth["gh CLI認証確認"]
-    ValidateAuth --> CheckClean["全リポジトリの状態確認 (Spinner)"]
-    CheckClean --> VerifyBase["Baseブランチ存在確認 (Config参照)"]
+    ValidateAuth --> CollectStatus["ステータス・PR状況収集 (Spinner)"]
+    CollectStatus --> RenderTable["pr status テーブル表示"]
+    RenderTable --> CheckBlockers["コンフリクト・Detached HEAD確認"]
+    CheckBlockers -- "エラー" --> ErrorState["エラー停止"]
+    CheckBlockers -- "OK" --> CheckAllPRs{"全リポジトリに\nPRが存在するか？"}
 
-    VerifyBase -- "未プッシュ/未プル/競合あり/GitHub以外/Baseなし" --> ErrorState["エラー: 状態不整合"]
-    VerifyBase -- "OK" --> GenSnapshot["スナップショット生成 (ConfigのBase反映)"]
+    CheckAllPRs -- "Yes" --> PromptYes["プロンプト: 説明を更新しますか？"]
+    PromptYes -- "No" --> Stop(["終了"])
+    PromptYes -- "Yes" --> SetSkipEditor["エディタ起動スキップ"]
 
-    GenSnapshot --> InputContent["タイトル・本文入力 (引数 or エディタ)"]
-    InputContent --> EmbedBlock["Mistletoeブロック埋め込み"]
+    CheckAllPRs -- "No" --> PromptNo["プロンプト: 作成しますか？"]
+    PromptNo -- "No" --> Stop
+    PromptNo -- "Yes" --> SetNoSkip["エディタ起動有効"]
 
-    EmbedBlock --> CreatePRs["PR作成ループ (並列)"]
+    SetSkipEditor --> VerifyBase["GitHub権限・Baseブランチ確認"]
+    SetNoSkip --> VerifyBase
 
-    subgraph "PR作成 (gh pr create)"
-        CreatePRs --> CallGH["gh pr create --base <ConfigBase> ..."]
-    end
+    VerifyBase -- "エラー" --> ErrorState
+    VerifyBase -- "OK" --> CheckEditor{"エディタ起動？"}
+    CheckEditor -- "Yes" --> InputContent["タイトル・本文入力 (エディタ)"]
+    CheckEditor -- "No" --> GenSnapshot["スナップショット生成"]
+    InputContent --> GenSnapshot
 
-    CallGH --> UpdateDesc["PR本文更新 (関連PRリンク追記・分類)"]
-    UpdateDesc --> ShowStatus["pr status 結果表示 (Spinner)"]
-    ErrorState --> Stop(["終了"])
-    ShowStatus --> Stop
+    GenSnapshot --> PushAndCreate["プッシュ & PR作成 (存在時はスキップ)"]
+    PushAndCreate --> UpdateDesc["PR本文更新 (スナップショット埋め込み)"]
+    UpdateDesc --> ShowFinalStatus["最終ステータス表示"]
+    ShowFinalStatus --> Stop
 ```
 
 ### 3.2. 依存関係の解析 (Dependency Parsing)

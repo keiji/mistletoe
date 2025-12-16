@@ -166,7 +166,7 @@ func TestVerifyGithubRequirements_Success(t *testing.T) {
 	repos := []Repository{repo}
 
 	// Mock gh to return success
-	existing, err := verifyGithubRequirements(repos, 1, "git", "gh")
+	existing, err := verifyGithubRequirements(repos, 1, "git", "gh", nil)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -195,7 +195,7 @@ func TestVerifyGithubRequirements_ExistingPR(t *testing.T) {
 	os.Setenv("MOCK_PR_EXISTS", "1")
 	defer os.Unsetenv("MOCK_PR_EXISTS")
 
-	existing, err := verifyGithubRequirements(repos, 1, "git", "gh")
+	existing, err := verifyGithubRequirements(repos, 1, "git", "gh", nil)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -225,7 +225,7 @@ func TestVerifyGithubRequirements_MissingBaseBranch(t *testing.T) {
 	os.Setenv("MOCK_GIT_LS_REMOTE_MISSING", "1")
 	defer os.Unsetenv("MOCK_GIT_LS_REMOTE_MISSING")
 
-	_, err := verifyGithubRequirements(repos, 1, "git", "gh")
+	_, err := verifyGithubRequirements(repos, 1, "git", "gh", nil)
 	if err == nil {
 		t.Error("Expected error due to missing base branch, got nil")
 	}
