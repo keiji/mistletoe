@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-func handleVersion(opts GlobalOptions) {
+func printCommonVersionInfo(opts GlobalOptions) {
 	v := AppVersion
 	if CommitHash != "" {
 		v = fmt.Sprintf("%s-%s", AppVersion, CommitHash)
@@ -39,27 +39,5 @@ func handleVersion(opts GlobalOptions) {
 	lines := strings.Split(string(out), "\n")
 	if len(lines) > 0 {
 		fmt.Println(lines[0])
-	}
-
-	if AppName == "Mistletoe-gh" {
-		fmt.Println()
-
-		displayGhPath := opts.GhPath
-		if resolved, err := exec.LookPath(opts.GhPath); err == nil {
-			displayGhPath = resolved
-		} else if filepath.IsAbs(opts.GhPath) {
-			displayGhPath = opts.GhPath
-		}
-		fmt.Printf("gh path: %s\n", displayGhPath)
-
-		outGh, err := exec.Command(opts.GhPath, "--version").Output()
-		if err == nil {
-			linesGh := strings.Split(string(outGh), "\n")
-			if len(linesGh) > 0 {
-				fmt.Println(linesGh[0])
-			}
-		} else {
-			fmt.Println("Error getting gh version (gh might not be installed)")
-		}
 	}
 }

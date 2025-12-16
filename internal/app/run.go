@@ -110,7 +110,11 @@ func Run(name, version, hash string, args []string) {
 	case "help":
 		handleHelp(subcmdArgs, opts)
 	case "version":
-		handleVersion(opts)
+		if AppName == "Mistletoe-gh" {
+			handleVersionGh(opts)
+		} else {
+			handleVersionMstl(opts)
+		}
 	case "":
 		handleHelp(subcmdArgs, opts)
 	default:
