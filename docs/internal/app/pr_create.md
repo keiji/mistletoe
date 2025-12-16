@@ -31,9 +31,10 @@ flowchart TD
     LoadDep --> ValidateAuth["gh CLI認証確認"]
     ValidateAuth --> CollectStatus["ステータス・PR状況収集 (Spinner)"]
     CollectStatus --> RenderTable["pr status テーブル表示"]
-    RenderTable --> CheckBlockers["コンフリクト・Detached HEAD確認"]
+    RenderTable --> CheckBlockers["コンフリクト・Detached HEAD・変更有無確認"]
     CheckBlockers -- "エラー" --> ErrorState["エラー停止"]
-    CheckBlockers -- "OK" --> CheckAllPRs{"全リポジトリに\nPRが存在するか？"}
+    CheckBlockers -- "OK" --> FilterRepos[["変更なしリポジトリを除外"]]
+    FilterRepos --> CheckAllPRs{"有効な全リポジトリに\nPRが存在するか？"}
 
     CheckAllPRs -- "Yes" --> PromptYes["プロンプト: 説明を更新しますか？"]
     PromptYes -- "No" --> Stop(["終了"])
@@ -58,7 +59,23 @@ flowchart TD
     ShowFinalStatus --> Stop
 ```
 
-### 3.2. 依存関係の解析 (Dependency Parsing)
+### 3.2. 変更検知と除外ロジック (Change Detection & Exclusion)
+
+各リポジトリについて、以下の条件を満たす場合、そのリポジトリはPushおよびPR作成/更新の対象から除外されます。
+
+*   **条件**: ローカルブランチのすべてのコミットが、リモートのBaseブランチ（`origin/<base-branch>`）に既に含まれている場合。
+    *   確認方法: `git rev-list --count origin/<base-branch>..HEAD` が `0` であること。
+*   **挙動**:
+    *   Pushを行いません。
+    *   新規PRを作成しません。
+    *   既存PRのDescription更新も行いません。
+*   **通知**: 除外されたリポジトリは、処理開始前に一覧表示され、ユーザーに通知されます。
+
+### 3.3. 既存PRの更新スキップ条件 (Skip Update for Closed/Merged PRs)
+
+既存のPull Requestが存在する場合でも、そのステータスが `MERGED` または `CLOSED` である場合、Descriptionの更新（スナップショットの埋め込み）はスキップされます。
+
+### 3.4. 依存関係の解析 (Dependency Parsing)
 
 `--dependencies` オプションで指定されたファイルは以下のルールで解析されます：
 *   **形式**: Markdownファイル内のMermaidグラフ（`graph` または `flowchart`）。
@@ -73,7 +90,7 @@ flowchart TD
     *   `ID["Label"]` や `ID{Label}` の形式であっても、先頭のID部分のみを使用して照合します。
 *   **検証**: グラフ内の抽出されたノードIDは、設定ファイル (`repositories` 内の `id`) と一致する必要があります。一致しないIDが含まれる場合はエラーとして終了します。
 
-### 3.3. Mistletoe ブロック (Mistletoe Block)
+### 3.5. Mistletoe ブロック (Mistletoe Block)
 
 PR 本文の末尾に、自動生成された不可視（または折りたたみ）ブロックを追加します。
 
@@ -120,7 +137,7 @@ PR 本文の末尾に、自動生成された不可視（または折りたた�
 
 これにより、レビュー担当者はスナップショット情報を参照でき、将来的な自動検証やリンク連携が可能になります。
 
-### 3.4. 制約事項 (Constraints)
+### 3.6. 制約事項 (Constraints)
 
 *   **GitHub のみ**: URL が GitHub を指していないリポジトリはスキップまたはエラー。
 *   **クリーンな状態**: 全てのリポジトリが最新（Up-to-date）であり、ローカルの変更がないことが推奨されますが、実装上は「プッシュ可能であること」の確認。

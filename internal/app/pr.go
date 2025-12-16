@@ -870,6 +870,20 @@ func updatePrDescriptions(prMap map[string]string, parallel int, ghPath string, 
 			sem <- struct{}{}
 			defer func() { <-sem }()
 
+			// Check PR State
+			stateCmd := execCommand(ghPath, "pr", "view", targetURL, "--json", "state", "-q", ".state")
+			stateOut, err := stateCmd.Output()
+			if err != nil {
+				mu.Lock()
+				errs = append(errs, fmt.Sprintf("Failed to check state for PR %s: %v", targetURL, err))
+				mu.Unlock()
+				return
+			}
+			state := strings.TrimSpace(string(stateOut))
+			if state == "MERGED" || state == "CLOSED" {
+				return
+			}
+
 			// Get current body
 			viewCmd := execCommand(ghPath, "pr", "view", targetURL, "--json", "body", "-q", ".body")
 			bodyOut, err := viewCmd.Output()
