@@ -64,7 +64,11 @@ flowchart TD
 各リポジトリについて、以下の条件を満たす場合、そのリポジトリはPushおよびPR作成/更新の対象から除外されます。
 
 *   **条件**: ローカルブランチのすべてのコミットが、リモートのBaseブランチ（`origin/<base-branch>`）に既に含まれている場合。
-    *   確認方法: `git rev-list --count origin/<base-branch>..HEAD` が `0` であること。
+    *   確認方法:
+        1.  `git ls-remote origin <base-branch>` でリモートBaseブランチのコミットハッシュを取得。
+        2.  `git merge-base --is-ancestor <remote-hash> HEAD` で、リモートのコミットがローカル `HEAD` の祖先であるか（＝含まれているか）を確認。
+        3.  祖先である場合、`HEAD` と `<remote-hash>` が同一かどうかを確認。同一であれば「変更なし」と判定。
+    *   ローカル環境への影響（fetchによるリモート追跡ブランチの更新など）を避けるため、`fetch` は行わずに判定します。
 *   **挙動**:
     *   Pushを行いません。
     *   新規PRを作成しません。
