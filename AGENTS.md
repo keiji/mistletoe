@@ -1,6 +1,9 @@
 # Communication Guidelines
 
-*   **Language**: Prioritize **Japanese** for basic interactions, and include **English** as well.
+*   **Language**:
+    *   Prioritize **Japanese** for basic interactions, and include **English** as well.
+    *   For **Issues and Pull Requests**, interactions should be based on **Japanese**.
+        *   However, if the Issue or Pull Request is written **only in English**, use **English** as the base.
 
 # Pull Request Guidelines
 
