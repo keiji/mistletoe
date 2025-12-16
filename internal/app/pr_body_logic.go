@@ -11,8 +11,8 @@ import (
 )
 
 // GenerateMistletoeBody creates the structured body content.
-// It accepts a map of all related PRs (RepoID -> URL) and an optional dependency graph.
-func GenerateMistletoeBody(snapshotData string, snapshotFilename string, currentRepoID string, allPRs map[string]string, deps *DependencyGraph) string {
+// It accepts a map of all related PRs (RepoID -> URL), an optional dependency graph, and the raw dependency content.
+func GenerateMistletoeBody(snapshotData string, snapshotFilename string, currentRepoID string, allPRs map[string]string, deps *DependencyGraph, dependencyContent string) string {
 	// Seed random number generator
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 
@@ -52,6 +52,19 @@ func GenerateMistletoeBody(snapshotData string, snapshotFilename string, current
 	sb.WriteString(base64.StdEncoding.EncodeToString([]byte(snapshotData)))
 	sb.WriteString("\n```\n")
 	sb.WriteString("</details>\n\n")
+
+	// Add Dependency Graph Block if content is provided
+	if dependencyContent != "" {
+		sb.WriteString("<details>\n")
+		sb.WriteString("<summary>dependencies.mmd</summary>\n\n")
+		sb.WriteString("```mermaid\n")
+		sb.WriteString(dependencyContent)
+		if !strings.HasSuffix(dependencyContent, "\n") {
+			sb.WriteString("\n")
+		}
+		sb.WriteString("```\n")
+		sb.WriteString("</details>\n\n")
+	}
 
 	sb.WriteString("### Related Pull Request(s)\n\n")
 

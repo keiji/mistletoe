@@ -17,7 +17,7 @@ func TestGenerateMistletoeBody(t *testing.T) {
 	}
 
 	// Test without dependencies (legacy/default behavior)
-	body := GenerateMistletoeBody(snapshot, filename, currentID, allPRs, nil)
+	body := GenerateMistletoeBody(snapshot, filename, currentID, allPRs, nil, "")
 
 	if !strings.Contains(body, "## Mistletoe") {
 		t.Error("Body missing Mistletoe header")
@@ -84,7 +84,7 @@ func TestGenerateMistletoeBody_WithDependencies(t *testing.T) {
 	}
 	// repo-dep1 is not in graph -> Others
 
-	body := GenerateMistletoeBody(snapshot, filename, currentID, allPRs, deps)
+	body := GenerateMistletoeBody(snapshot, filename, currentID, allPRs, deps, "")
 
 	if !strings.Contains(body, "#### Dependencies") {
 		t.Error("Missing Dependencies section")
@@ -112,6 +112,20 @@ func TestGenerateMistletoeBody_WithDependencies(t *testing.T) {
 
 	if strings.Contains(body, "url-main") {
 		t.Error("Should not contain self url")
+	}
+}
+
+func TestGenerateMistletoeBody_WithDependencyContent(t *testing.T) {
+	snapshot := "{}"
+	filename := "snap.json"
+	depContent := "graph TD\nA-->B"
+	body := GenerateMistletoeBody(snapshot, filename, "A", nil, nil, depContent)
+
+	if !strings.Contains(body, "<summary>dependencies.mmd</summary>") {
+		t.Error("Missing dependencies summary")
+	}
+	if !strings.Contains(body, "```mermaid\n"+depContent) {
+		t.Error("Missing mermaid block content")
 	}
 }
 

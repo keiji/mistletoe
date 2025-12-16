@@ -337,13 +337,21 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 
 	// 3. Load Dependencies (if specified)
 	var deps *DependencyGraph
+	var depContent string
 	if depPath != "" {
+		contentBytes, errRead := os.ReadFile(depPath)
+		if errRead != nil {
+			fmt.Printf("Error reading dependency file: %v\n", errRead)
+			os.Exit(1)
+		}
+		depContent = string(contentBytes)
+
 		var validIDs []string
 		for _, r := range *config.Repositories {
 			validIDs = append(validIDs, getRepoName(r))
 		}
 		var errDep error
-		deps, errDep = LoadDependencies(depPath, validIDs)
+		deps, errDep = ParseDependencies(depContent, validIDs)
 		if errDep != nil {
 			fmt.Printf("Error loading dependencies: %v\n", errDep)
 			os.Exit(1)
@@ -434,7 +442,7 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 	fmt.Printf("Snapshot saved to %s\n", filename)
 
 	// Generate initial Mistletoe block without related PRs (pass empty map)
-	initialMistletoeBlock := GenerateMistletoeBody(string(snapshotData), filename, "", make(map[string]string), deps)
+	initialMistletoeBlock := GenerateMistletoeBody(string(snapshotData), filename, "", make(map[string]string), deps, depContent)
 	prBodyWithSnapshot := EmbedMistletoeBody(prBody, initialMistletoeBlock)
 
 	// 8. Execution: Push & Create PR
@@ -448,7 +456,7 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 
 	// 9. Post-processing: Update Descriptions
 	fmt.Println("Updating Pull Request descriptions...")
-	if err := updatePrDescriptions(prMap, parallel, opts.GhPath, string(snapshotData), filename, deps); err != nil {
+	if err := updatePrDescriptions(prMap, parallel, opts.GhPath, string(snapshotData), filename, deps, depContent); err != nil {
 		fmt.Printf("Error updating descriptions: %v\n", err)
 		os.Exit(1)
 	}
@@ -712,7 +720,7 @@ func executePrCreation(repos []Repository, parallel int, gitPath, ghPath string,
 	return prMap, nil
 }
 
-func updatePrDescriptions(prMap map[string]string, parallel int, ghPath string, snapshotData, snapshotFilename string, deps *DependencyGraph) error {
+func updatePrDescriptions(prMap map[string]string, parallel int, ghPath string, snapshotData, snapshotFilename string, deps *DependencyGraph, depContent string) error {
 	if len(prMap) == 0 {
 		return nil
 	}
@@ -741,7 +749,7 @@ func updatePrDescriptions(prMap map[string]string, parallel int, ghPath string, 
 			originalBody := strings.TrimSpace(string(bodyOut))
 
 			// Generate new Mistletoe block
-			newBlock := GenerateMistletoeBody(snapshotData, snapshotFilename, repoID, prMap, deps)
+			newBlock := GenerateMistletoeBody(snapshotData, snapshotFilename, repoID, prMap, deps, depContent)
 
 			// Update body
 			newBody := EmbedMistletoeBody(originalBody, newBlock)

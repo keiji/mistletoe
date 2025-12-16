@@ -190,7 +190,10 @@ mstl-gh pr create -f <config_file> [options]
 **Options:**
 *   `-t, --title <string>`: Title of the Pull Request.
 *   `-b, --body <string>`: Body content of the Pull Request.
+*   `-d, --dependencies <path>`: Path to a Markdown file containing a Mermaid dependency graph.
 *   If title/body are omitted, the default editor is opened.
+
+If `--dependencies` is provided, the graph content is embedded in the PR body (hidden in a details block with a Mermaid preview), and related PRs are categorized based on the graph.
 
 #### `pr status`
 
