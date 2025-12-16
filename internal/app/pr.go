@@ -425,9 +425,6 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 		if countPRs < len(activeRepos) {
 			allExist = false
 		}
-	} else {
-		// If no active repos, we can say all (0) exist? Or irrelevant.
-		// If 0 active repos, we likely exit later.
 	}
 
 	var skipEditor bool
