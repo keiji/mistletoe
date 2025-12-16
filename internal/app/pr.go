@@ -387,51 +387,78 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 		}
 	}
 
-	// 7. Check for All Existing PRs & Prompt
+	// 6.5 Filter repos with no changes relative to base
+	fmt.Println("Checking for changes relative to base branch...")
+	activeRepos, skippedRepos := filterPushableRepos(*config.Repositories, parallel, opts.GitPath)
+
+	if len(skippedRepos) > 0 {
+		fmt.Println("The following repositories will be skipped (all local commits are already in base branch):")
+		for _, r := range skippedRepos {
+			fmt.Printf(" - %s\n", r)
+		}
+		fmt.Println()
+	}
+
+	// 7. Check for All Existing PRs (ONLY for Active Repos) & Prompt
 	allExist := true
 	knownPRs := make(map[string]string)
 
-	// Determine if all repositories have existing PRs
-	// Also populate knownPRs for optimization
-	// Note: We need to handle the case where some repos in config might not be in rows (if filtered? status check iterates config repos).
-	// CollectStatus returns rows for all configured repos.
-
 	countPRs := 0
+	// We need to check existence ONLY for activeRepos.
+	// But prRows contains info for ALL repos.
+	activeMap := make(map[string]bool)
+	for _, r := range activeRepos {
+		activeMap[getRepoName(r)] = true
+	}
+
 	for _, row := range prRows {
-		if row.PrURL != "" && row.PrURL != "-" {
-			knownPRs[row.Repo] = row.PrURL
-			countPRs++
+		// Only consider active repos for "allExist" logic
+		if activeMap[row.Repo] {
+			if row.PrURL != "" && row.PrURL != "-" {
+				knownPRs[row.Repo] = row.PrURL
+				countPRs++
+			}
 		}
 	}
 
-	if countPRs < len(*config.Repositories) {
-		allExist = false
+	if len(activeRepos) > 0 {
+		if countPRs < len(activeRepos) {
+			allExist = false
+		}
+	} else {
+		// If no active repos, we can say all (0) exist? Or irrelevant.
+		// If 0 active repos, we likely exit later.
 	}
 
 	var skipEditor bool
 
-	if allExist {
-		fmt.Print("All repositories have existing Pull Requests. Do you want to update the description? (yes/no): ")
-		reader := bufio.NewReader(os.Stdin)
-		input, _ := reader.ReadString('\n')
-		input = strings.TrimSpace(strings.ToLower(input))
-		if input == "y" || input == "yes" {
-			skipEditor = true
+	if len(activeRepos) > 0 {
+		if allExist {
+			fmt.Print("All active repositories have existing Pull Requests. Do you want to update the description? (yes/no): ")
+			reader := bufio.NewReader(os.Stdin)
+			input, _ := reader.ReadString('\n')
+			input = strings.TrimSpace(strings.ToLower(input))
+			if input == "y" || input == "yes" {
+				skipEditor = true
+			} else {
+				fmt.Println("Aborted.")
+				os.Exit(1)
+			}
 		} else {
-			fmt.Println("Aborted.")
-			os.Exit(1)
+			fmt.Print("Proceed with Push and Pull Request creation? (yes/no): ")
+			reader := bufio.NewReader(os.Stdin)
+			input, _ := reader.ReadString('\n')
+			input = strings.TrimSpace(strings.ToLower(input))
+			if input == "y" || input == "yes" {
+				skipEditor = false
+			} else {
+				fmt.Println("Aborted.")
+				os.Exit(1)
+			}
 		}
 	} else {
-		fmt.Print("Proceed with Push and Pull Request creation? (yes/no): ")
-		reader := bufio.NewReader(os.Stdin)
-		input, _ := reader.ReadString('\n')
-		input = strings.TrimSpace(strings.ToLower(input))
-		if input == "y" || input == "yes" {
-			skipEditor = false
-		} else {
-			fmt.Println("Aborted.")
-			os.Exit(1)
-		}
+		fmt.Println("No repositories with changes to process.")
+		return
 	}
 
 	// Input Message if needed
@@ -451,7 +478,6 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 	}
 
 	// 8. Check GitHub Management & Permissions & Existing PRs
-	activeRepos := *config.Repositories
 	if len(activeRepos) == 0 {
 		fmt.Println("No repositories to process.")
 		return
@@ -510,6 +536,67 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 	RenderPrStatusTable(finalPrRows)
 
 	fmt.Println("Done.")
+}
+
+// filterPushableRepos filters out repositories where local branch commits are fully contained in the base branch.
+func filterPushableRepos(repos []Repository, parallel int, gitPath string) ([]Repository, []string) {
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, parallel)
+
+	shouldKeep := make([]bool, len(repos))
+
+	for i, repo := range repos {
+		wg.Add(1)
+		go func(idx int, r Repository) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+
+			repoDir := GetRepoDir(r)
+
+			// Resolve Base Branch
+			baseBranch := ""
+			if r.BaseBranch != nil && *r.BaseBranch != "" {
+				baseBranch = *r.BaseBranch
+			} else if r.Branch != nil && *r.Branch != "" {
+				baseBranch = *r.Branch
+			}
+
+			keep := true
+			if baseBranch != "" {
+				// Verify if base branch exists on remote.
+				// If missing, we default to KEEP, so verifyGithubRequirements can catch it with a proper error.
+				// But to check commits, we need it.
+				// Check origin/<base> existence
+				err := execCommand(gitPath, "-C", repoDir, "rev-parse", "--verify", "origin/"+baseBranch).Run()
+				if err == nil {
+					// Check commit count
+					out, err := RunGit(repoDir, gitPath, "rev-list", "--count", fmt.Sprintf("origin/%s..HEAD", baseBranch))
+					if err == nil {
+						if strings.TrimSpace(out) == "0" {
+							keep = false
+						}
+					}
+				}
+			}
+
+			shouldKeep[idx] = keep
+		}(i, repo)
+	}
+	wg.Wait()
+
+	var active []Repository
+	var skipped []string
+
+	for i, keep := range shouldKeep {
+		if keep {
+			active = append(active, repos[i])
+		} else {
+			skipped = append(skipped, getRepoName(repos[i]))
+		}
+	}
+
+	return active, skipped
 }
 
 // Mockable lookPath for testing
