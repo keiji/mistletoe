@@ -94,7 +94,7 @@ PR 本文の末尾に、自動生成された不可視（または折りたた�
     *   **注記**: `<details>` タグの外側に配置し、コードブロックで囲みます。
 3.  **依存関係グラフ (`<details>` 内, Optional)**:
     *   条件: `--dependencies` オプション指定時。
-    *   summary: `dependencies.mmd`
+    *   summary: `mistletoe-dependencies-[identifier].mmd`
     *   内容: 指定されたMermaidグラフの生データ（`mermaid` コードブロック内）。GitHub上でプレビュー表示されます。
 4.  **関連 PR リンク**:
     *   他のリポジトリで作成された関連 PR へのリンク一覧。

@@ -55,8 +55,13 @@ func GenerateMistletoeBody(snapshotData string, snapshotFilename string, current
 
 	// Add Dependency Graph Block if content is provided
 	if dependencyContent != "" {
+		// Calculate filename: replace "snapshot" -> "dependencies" and extension .json -> .mmd
+		// snapshotFilename is like "mistletoe-snapshot-[identifier].json"
+		depFilename := strings.Replace(snapshotFilename, "snapshot", "dependencies", 1)
+		depFilename = strings.Replace(depFilename, ".json", ".mmd", 1)
+
 		sb.WriteString("<details>\n")
-		sb.WriteString("<summary>dependencies.mmd</summary>\n\n")
+		sb.WriteString(fmt.Sprintf("<summary>%s</summary>\n\n", depFilename))
 
 		trimmed := strings.TrimSpace(dependencyContent)
 		if strings.HasPrefix(trimmed, "```mermaid") {
