@@ -431,7 +431,7 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 
 	if len(activeRepos) > 0 {
 		if allExist {
-			fmt.Print("All target repositories already have Pull Requests. Update descriptions? (yes/no): ")
+			fmt.Print("No repositories to create Pull Requests for. Update existing Pull Request descriptions? (yes/no): ")
 			reader := bufio.NewReader(os.Stdin)
 			input, _ := reader.ReadString('\n')
 			input = strings.TrimSpace(strings.ToLower(input))
