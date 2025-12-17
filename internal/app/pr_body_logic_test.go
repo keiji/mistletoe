@@ -22,17 +22,43 @@ func TestGenerateMistletoeBody(t *testing.T) {
 	if !strings.Contains(body, "## Mistletoe") {
 		t.Error("Body missing Mistletoe header")
 	}
+
+	// Check Order: Related Text -> Related JSON -> Snapshot
+	relatedTextIdx := strings.Index(body, "### Related Pull Request(s)")
+	snapshotIdx := strings.Index(body, "### snapshot")
+
+	if relatedTextIdx == -1 {
+		t.Error("Body missing Related Pull Request(s) section")
+	}
+	if snapshotIdx == -1 {
+		t.Error("Body missing snapshot section")
+	}
+	if relatedTextIdx > snapshotIdx {
+		t.Error("Related Pull Request(s) should be above snapshot")
+	}
+
 	if !strings.Contains(body, snapshot) {
 		t.Error("Body missing snapshot")
 	}
 	if !strings.Contains(body, filename) {
-		t.Error("Body missing filename")
+		t.Error("Body missing snapshot filename")
+	}
+
+	// Check Related JSON
+	relatedFilename := strings.Replace(filename, "snapshot", "related-pr", 1)
+	if !strings.Contains(body, relatedFilename) {
+		t.Error("Body missing related pr filename")
 	}
 	if !strings.Contains(body, "http://example.com/pr/b") {
 		t.Error("Body missing related url")
 	}
 	if strings.Contains(body, "http://example.com/pr/a") {
 		t.Error("Body should not contain self url")
+	}
+
+	// Check JSON content (flat list -> others)
+	if !strings.Contains(body, `"others":`) {
+		t.Error("Body missing others key in JSON")
 	}
 
 	// Check Base64 block
@@ -67,10 +93,10 @@ func TestGenerateMistletoeBody_WithDependencies(t *testing.T) {
 	currentID := "repo-main"
 
 	allPRs := map[string]string{
-		"repo-main": "url-main",
-		"repo-dep1": "url-dep1",
-		"repo-dep2": "url-dep2", // Depended by main
-		"repo-lib":  "url-lib",  // Main depends on lib
+		"repo-main":  "url-main",
+		"repo-dep1":  "url-dep1",
+		"repo-dep2":  "url-dep2", // Depended by main
+		"repo-lib":   "url-lib",  // Main depends on lib
 		"repo-other": "url-other",
 	}
 
@@ -112,6 +138,17 @@ func TestGenerateMistletoeBody_WithDependencies(t *testing.T) {
 
 	if strings.Contains(body, "url-main") {
 		t.Error("Should not contain self url")
+	}
+
+	// Verify JSON structure keys exist
+	if !strings.Contains(body, `"dependencies":`) {
+		t.Error("Missing dependencies key in JSON")
+	}
+	if !strings.Contains(body, `"dependents":`) {
+		t.Error("Missing dependents key in JSON")
+	}
+	if !strings.Contains(body, `"others":`) {
+		t.Error("Missing others key in JSON")
 	}
 }
 

@@ -2,6 +2,7 @@ package app
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"math/rand"
 	"regexp"
@@ -9,6 +10,12 @@ import (
 	"strings"
 	"time"
 )
+
+type relatedPRsJSON struct {
+	Dependencies []string `json:"dependencies,omitempty"`
+	Dependents   []string `json:"dependents,omitempty"`
+	Others       []string `json:"others,omitempty"`
+}
 
 // GenerateMistletoeBody creates the structured body content.
 // It accepts a map of all related PRs (RepoID -> URL), an optional dependency graph, and the raw dependency content.
@@ -40,48 +47,6 @@ func GenerateMistletoeBody(snapshotData string, snapshotFilename string, current
 	sb.WriteString("## Mistletoe\n")
 	sb.WriteString("This content is auto-generated. Manual edits may be lost.\n\n")
 
-	sb.WriteString("### snapshot\n\n")
-	sb.WriteString("<details>\n")
-	sb.WriteString(fmt.Sprintf("<summary>%s</summary>\n\n", snapshotFilename))
-	sb.WriteString("```json\n")
-	sb.WriteString(snapshotData)
-	sb.WriteString("\n```\n\n")
-
-	// Add Base64 encoded snapshot block
-	sb.WriteString("```\n")
-	sb.WriteString(base64.StdEncoding.EncodeToString([]byte(snapshotData)))
-	sb.WriteString("\n```\n")
-	sb.WriteString("</details>\n\n")
-
-	// Add Dependency Graph Block if content is provided
-	if dependencyContent != "" {
-		// Calculate filename: replace "snapshot" -> "dependencies" and extension .json -> .mmd
-		// snapshotFilename is like "mistletoe-snapshot-[identifier].json"
-		depFilename := strings.Replace(snapshotFilename, "snapshot", "dependencies", 1)
-		depFilename = strings.Replace(depFilename, ".json", ".mmd", 1)
-
-		sb.WriteString("<details>\n")
-		sb.WriteString(fmt.Sprintf("<summary>%s</summary>\n\n", depFilename))
-
-		trimmed := strings.TrimSpace(dependencyContent)
-		if strings.HasPrefix(trimmed, "```mermaid") {
-			sb.WriteString(dependencyContent)
-			if !strings.HasSuffix(dependencyContent, "\n") {
-				sb.WriteString("\n")
-			}
-		} else {
-			sb.WriteString("```mermaid\n")
-			sb.WriteString(dependencyContent)
-			if !strings.HasSuffix(dependencyContent, "\n") {
-				sb.WriteString("\n")
-			}
-			sb.WriteString("```\n")
-		}
-		sb.WriteString("</details>\n\n")
-	}
-
-	sb.WriteString("### Related Pull Request(s)\n\n")
-
 	// Filter out self
 	targets := make(map[string]string)
 	for id, url := range allPRs {
@@ -90,24 +55,22 @@ func GenerateMistletoeBody(snapshotData string, snapshotFilename string, current
 		}
 	}
 
-	if deps == nil {
-		var urls []string
-		for _, u := range targets {
-			urls = append(urls, u)
-		}
-		sort.Strings(urls)
+	var relatedJSON relatedPRsJSON
 
-		if len(urls) > 0 {
-			for _, u := range urls {
-				sb.WriteString(fmt.Sprintf(" * %s\n", u))
-			}
+	// Prepare lists
+	var flatList []string
+	var dependencies []string
+	var dependents []string
+	var others []string
+
+	if deps == nil {
+		for _, u := range targets {
+			flatList = append(flatList, u)
 		}
+		sort.Strings(flatList)
+		relatedJSON.Others = flatList
 	} else {
 		// Categorize
-		var dependencies []string // Depends on
-		var dependents []string   // Depended by
-		var others []string
-
 		// Prepare sets for fast lookup
 		forwardDeps := make(map[string]bool)
 		if list, ok := deps.Forward[currentRepoID]; ok {
@@ -142,6 +105,21 @@ func GenerateMistletoeBody(snapshotData string, snapshotFilename string, current
 		sort.Strings(dependents)
 		sort.Strings(others)
 
+		relatedJSON.Dependencies = dependencies
+		relatedJSON.Dependents = dependents
+		relatedJSON.Others = others
+	}
+
+	// 1. Related Pull Request(s) Text
+	sb.WriteString("### Related Pull Request(s)\n\n")
+
+	if deps == nil {
+		if len(flatList) > 0 {
+			for _, u := range flatList {
+				sb.WriteString(fmt.Sprintf(" * %s\n", u))
+			}
+		}
+	} else {
 		if len(dependencies) > 0 {
 			sb.WriteString("#### Dependencies\n")
 			for _, u := range dependencies {
@@ -164,6 +142,58 @@ func GenerateMistletoeBody(snapshotData string, snapshotFilename string, current
 				sb.WriteString(fmt.Sprintf(" * %s\n", u))
 			}
 		}
+	}
+	sb.WriteString("\n")
+
+	// 2. Related Pull Request(s) JSON
+	relatedFilename := strings.Replace(snapshotFilename, "snapshot", "related-pr", 1)
+	sb.WriteString("<details>\n")
+	sb.WriteString(fmt.Sprintf("<summary>%s</summary>\n\n", relatedFilename))
+	sb.WriteString("```json\n")
+	bytes, _ := json.MarshalIndent(relatedJSON, "", "    ")
+	sb.WriteString(string(bytes))
+	sb.WriteString("\n```\n")
+	sb.WriteString("</details>\n\n")
+
+	// 3. Snapshot
+	sb.WriteString("### snapshot\n\n")
+	sb.WriteString("<details>\n")
+	sb.WriteString(fmt.Sprintf("<summary>%s</summary>\n\n", snapshotFilename))
+	sb.WriteString("```json\n")
+	sb.WriteString(snapshotData)
+	sb.WriteString("\n```\n\n")
+
+	// Add Base64 encoded snapshot block
+	sb.WriteString("```\n")
+	sb.WriteString(base64.StdEncoding.EncodeToString([]byte(snapshotData)))
+	sb.WriteString("\n```\n")
+	sb.WriteString("</details>\n\n")
+
+	// 4. Dependency Graph
+	if dependencyContent != "" {
+		// Calculate filename: replace "snapshot" -> "dependencies" and extension .json -> .mmd
+		// snapshotFilename is like "mistletoe-snapshot-[identifier].json"
+		depFilename := strings.Replace(snapshotFilename, "snapshot", "dependencies", 1)
+		depFilename = strings.Replace(depFilename, ".json", ".mmd", 1)
+
+		sb.WriteString("<details>\n")
+		sb.WriteString(fmt.Sprintf("<summary>%s</summary>\n\n", depFilename))
+
+		trimmed := strings.TrimSpace(dependencyContent)
+		if strings.HasPrefix(trimmed, "```mermaid") {
+			sb.WriteString(dependencyContent)
+			if !strings.HasSuffix(dependencyContent, "\n") {
+				sb.WriteString("\n")
+			}
+		} else {
+			sb.WriteString("```mermaid\n")
+			sb.WriteString(dependencyContent)
+			if !strings.HasSuffix(dependencyContent, "\n") {
+				sb.WriteString("\n")
+			}
+			sb.WriteString("```\n")
+		}
+		sb.WriteString("</details>\n\n")
 	}
 
 	sb.WriteString(bottomSep + "\n")

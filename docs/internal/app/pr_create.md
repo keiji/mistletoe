@@ -102,7 +102,18 @@ PR 本文の末尾に、自動生成された不可視（または折りたた�
 (ユーザー入力本文)
 
 ------------------ (ランダムな区切り線)
-<details><summary>Mistletoe Snapshot</summary>
+## Mistletoe
+
+### Related Pull Request(s)
+...
+
+<details><summary>mistletoe-related-pr-[identifier].json</summary>
+... JSON Data ...
+</details>
+
+### snapshot
+
+<details><summary>mistletoe-snapshot-[identifier].json</summary>
 ... JSON Snapshot Data ...
 </details>
 
@@ -120,24 +131,34 @@ PR 本文の末尾に、自動生成された不可視（または折りたた�
     *   `N` が偶数の場合: `N * 2 - 1`
 
 ブロック構成要素:
-1.  **JSON スナップショット (`<details>` 内)**:
-    *   ファイル名: `mistletoe-snapshot-[identifier].json`
-    *   内容: 整形された JSON データ。スナップショット内の `base-branch` には設定ファイルの `base-branch`（なければ `branch`）が反映されます。
-2.  **Base64 エンコードデータ (コードブロック)**:
-    *   目的: 自動処理用の機械可読データの提供。
-    *   内容: スナップショット JSON の Base64 エンコード文字列。
-    *   **注記**: `<details>` タグの外側に配置し、コードブロックで囲みます。
-3.  **依存関係グラフ (`<details>` 内, Optional)**:
-    *   条件: `--dependencies` オプション指定時。
-    *   summary: `mistletoe-dependencies-[identifier].mmd`
-    *   内容: 指定されたMermaidグラフの生データ（`mermaid` コードブロック内）。GitHub上でプレビュー表示されます。
-4.  **関連 PR リンク**:
+1.  **関連 PR リンク**:
     *   他のリポジトリで作成された関連 PR へのリンク一覧。
     *   `--dependencies` が指定された場合、以下のセクションに分類して記載されます：
         *   **Dependencies**: このリポジトリが依存している先のリポジトリのPR。
         *   **Dependents**: このリポジトリに依存している元のリポジトリのPR。
         *   **Others**: 依存関係がない、またはグラフに含まれないリポジトリのPR。
     *   指定がない場合は、単一のリストとして全関連PRを表示します。
+2.  **関連 PR リンク (JSON形式, `<details>` 内)**:
+    *   ファイル名: `mistletoe-related-pr-[identifier].json`
+    *   内容: 関連PRのURLを分類したJSONデータ。
+        ```json
+        {
+            "dependencies": ["..."],
+            "dependents": ["..."],
+            "others": ["..."]
+        }
+        ```
+3.  **JSON スナップショット (`<details>` 内)**:
+    *   ファイル名: `mistletoe-snapshot-[identifier].json`
+    *   内容: 整形された JSON データ。スナップショット内の `base-branch` には設定ファイルの `base-branch`（なければ `branch`）が反映されます。
+4.  **Base64 エンコードデータ (コードブロック)**:
+    *   目的: 自動処理用の機械可読データの提供。
+    *   内容: スナップショット JSON の Base64 エンコード文字列。
+    *   **注記**: `<details>` タグの外側に配置し、コードブロックで囲みます。
+5.  **依存関係グラフ (`<details>` 内, Optional)**:
+    *   条件: `--dependencies` オプション指定時。
+    *   summary: `mistletoe-dependencies-[identifier].mmd`
+    *   内容: 指定されたMermaidグラフの生データ（`mermaid` コードブロック内）。GitHub上でプレビュー表示されます。
 
 これにより、レビュー担当者はスナップショット情報を参照でき、将来的な自動検証やリンク連携が可能になります。
 
