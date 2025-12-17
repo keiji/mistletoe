@@ -12,13 +12,20 @@ import (
 )
 
 var (
+	// ErrConfigFileNotFound indicates that the configuration file was not found.
 	ErrConfigFileNotFound = errors.New("File not found")
-	ErrInvalidDataFormat  = errors.New("Invalid data format")
-	ErrDuplicateID        = errors.New("Duplicate repository ID")
-	ErrInvalidFilePath    = errors.New("Invalid file path")
-	ErrInvalidID          = errors.New("Invalid repository ID")
-	ErrInvalidURL         = errors.New("Invalid repository URL")
-	ErrInvalidGitRef      = errors.New("Invalid git reference")
+	// ErrInvalidDataFormat indicates that the configuration data is invalid.
+	ErrInvalidDataFormat = errors.New("Invalid data format")
+	// ErrDuplicateID indicates that a duplicate repository ID was found.
+	ErrDuplicateID = errors.New("Duplicate repository ID")
+	// ErrInvalidFilePath indicates that the file path is invalid.
+	ErrInvalidFilePath = errors.New("Invalid file path")
+	// ErrInvalidID indicates that the repository ID is invalid.
+	ErrInvalidID = errors.New("Invalid repository ID")
+	// ErrInvalidURL indicates that the repository URL is invalid.
+	ErrInvalidURL = errors.New("Invalid repository URL")
+	// ErrInvalidGitRef indicates that the git reference is invalid.
+	ErrInvalidGitRef = errors.New("Invalid git reference")
 )
 
 var (
@@ -31,6 +38,7 @@ var (
 	safeGitRefRegex = regexp.MustCompile(`^[a-zA-Z0-9./_-]+$`)
 )
 
+// Repository represents a single repository configuration.
 type Repository struct {
 	ID         *string  `json:"id"`
 	URL        *string  `json:"url"`
@@ -39,10 +47,12 @@ type Repository struct {
 	BaseBranch *string  `json:"base-branch,omitempty"`
 }
 
+// Config represents the top-level configuration structure.
 type Config struct {
 	Repositories *[]Repository `json:"repositories"`
 }
 
+// ParseConfig parses the configuration JSON data.
 func ParseConfig(data []byte) (*Config, error) {
 	var config Config
 	if err := json.Unmarshal(data, &config); err != nil {

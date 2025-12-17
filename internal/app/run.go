@@ -7,18 +7,21 @@ import (
 	"path/filepath"
 )
 
+// Parallel processing constants.
 const (
 	MinParallel     = 1
 	MaxParallel     = 128
 	DefaultParallel = 1
 )
 
+// Global application variables.
 var (
 	AppName    string
 	AppVersion string
 	CommitHash string
 )
 
+// GlobalOptions holds global command-line options.
 type GlobalOptions struct {
 	GitPath string
 	GhPath  string
@@ -57,8 +60,8 @@ func validateGit(gitPath string) error {
 }
 
 // Run is the entry point for the application logic.
-func Run(appType AppType, version, hash string, args []string) {
-	if appType == AppTypeMstlGh {
+func Run(appType Type, version, hash string, args []string) {
+	if appType == TypeMstlGh {
 		AppName = AppNameMstlGh
 	} else {
 		AppName = AppNameMstl
@@ -83,7 +86,7 @@ func Run(appType AppType, version, hash string, args []string) {
 	}
 
 	ghPath := "gh"
-	if appType == AppTypeMstlGh {
+	if appType == TypeMstlGh {
 		ghPath = getGhPath()
 	}
 
@@ -106,7 +109,7 @@ func Run(appType AppType, version, hash string, args []string) {
 	case CmdPush:
 		handlePush(subcmdArgs, opts)
 	case CmdPr:
-		if appType != AppTypeMstlGh {
+		if appType != TypeMstlGh {
 			fmt.Printf("Unknown subcommand: %s.\n", subcmdName)
 			os.Exit(1)
 		}
@@ -114,7 +117,7 @@ func Run(appType AppType, version, hash string, args []string) {
 	case CmdHelp:
 		handleHelp(subcmdArgs, opts)
 	case CmdVersion:
-		if appType == AppTypeMstlGh {
+		if appType == TypeMstlGh {
 			handleVersionGh(opts)
 		} else {
 			handleVersionMstl(opts)

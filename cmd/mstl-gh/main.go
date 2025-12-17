@@ -1,3 +1,4 @@
+// Package main is the entry point for the mstl-gh application.
 package main
 
 import (
@@ -12,5 +13,5 @@ var (
 )
 
 func main() {
-	app.Run(app.AppTypeMstlGh, appVersion, commitHash, os.Args)
+	app.Run(app.TypeMstlGh, appVersion, commitHash, os.Args)
 }

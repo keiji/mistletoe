@@ -24,7 +24,7 @@ func fakeExecCommand(command string, args ...string) *exec.Cmd {
 	return cmd
 }
 
-func TestHelperProcess(t *testing.T) {
+func TestHelperProcess(_ *testing.T) {
 	if os.Getenv("GO_WANT_HELPER_PROCESS") != "1" {
 		return
 	}
@@ -130,7 +130,7 @@ func TestCheckGhAvailability(t *testing.T) {
 	oldExec := execCommand
 	execCommand = fakeExecCommand
 	oldLookPath := lookPath
-	lookPath = func(file string) (string, error) { return "/usr/bin/gh", nil }
+	lookPath = func(_ string) (string, error) { return "/usr/bin/gh", nil }
 	defer func() {
 		execCommand = oldExec
 		lookPath = oldLookPath

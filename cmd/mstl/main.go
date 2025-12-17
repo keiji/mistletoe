@@ -1,3 +1,4 @@
+// Package main is the entry point for the mstl application.
 package main
 
 import (
@@ -12,5 +13,5 @@ var (
 )
 
 func main() {
-	app.Run(app.AppTypeMstl, appVersion, commitHash, os.Args)
+	app.Run(app.TypeMstl, appVersion, commitHash, os.Args)
 }

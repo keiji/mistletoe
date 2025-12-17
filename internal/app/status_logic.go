@@ -266,6 +266,7 @@ func getRepoStatus(repo Repository, gitPath string) *StatusRow {
 	}
 }
 
+// RenderStatusTable renders the status table to stdout.
 func RenderStatusTable(rows []StatusRow) {
 	table := tablewriter.NewTable(os.Stdout,
 		tablewriter.WithHeaderAutoFormat(tw.Off),

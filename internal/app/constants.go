@@ -1,13 +1,13 @@
 package app
 
-// AppType represents the type of the application.
-type AppType int
+// Type represents the type of the application.
+type Type int
 
 const (
-	// AppTypeMstl represents the 'mstl' application.
-	AppTypeMstl AppType = iota
-	// AppTypeMstlGh represents the 'mstl-gh' application.
-	AppTypeMstlGh
+	// TypeMstl represents the 'mstl' application.
+	TypeMstl Type = iota
+	// TypeMstlGh represents the 'mstl-gh' application.
+	TypeMstlGh
 )
 
 const (
