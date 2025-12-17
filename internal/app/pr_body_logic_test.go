@@ -223,3 +223,119 @@ Outro`
 		t.Error("Outro should be preserved")
 	}
 }
+
+func TestDependencyCategorization_Verification(t *testing.T) {
+	// 1. Setup the scenario from the user prompt
+	// Graph:
+	// mstl1 -.-> mstl2
+	// mstl2 --> mstl3
+	// mstl1 --> mstl3
+
+	mermaid := `graph TD
+    mstl1["frontend"] -.-> mstl2[backend]
+    mstl2 --> mstl3("common")
+    mstl1 --> mstl3`
+
+	repoIDs := []string{"mstl1", "mstl2", "mstl3"}
+
+	// Parse the graph to get DependencyGraph
+	deps, err := ParseDependencies(mermaid, repoIDs)
+	if err != nil {
+		t.Fatalf("Failed to parse mermaid: %v", err)
+	}
+
+	// 2. Mock PR URLs
+	allPRs := map[string]string{
+		"mstl1": "https://github.com/org/mstl1/pull/1",
+		"mstl2": "https://github.com/org/mstl2/pull/2",
+		"mstl3": "https://github.com/org/mstl3/pull/3",
+	}
+
+	// 3. Define Expectations
+	tests := []struct {
+		RepoID             string
+		ExpectDependencies []string // Should appear in Dependencies section
+		ExpectDependents   []string // Should appear in Dependents section
+		ExpectOthers       []string // Should appear in Others section
+	}{
+		{
+			RepoID: "mstl1",
+			// Dependencies: mstl2, mstl3
+			ExpectDependencies: []string{"mstl2/pull/2", "mstl3/pull/3"},
+			ExpectDependents:   []string{},
+		},
+		{
+			RepoID: "mstl2",
+			// Dependencies: mstl3
+			// Dependents: mstl1
+			ExpectDependencies: []string{"mstl3/pull/3"},
+			ExpectDependents:   []string{"mstl1/pull/1"},
+		},
+		{
+			RepoID: "mstl3",
+			// Dependents: mstl1, mstl2
+			ExpectDependencies: []string{},
+			ExpectDependents:   []string{"mstl1/pull/1", "mstl2/pull/2"},
+		},
+	}
+
+	// 4. Verify each repository
+	for _, tc := range tests {
+		t.Run(tc.RepoID, func(t *testing.T) {
+			body := GenerateMistletoeBody("{}", "snapshot.json", tc.RepoID, allPRs, deps, mermaid)
+
+			// Helper to extract sections
+			checkSection := func(name string, expectedURLs []string) {
+				// Normalize to ensure we are searching correctly
+				// The body uses "#### Name"
+				header := "#### " + name
+				if len(expectedURLs) == 0 {
+					if strings.Contains(body, header) {
+						t.Errorf("Section '%s' should not be present, but header found.", name)
+					}
+					return
+				}
+
+				if !strings.Contains(body, header) {
+					t.Errorf("Section '%s' missing.", name)
+					return
+				}
+
+				// Check that each URL is present
+				for _, url := range expectedURLs {
+					if !strings.Contains(body, url) {
+						t.Errorf("In section '%s', missing URL: %s", name, url)
+					}
+				}
+			}
+
+			checkSection("Dependencies", tc.ExpectDependencies)
+			checkSection("Dependents", tc.ExpectDependents)
+			checkSection("Others", tc.ExpectOthers)
+
+			// Additional check: Ensure items are not miscategorized.
+			if len(tc.ExpectDependencies) > 0 && len(tc.ExpectDependents) > 0 {
+				depIdx := strings.Index(body, "#### Dependencies")
+				deperIdx := strings.Index(body, "#### Dependents")
+
+				if depIdx > deperIdx {
+					t.Error("Dependencies section should come before Dependents")
+				}
+
+				for _, u := range tc.ExpectDependencies {
+					uIdx := strings.Index(body, u)
+					if uIdx > deperIdx {
+						t.Errorf("URL %s (Dependency) appears after Dependents header", u)
+					}
+				}
+
+				for _, u := range tc.ExpectDependents {
+					uIdx := strings.Index(body, u)
+					if uIdx < deperIdx {
+						t.Errorf("URL %s (Dependent) appears before Dependents header", u)
+					}
+				}
+			}
+		})
+	}
+}
