@@ -217,6 +217,19 @@ graph TD
 
 You can define dependencies as a Mermaid graph.
 
+#### `pr checkout`
+
+Restores the state of repositories based on the snapshot embedded in a Mistletoe-managed Pull Request. It parses the Mistletoe block from the PR body, clones missing repositories, and checks out the recorded branches or revisions.
+
+**Usage:**
+```bash
+mstl-gh pr checkout -u <PR_URL> [options]
+```
+
+**Options:**
+*   `-u, --url <string>`: The URL of the Pull Request containing the snapshot (Required).
+*   `-p, --parallel <int>`: Number of parallel processes to use (default: 1).
+
 #### `pr status`
 
 Displays the status of Pull Requests associated with the current branches of the configured repositories.
