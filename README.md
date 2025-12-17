@@ -100,7 +100,7 @@ mstl status -f <config_file> [options]
 **Status Indicators:**
 *   `>` (Green): Local branch has unpushed commits.
 *   `<` (Yellow): Remote branch has updates (pullable, fast-forward/merge).
-*   `x` (Red): Remote branch has updates, but there are conflicts.
+*   `!` (Yellow): Remote branch has updates, but there are conflicts.
 *   `-`: Clean (synchronized).
 
 #### `push`
