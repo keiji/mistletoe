@@ -57,8 +57,12 @@ func validateGit(gitPath string) error {
 }
 
 // Run is the entry point for the application logic.
-func Run(name, version, hash string, args []string) {
-	AppName = name
+func Run(appType AppType, version, hash string, args []string) {
+	if appType == AppTypeMstlGh {
+		AppName = AppNameMstlGh
+	} else {
+		AppName = AppNameMstl
+	}
 	AppVersion = version
 	CommitHash = hash
 
@@ -71,7 +75,7 @@ func Run(name, version, hash string, args []string) {
 	gitPath := getGitPath()
 	gitErr := validateGit(gitPath)
 
-	isPermissive := subcmdName == "help" || subcmdName == "version" || subcmdName == ""
+	isPermissive := subcmdName == CmdHelp || subcmdName == CmdVersion || subcmdName == ""
 
 	if gitErr != nil && !isPermissive {
 		fmt.Printf("Error: Git is not callable at '%s'. (%v)\n", gitPath, gitErr)
@@ -79,7 +83,7 @@ func Run(name, version, hash string, args []string) {
 	}
 
 	ghPath := "gh"
-	if AppName == "Mistletoe-gh" {
+	if appType == AppTypeMstlGh {
 		ghPath = getGhPath()
 	}
 
@@ -89,28 +93,28 @@ func Run(name, version, hash string, args []string) {
 	}
 
 	switch subcmdName {
-	case "init":
+	case CmdInit:
 		handleInit(subcmdArgs, opts)
-	case "snapshot":
+	case CmdSnapshot:
 		handleSnapshot(subcmdArgs, opts)
-	case "switch":
+	case CmdSwitch:
 		handleSwitch(subcmdArgs, opts)
-	case "status":
+	case CmdStatus:
 		handleStatus(subcmdArgs, opts)
-	case "sync":
+	case CmdSync:
 		handleSync(subcmdArgs, opts)
-	case "push":
+	case CmdPush:
 		handlePush(subcmdArgs, opts)
-	case "pr":
-		if AppName != "Mistletoe-gh" {
+	case CmdPr:
+		if appType != AppTypeMstlGh {
 			fmt.Printf("Unknown subcommand: %s.\n", subcmdName)
 			os.Exit(1)
 		}
 		handlePr(subcmdArgs, opts)
-	case "help":
+	case CmdHelp:
 		handleHelp(subcmdArgs, opts)
-	case "version":
-		if AppName == "Mistletoe-gh" {
+	case CmdVersion:
+		if appType == AppTypeMstlGh {
 			handleVersionGh(opts)
 		} else {
 			handleVersionMstl(opts)
