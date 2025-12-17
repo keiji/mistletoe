@@ -94,6 +94,81 @@ func validateEnvironment(repos []Repository, gitPath string) error {
 	return nil
 }
 
+// PerformInit executes the initialization (clone/checkout) logic for the given repositories.
+func PerformInit(repos []Repository, gitPath string, parallel, depth int) error {
+	if err := validateEnvironment(repos, gitPath); err != nil {
+		return fmt.Errorf("error validating environment: %w", err)
+	}
+
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, parallel)
+
+	for _, repo := range repos {
+		wg.Add(1)
+		go func(repo Repository) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+
+			// 1. Git Clone
+			gitArgs := []string{"clone"}
+			if depth > 0 {
+				gitArgs = append(gitArgs, "--depth", fmt.Sprintf("%d", depth))
+			}
+			gitArgs = append(gitArgs, *repo.URL)
+			targetDir := GetRepoDir(repo)
+
+			// Explicitly pass target directory to avoid ambiguity and to know where to checkout later.
+			gitArgs = append(gitArgs, targetDir)
+
+			// Check if directory already exists and is a git repo.
+			shouldClone := true
+			if info, err := os.Stat(targetDir); err == nil && info.IsDir() {
+				gitDir := filepath.Join(targetDir, ".git")
+				if _, err := os.Stat(gitDir); err == nil {
+					fmt.Printf("Repository %s exists. Skipping clone.\n", targetDir)
+					shouldClone = false
+				}
+			}
+
+			if shouldClone {
+				fmt.Printf("Cloning %s into %s...\n", *repo.URL, targetDir)
+				if err := RunGitInteractive("", gitPath, gitArgs...); err != nil {
+					fmt.Printf("Error cloning %s: %v\n", *repo.URL, err)
+					// Skip checkout if clone failed
+					return
+				}
+			}
+
+			// 2. Switch Branch / Checkout Revision
+			if repo.Revision != nil && *repo.Revision != "" {
+				// Checkout revision
+				fmt.Printf("Checking out revision %s in %s...\n", *repo.Revision, targetDir)
+				if err := RunGitInteractive(targetDir, gitPath, "checkout", *repo.Revision); err != nil {
+					fmt.Printf("Error checking out revision %s in %s: %v\n", *repo.Revision, targetDir, err)
+					return
+				}
+
+				if repo.Branch != nil && *repo.Branch != "" {
+					// Create branch
+					fmt.Printf("Creating branch %s at revision %s in %s...\n", *repo.Branch, *repo.Revision, targetDir)
+					if err := RunGitInteractive(targetDir, gitPath, "checkout", "-b", *repo.Branch); err != nil {
+						fmt.Printf("Error creating branch %s in %s: %v\n", *repo.Branch, targetDir, err)
+					}
+				}
+			} else if repo.Branch != nil && *repo.Branch != "" {
+				// "チェックアウト後、各要素についてbranchで示されたブランチに切り替える。"
+				fmt.Printf("Switching %s to branch %s...\n", targetDir, *repo.Branch)
+				if err := RunGitInteractive(targetDir, gitPath, "checkout", *repo.Branch); err != nil {
+					fmt.Printf("Error switching branch for %s: %v.\n", targetDir, err)
+				}
+			}
+		}(repo)
+	}
+	wg.Wait()
+	return nil
+}
+
 func handleInit(args []string, opts GlobalOptions) {
 	var fShort, fLong string
 	var depth int
@@ -129,75 +204,8 @@ func handleInit(args []string, opts GlobalOptions) {
 		os.Exit(1)
 	}
 
-	if err := validateEnvironment(*config.Repositories, opts.GitPath); err != nil {
-		fmt.Println("Error validating environment:", err)
+	if err := PerformInit(*config.Repositories, opts.GitPath, parallel, depth); err != nil {
+		fmt.Println(err)
 		os.Exit(1)
 	}
-
-	var wg sync.WaitGroup
-	sem := make(chan struct{}, parallel)
-
-	for _, repo := range *config.Repositories {
-		wg.Add(1)
-		go func(repo Repository) {
-			defer wg.Done()
-			sem <- struct{}{}
-			defer func() { <-sem }()
-
-			// 1. Git Clone
-			gitArgs := []string{"clone"}
-			if depth > 0 {
-				gitArgs = append(gitArgs, "--depth", fmt.Sprintf("%d", depth))
-			}
-			gitArgs = append(gitArgs, *repo.URL)
-			targetDir := GetRepoDir(repo)
-
-			// Explicitly pass target directory to avoid ambiguity and to know where to checkout later.
-			gitArgs = append(gitArgs, targetDir)
-
-			// Check if directory already exists and is a git repo.
-			shouldClone := true
-			if info, err := os.Stat(targetDir); err == nil && info.IsDir() {
-				gitDir := filepath.Join(targetDir, ".git")
-				if _, err := os.Stat(gitDir); err == nil {
-					fmt.Printf("Repository %s exists. Skipping clone.\n", targetDir)
-					shouldClone = false
-				}
-			}
-
-			if shouldClone {
-				fmt.Printf("Cloning %s into %s...\n", *repo.URL, targetDir)
-				if err := RunGitInteractive("", opts.GitPath, gitArgs...); err != nil {
-					fmt.Printf("Error cloning %s: %v\n", *repo.URL, err)
-					// Skip checkout if clone failed
-					return
-				}
-			}
-
-			// 2. Switch Branch / Checkout Revision
-			if repo.Revision != nil && *repo.Revision != "" {
-				// Checkout revision
-				fmt.Printf("Checking out revision %s in %s...\n", *repo.Revision, targetDir)
-				if err := RunGitInteractive(targetDir, opts.GitPath, "checkout", *repo.Revision); err != nil {
-					fmt.Printf("Error checking out revision %s in %s: %v\n", *repo.Revision, targetDir, err)
-					return
-				}
-
-				if repo.Branch != nil && *repo.Branch != "" {
-					// Create branch
-					fmt.Printf("Creating branch %s at revision %s in %s...\n", *repo.Branch, *repo.Revision, targetDir)
-					if err := RunGitInteractive(targetDir, opts.GitPath, "checkout", "-b", *repo.Branch); err != nil {
-						fmt.Printf("Error creating branch %s in %s: %v\n", *repo.Branch, targetDir, err)
-					}
-				}
-			} else if repo.Branch != nil && *repo.Branch != "" {
-				// "チェックアウト後、各要素についてbranchで示されたブランチに切り替える。"
-				fmt.Printf("Switching %s to branch %s...\n", targetDir, *repo.Branch)
-				if err := RunGitInteractive(targetDir, opts.GitPath, "checkout", *repo.Branch); err != nil {
-					fmt.Printf("Error switching branch for %s: %v.\n", targetDir, err)
-				}
-			}
-		}(repo)
-	}
-	wg.Wait()
 }
