@@ -69,8 +69,8 @@ func handlePrCheckout(args []string, opts GlobalOptions) {
 	// We can display it or validate it if needed.
 	if len(relatedJSON) > 0 {
 		var rel map[string]interface{}
-		if err := json.Unmarshal(relatedJSON, &rel); err == nil {
-			// Just verify it's valid JSON
+		if err := json.Unmarshal(relatedJSON, &rel); err != nil {
+			fmt.Printf("Warning: related PR JSON is invalid: %v\n", err)
 		}
 	}
 
