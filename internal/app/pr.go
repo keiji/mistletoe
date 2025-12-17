@@ -21,7 +21,7 @@ var execCommand = exec.Command
 func HandlePr(args []string, opts GlobalOptions) {
 	if len(args) == 0 {
 		fmt.Println("Usage: mstl-gh pr <subcommand> [options]")
-		fmt.Println("Available subcommands: create, status")
+		fmt.Println("Available subcommands: create, checkout, status")
 		os.Exit(1)
 	}
 
@@ -31,6 +31,8 @@ func HandlePr(args []string, opts GlobalOptions) {
 	switch subcmd {
 	case CmdCreate:
 		handlePrCreate(subArgs, opts)
+	case CmdCheckout:
+		handlePrCheckout(subArgs, opts)
 	case CmdStatus:
 		handlePrStatus(subArgs, opts)
 	default:

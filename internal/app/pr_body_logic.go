@@ -260,3 +260,88 @@ func EmbedMistletoeBody(originalBody, newBlock string) string {
 	// Not found, append
 	return strings.TrimRight(originalBody, "\n") + newBlock
 }
+
+// ParseMistletoeBlock extracts the JSON blocks from a Mistletoe-formatted body.
+// It returns the decoded snapshot (as a Config struct), raw Related PRs JSON, or error if not found.
+func ParseMistletoeBlock(body string) (*Config, []byte, error) {
+	lines := strings.Split(body, "\n")
+	startIdx := -1
+	endIdx := -1
+
+	headerRe := regexp.MustCompile(`^#+\s+Mistletoe`)
+
+	// 1. Locate Block
+	for i, line := range lines {
+		if headerRe.MatchString(strings.TrimSpace(line)) {
+			startIdx = i
+			if i > 0 {
+				prev := strings.TrimSpace(lines[i-1])
+				if len(prev) >= 3 && strings.Count(prev, "-") == len(prev) {
+					startIdx = i - 1
+				}
+			}
+			for j := i + 1; j < len(lines); j++ {
+				next := strings.TrimSpace(lines[j])
+				if len(next) >= 3 && strings.Count(next, "-") == len(next) {
+					endIdx = j
+					break
+				}
+			}
+			if endIdx != -1 {
+				break
+			}
+			startIdx = -1
+		}
+	}
+
+	if startIdx == -1 || endIdx == -1 {
+		return nil, nil, fmt.Errorf("Mistletoe block not found in PR body")
+	}
+
+	blockContent := strings.Join(lines[startIdx:endIdx+1], "\n")
+
+	// 2. Extract Snapshot (Config)
+	// Look for snapshot filename (mistletoe-snapshot-...) in <summary>
+	// Then parse the JSON code block inside that details block.
+
+	// Regex to find snapshot block:
+	// <details>\s*<summary>.*mistletoe-snapshot-.*\.json</summary>\s*```json\s*(\{.*?\})\s*```
+	// This might be tricky with multiline regex in Go. We'll step through details blocks.
+
+	detailsRe := regexp.MustCompile(`(?s)<details>(.*?)</details>`)
+	matches := detailsRe.FindAllStringSubmatch(blockContent, -1)
+
+	var snapshotConfig *Config
+	var relatedPrJSON []byte
+
+	for _, m := range matches {
+		content := m[1]
+		if strings.Contains(content, "mistletoe-snapshot-") {
+			// Extract JSON
+			jsonRe := regexp.MustCompile(`(?s)\x60\x60\x60json\s*(.*?)\s*\x60\x60\x60`)
+			jsonMatch := jsonRe.FindStringSubmatch(content)
+			if len(jsonMatch) > 1 {
+				rawJSON := jsonMatch[1]
+				// Decode
+				var repos []Repository
+				if err := json.Unmarshal([]byte(rawJSON), &repos); err == nil {
+					snapshotConfig = &Config{Repositories: &repos}
+				}
+			}
+		}
+		if strings.Contains(content, "mistletoe-related-pr-") {
+			// Extract JSON
+			jsonRe := regexp.MustCompile(`(?s)\x60\x60\x60json\s*(.*?)\s*\x60\x60\x60`)
+			jsonMatch := jsonRe.FindStringSubmatch(content)
+			if len(jsonMatch) > 1 {
+				relatedPrJSON = []byte(jsonMatch[1])
+			}
+		}
+	}
+
+	if snapshotConfig == nil {
+		return nil, nil, fmt.Errorf("snapshot data not found in Mistletoe block")
+	}
+
+	return snapshotConfig, relatedPrJSON, nil
+}
