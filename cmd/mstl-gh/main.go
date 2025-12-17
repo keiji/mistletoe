@@ -1,3 +1,4 @@
+// Package main is the entry point for the mstl-gh application.
 package main
 
 import (
@@ -7,11 +8,16 @@ import (
 )
 
 var (
-	appName    = "Mistletoe-gh"
 	appVersion = "0.0.2"
 	commitHash string
 )
 
 func main() {
-	app.Run(appName, appVersion, commitHash, os.Args)
+	app.Run(app.TypeMstlGh, appVersion, commitHash, os.Args, func(cmd string, args []string, opts app.GlobalOptions) bool {
+		if cmd == app.CmdPr {
+			app.HandlePr(args, opts)
+			return true
+		}
+		return false
+	})
 }

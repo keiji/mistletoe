@@ -17,8 +17,8 @@ import (
 
 var execCommand = exec.Command
 
-// handlePr handles the 'pr' subcommand.
-func handlePr(args []string, opts GlobalOptions) {
+// HandlePr handles the 'pr' subcommand.
+func HandlePr(args []string, opts GlobalOptions) {
 	if len(args) == 0 {
 		fmt.Println("Usage: mstl-gh pr <subcommand> [options]")
 		fmt.Println("Available subcommands: create, status")
@@ -29,9 +29,9 @@ func handlePr(args []string, opts GlobalOptions) {
 	subArgs := args[1:]
 
 	switch subcmd {
-	case "create":
+	case CmdCreate:
 		handlePrCreate(subArgs, opts)
-	case "status":
+	case CmdStatus:
 		handlePrStatus(subArgs, opts)
 	default:
 		fmt.Printf("Unknown pr subcommand: %s\n", subcmd)
@@ -234,13 +234,13 @@ func RenderPrStatusTable(rows []PrStatusRow) {
 	for _, row := range rows {
 		statusStr := ""
 		if row.HasUnpushed {
-			statusStr += FgGreen + ">" + Reset
+			statusStr += FgGreen + StatusSymbolUnpushed + Reset
 		}
 
 		if row.HasConflict {
-			statusStr += FgYellow + "!" + Reset
+			statusStr += FgYellow + StatusSymbolConflict + Reset
 		} else if row.IsPullable {
-			statusStr += FgYellow + "<" + Reset
+			statusStr += FgYellow + StatusSymbolPullable + Reset
 		}
 
 		if statusStr == "" {
@@ -257,7 +257,7 @@ func RenderPrStatusTable(rows []PrStatusRow) {
 	if err := table.Render(); err != nil {
 		fmt.Printf("Error rendering table: %v\n", err)
 	}
-	fmt.Println("Status Legend: < Pullable, > Unpushed, ! Conflict")
+	fmt.Printf("Status Legend: %s Pullable, %s Unpushed, %s Conflict\n", StatusSymbolPullable, StatusSymbolUnpushed, StatusSymbolConflict)
 }
 
 // handlePrCreate handles 'pr create'.

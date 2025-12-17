@@ -12,12 +12,6 @@ import (
 	"github.com/olekukonko/tablewriter/tw"
 )
 
-const (
-	ColorNone   = 0
-	ColorYellow = 1
-	ColorGreen  = 2
-)
-
 // StatusRow represents the status of a single repository.
 type StatusRow struct {
 	Repo           string
@@ -272,6 +266,7 @@ func getRepoStatus(repo Repository, gitPath string) *StatusRow {
 	}
 }
 
+// RenderStatusTable renders the status table to stdout.
 func RenderStatusTable(rows []StatusRow) {
 	table := tablewriter.NewTable(os.Stdout,
 		tablewriter.WithHeaderAutoFormat(tw.Off),
@@ -303,13 +298,13 @@ func RenderStatusTable(rows []StatusRow) {
 		// Status Column
 		statusStr := ""
 		if row.HasUnpushed {
-			statusStr += FgGreen + ">" + Reset
+			statusStr += FgGreen + StatusSymbolUnpushed + Reset
 		}
 
 		if row.HasConflict {
-			statusStr += FgYellow + "!" + Reset
+			statusStr += FgYellow + StatusSymbolConflict + Reset
 		} else if row.IsPullable {
-			statusStr += FgYellow + "<" + Reset
+			statusStr += FgYellow + StatusSymbolPullable + Reset
 		}
 
 		if statusStr == "" {
@@ -327,5 +322,5 @@ func RenderStatusTable(rows []StatusRow) {
 	if err := table.Render(); err != nil {
 		fmt.Printf("Error rendering table: %v\n", err)
 	}
-	fmt.Println("Status Legend: < Pullable, > Unpushed, ! Conflict")
+	fmt.Printf("Status Legend: %s Pullable, %s Unpushed, %s Conflict\n", StatusSymbolPullable, StatusSymbolUnpushed, StatusSymbolConflict)
 }
