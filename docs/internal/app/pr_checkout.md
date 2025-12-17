@@ -1,7 +1,7 @@
 # pr checkout
 
 ## 概要
-`pr checkout`コマンドは、Mistletoeによって管理されているPull RequestのURLを指定し、そのPull Requestに記載された構成情報（スナップショット）に基づいて、手元のリポジトリ群の状態を復元・同期するためのコマンドである。
+`pr checkout`コマンドは、Mistletoeによって管理されているPull RequestのURLを指定し、そのPull Requestに記載された構成情報（スナップショット）に基づいて、手元のリポジトリ群の状態を復元・同期するためのコマンドです。
 
 ## 仕様
 
@@ -16,24 +16,24 @@ mstl-gh pr checkout -u [PRのURL] [-p parallel]
 
 ### 動作要件
 1.  **環境確認**:
-    *   `git`コマンドが利用可能であること。
-    *   `gh` (GitHub CLI) コマンドが利用可能であり、認証済みであること。
-    *   指定されたURLのPull Requestへアクセス可能であること。
+    *   `git`コマンドが利用可能であることを確認します。
+    *   `gh` (GitHub CLI) コマンドが利用可能であり、認証済みであることを確認します。
+    *   指定されたURLのPull Requestへアクセス可能であることを確認します。
 2.  **情報の取得**:
-    *   指定されたPRの本文（Body）を取得する。
-    *   本文内のMistletoeブロックを解析し、以下の情報を抽出する。
+    *   指定されたPRの本文（Body）を取得します。
+    *   本文内のMistletoeブロックを解析し、以下の情報を抽出します。
         *   スナップショット情報（JSON形式）: 各リポジトリのURL、リビジョン、ブランチ情報。
         *   関連Pull Request情報（JSON形式）: 依存関係や他の関連PRのURL（現状は読み込みのみ）。
 3.  **初期化・同期 (Init)**:
-    *   スナップショット情報を設定ファイル（Config）とみなす。
-    *   `init` コマンド相当のロジックを実行し、リポジトリのクローンおよび指定されたリビジョン/ブランチへのチェックアウトを行う。
+    *   スナップショット情報を設定ファイル（Config）とみなします。
+    *   `init` コマンド相当のロジックを実行し、リポジトリのクローンおよび指定されたリビジョン/ブランチへのチェックアウトを行います。
 4.  **ステータス表示**:
-    *   同期完了後、`pr status` コマンド相当のロジックを実行し、現在のリポジトリ状態とPRの対応状況を表形式で表示する。
+    *   同期完了後、`pr status` コマンド相当のロジックを実行し、現在のリポジトリ状態とPRの対応状況を表形式で表示します。
 
 ### エラーハンドリング
-*   `gh`コマンドが未インストールまたは未認証の場合はエラー終了する。
-*   指定されたURLが有効なMistletoe管理のPRでない（Mistletoeブロックが見つからない、または破損している）場合はエラー終了する。
-*   リポジトリの同期中にエラーが発生した場合（権限不足、ネットワークエラー等）、可能な限り処理を続行し、最後にエラーを報告する。
+*   `gh`コマンドが未インストールまたは未認証の場合はエラー終了します。
+*   指定されたURLが有効なMistletoe管理のPRでない（Mistletoeブロックが見つからない、または破損している）場合はエラー終了します。
+*   リポジトリの同期中にエラーが発生した場合（権限不足、ネットワークエラー等）、可能な限り処理を続行し、最後にエラーを報告します。
 
 ## 内部ロジック
 
@@ -41,32 +41,32 @@ mstl-gh pr checkout -u [PRのURL] [-p parallel]
 
 ```mermaid
 flowchart TD
-    A[開始] --> B{Git/Gh確認}
-    B -- NG --> C[エラー終了]
-    B -- OK --> D[PR情報の取得 (gh pr view)]
-    D --> E{情報の取得成功?}
-    E -- No --> C
-    E -- Yes --> F[Mistletoeブロック解析]
-    F --> G{ブロック存在?}
-    G -- No --> H[エラー: Mistletoeブロックなし]
-    G -- Yes --> I[スナップショットJSON抽出]
-    I --> J[関連PR JSON抽出]
-    J --> K[Configオブジェクト生成]
-    K --> L[Init処理実行 (並列)]
-    L --> M[PR Status収集]
-    M --> N[結果表示]
-    N --> O[終了]
+    Start["開始"] --> CheckEnv{"Git/Gh確認"}
+    CheckEnv -- NG --> ErrorEnv["エラー終了"]
+    CheckEnv -- OK --> GetPRInfo["PR情報の取得 (gh pr view)"]
+    GetPRInfo --> CheckInfo{"情報の取得成功?"}
+    CheckInfo -- No --> ErrorEnv
+    CheckInfo -- Yes --> ParseBlock["Mistletoeブロック解析"]
+    ParseBlock --> CheckBlock{"ブロック存在?"}
+    CheckBlock -- No --> ErrorBlock["エラー: Mistletoeブロックなし"]
+    CheckBlock -- Yes --> ExtractSnap["スナップショットJSON抽出"]
+    ExtractSnap --> ExtractRel["関連PR JSON抽出"]
+    ExtractRel --> CreateConfig["Configオブジェクト生成"]
+    CreateConfig --> ExecInit["Init処理実行 (並列)"]
+    ExecInit --> CollectStatus["PR Status収集"]
+    CollectStatus --> ShowResult["結果表示"]
+    ShowResult --> End["終了"]
 ```
 
 ### コンポーネント詳細
 
 1.  **Mistletoeブロック解析**:
-    *   PR本文から `## Mistletoe` ヘッダーとセパレーターで囲まれたブロックを特定する。
-    *   ブロック内の `<details>` タグに含まれるJSONブロックを探し、スナップショットと関連PR情報をデコードする。
-    *   スナップショットにはBase64エンコードされたブロックも存在するが、可読性のあるJSONブロックを優先して読み込む（または整合性チェックとして両方見る）。
+    *   PR本文から `## Mistletoe` ヘッダーとセパレーターで囲まれたブロックを特定します。
+    *   ブロック内の `<details>` タグに含まれるJSONブロックを探し、スナップショットと関連PR情報をデコードします。
+    *   スナップショットにはBase64エンコードされたブロックも存在しますが、可読性のあるJSONブロックを優先して読み込みます（または整合性チェックとして両方見ます）。
 
 2.  **Init処理の再利用**:
-    *   既存の `internal/app/init.go` 内のロジックをリファクタリングし、`Config` オブジェクト（または `[]Repository`）を受け取ってクローン・チェックアウトを行う共通関数 `PerformInit` を作成し、これを呼び出す。
+    *   既存の `internal/app/init.go` 内のロジックをリファクタリングし、`Config` オブジェクト（または `[]Repository`）を受け取ってクローン・チェックアウトを行う共通関数 `PerformInit` を作成し、これを呼び出します。
 
 3.  **Status処理の再利用**:
-    *   既存の `internal/app/pr.go` 内の `CollectPrStatus` および `RenderPrStatusTable` を使用して結果を表示する。
+    *   既存の `internal/app/pr.go` 内の `CollectPrStatus` および `RenderPrStatusTable` を使用して結果を表示します。

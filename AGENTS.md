@@ -37,6 +37,12 @@ To run `revive` in the sandbox environment:
 *   [Material Design Writing Best Practices](https://m3.material.io/foundations/writing/best-practices)
 *   [Digital.gov Style Guide](https://digital.gov/style-guide)
 
-## Documentation
+## Documentation Guidelines
 
-*   **Design Documents**: All design documents (e.g., in `docs/`) must be written in **Japanese**.
+*   **Language**: All design documents (e.g., in `docs/`) must be written in **Japanese**.
+*   **Writing Style (Tone)**:
+    *   Use the polite **"Desu/Masu" (です・ます)** style for main body text.
+    *   For **bullet points (lists)**, use **"Taigendome" (noun-ending/incomplete sentence)** style and **do not use punctuation (periods)** at the end.
+*   **Mermaid Diagrams**:
+    *   Node IDs must be descriptive (e.g., `CheckEnv`, `ParseBlock`) rather than single letters (`A`, `B`).
+    *   Japanese text within diagrams must be enclosed in double quotes (e.g., `id["日本語テキスト"]`).
