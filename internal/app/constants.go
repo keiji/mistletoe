@@ -25,10 +25,8 @@ const (
 	CmdStatus   = "status"
 	CmdSync     = "sync"
 	CmdPush     = "push"
-	CmdPr       = "pr"
 	CmdHelp     = "help"
 	CmdVersion  = "version"
-	CmdCreate   = "create"
 )
 
 // Status symbols

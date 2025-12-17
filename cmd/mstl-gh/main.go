@@ -13,5 +13,11 @@ var (
 )
 
 func main() {
-	app.Run(app.TypeMstlGh, appVersion, commitHash, os.Args)
+	app.Run(app.TypeMstlGh, appVersion, commitHash, os.Args, func(cmd string, args []string, opts app.GlobalOptions) bool {
+		if cmd == app.CmdPr {
+			app.HandlePr(args, opts)
+			return true
+		}
+		return false
+	})
 }

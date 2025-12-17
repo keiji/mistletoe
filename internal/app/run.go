@@ -60,7 +60,7 @@ func validateGit(gitPath string) error {
 }
 
 // Run is the entry point for the application logic.
-func Run(appType Type, version, hash string, args []string) {
+func Run(appType Type, version, hash string, args []string, extraHandler func(string, []string, GlobalOptions) bool) {
 	if appType == TypeMstlGh {
 		AppName = AppNameMstlGh
 	} else {
@@ -108,12 +108,6 @@ func Run(appType Type, version, hash string, args []string) {
 		handleSync(subcmdArgs, opts)
 	case CmdPush:
 		handlePush(subcmdArgs, opts)
-	case CmdPr:
-		if appType != TypeMstlGh {
-			fmt.Printf("Unknown subcommand: %s.\n", subcmdName)
-			os.Exit(1)
-		}
-		handlePr(subcmdArgs, opts)
 	case CmdHelp:
 		handleHelp(subcmdArgs, opts)
 	case CmdVersion:
@@ -125,6 +119,9 @@ func Run(appType Type, version, hash string, args []string) {
 	case "":
 		handleHelp(subcmdArgs, opts)
 	default:
+		if extraHandler != nil && extraHandler(subcmdName, subcmdArgs, opts) {
+			return
+		}
 		fmt.Printf("Unknown subcommand: %s.\n", subcmdName)
 		os.Exit(1)
 	}

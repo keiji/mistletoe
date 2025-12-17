@@ -13,5 +13,5 @@ var (
 )
 
 func main() {
-	app.Run(app.TypeMstl, appVersion, commitHash, os.Args)
+	app.Run(app.TypeMstl, appVersion, commitHash, os.Args, nil)
 }

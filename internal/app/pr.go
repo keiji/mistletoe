@@ -17,8 +17,8 @@ import (
 
 var execCommand = exec.Command
 
-// handlePr handles the 'pr' subcommand.
-func handlePr(args []string, opts GlobalOptions) {
+// HandlePr handles the 'pr' subcommand.
+func HandlePr(args []string, opts GlobalOptions) {
 	if len(args) == 0 {
 		fmt.Println("Usage: mstl-gh pr <subcommand> [options]")
 		fmt.Println("Available subcommands: create, status")
