@@ -91,7 +91,7 @@ func TestResolveCommonValues(t *testing.T) {
 			name:         "Parallel Too Low",
 			fLong:        "",
 			fShort:       "",
-			pVal:         MinParallel - 1,
+			pVal:         -1,
 			pValShort:    DefaultParallel,
 			wantConfig:   "",
 			wantParallel: 0,

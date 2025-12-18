@@ -16,6 +16,7 @@ mstl snapshot [options]
 | :--- | :--- | :--- | :--- |
 | `--output-file` | `-o` | 出力する設定ファイルのパス。 | `mistletoe-snapshot-[identifier].json` |
 | `--file` | `-f` | 参照元の設定ファイル（ベース情報の取得用）。標準入力を使用する場合、データは Base64 エンコードされている必要があります。 | なし |
+| `--parallel` | `-p` | 並列実行数。1から128の間で指定します。 | `1` |
 
 ※ `identifier` は含まれるリポジトリのリビジョン情報のハッシュ値から計算されます。
 
@@ -54,7 +55,7 @@ flowchart TD
     Decode --> LoadConfig
     LoadConfig --> ScanDir["カレントディレクトリ走査"]
 
-    ScanDir --> Loop["ディレクトリループ"]
+    ScanDir --> Loop["並列ループ (各ディレクトリ)"]
 
     subgraph "各ディレクトリの処理"
         Loop --> CheckGit{Is Git Repo?}

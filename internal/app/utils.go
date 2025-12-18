@@ -90,9 +90,9 @@ func RunEditor() (string, error) {
 func ResolveCommonValues(fLong, fShort string, pVal, pValShort int) (string, int, []byte, error) {
 	// Parallel
 	parallel := DefaultParallel
-	if pVal != DefaultParallel {
+	if pVal != DefaultParallel && pVal != 0 {
 		parallel = pVal
-	} else if pValShort != DefaultParallel {
+	} else if pValShort != DefaultParallel && pValShort != 0 {
 		parallel = pValShort
 	}
 
