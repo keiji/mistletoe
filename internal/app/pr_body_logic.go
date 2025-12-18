@@ -145,17 +145,7 @@ func GenerateMistletoeBody(snapshotData string, snapshotFilename string, current
 	}
 	sb.WriteString("\n")
 
-	// 2. Related Pull Request(s) JSON
-	relatedFilename := strings.Replace(snapshotFilename, "snapshot", "related-pr", 1)
-	sb.WriteString("<details>\n")
-	sb.WriteString(fmt.Sprintf("<summary>%s</summary>\n\n", relatedFilename))
-	sb.WriteString("```json\n")
-	bytes, _ := json.MarshalIndent(relatedJSON, "", "    ")
-	sb.WriteString(string(bytes))
-	sb.WriteString("\n```\n")
-	sb.WriteString("</details>\n\n")
-
-	// 3. Snapshot
+	// 2. Snapshot
 	sb.WriteString("### snapshot\n\n")
 	sb.WriteString("<details>\n")
 	sb.WriteString(fmt.Sprintf("<summary>%s</summary>\n\n", snapshotFilename))
@@ -169,7 +159,7 @@ func GenerateMistletoeBody(snapshotData string, snapshotFilename string, current
 	sb.WriteString("\n```\n")
 	sb.WriteString("</details>\n\n")
 
-	// 4. Dependency Graph
+	// 3. Dependency Graph
 	if dependencyContent != "" {
 		// Calculate filename: replace "snapshot" -> "dependencies" and extension .json -> .mmd
 		// snapshotFilename is like "mistletoe-snapshot-[identifier].json"
@@ -195,6 +185,16 @@ func GenerateMistletoeBody(snapshotData string, snapshotFilename string, current
 		}
 		sb.WriteString("</details>\n\n")
 	}
+
+	// 4. Related Pull Request(s) JSON
+	relatedFilename := strings.Replace(snapshotFilename, "snapshot", "related-pr", 1)
+	sb.WriteString("<details>\n")
+	sb.WriteString(fmt.Sprintf("<summary>%s</summary>\n\n", relatedFilename))
+	sb.WriteString("```json\n")
+	bytes, _ := json.MarshalIndent(relatedJSON, "", "    ")
+	sb.WriteString(string(bytes))
+	sb.WriteString("\n```\n")
+	sb.WriteString("</details>\n\n")
 
 	sb.WriteString(bottomSep + "\n")
 	return sb.String()

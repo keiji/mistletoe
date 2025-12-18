@@ -23,9 +23,10 @@ func TestGenerateMistletoeBody(t *testing.T) {
 		t.Error("Body missing Mistletoe header")
 	}
 
-	// Check Order: Related Text -> Related JSON -> Snapshot
+	// Check Order: Related Text -> Snapshot -> Related JSON
 	relatedTextIdx := strings.Index(body, "### Related Pull Request(s)")
 	snapshotIdx := strings.Index(body, "### snapshot")
+	relatedJSONIdx := strings.Index(body, "mistletoe-related-pr-")
 
 	if relatedTextIdx == -1 {
 		t.Error("Body missing Related Pull Request(s) section")
@@ -33,8 +34,14 @@ func TestGenerateMistletoeBody(t *testing.T) {
 	if snapshotIdx == -1 {
 		t.Error("Body missing snapshot section")
 	}
+	if relatedJSONIdx == -1 {
+		t.Error("Body missing related PR JSON section")
+	}
 	if relatedTextIdx > snapshotIdx {
 		t.Error("Related Pull Request(s) should be above snapshot")
+	}
+	if snapshotIdx > relatedJSONIdx {
+		t.Error("Snapshot should be above Related PR JSON")
 	}
 
 	if !strings.Contains(body, snapshot) {
