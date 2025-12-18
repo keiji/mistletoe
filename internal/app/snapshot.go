@@ -20,6 +20,8 @@ func handleSnapshot(args []string, opts GlobalOptions) {
 		fShort    string
 		pVal      int
 		pValShort int
+		vLong     bool
+		vShort    bool
 	)
 	fs := flag.NewFlagSet("snapshot", flag.ExitOnError)
 	fs.StringVar(&oLong, "output-file", "", "output file path")
@@ -28,6 +30,8 @@ func handleSnapshot(args []string, opts GlobalOptions) {
 	fs.StringVar(&fShort, "f", "", "Configuration file path (shorthand)")
 	fs.IntVar(&pVal, "parallel", DefaultParallel, "number of parallel processes")
 	fs.IntVar(&pValShort, "p", DefaultParallel, "number of parallel processes (short)")
+	fs.BoolVar(&vLong, "verbose", false, "Enable verbose output")
+	fs.BoolVar(&vShort, "v", false, "Enable verbose output (shorthand)")
 
 	if err := ParseFlagsFlexible(fs, args); err != nil {
 		fmt.Println("Error parsing flags:", err)
@@ -46,6 +50,7 @@ func handleSnapshot(args []string, opts GlobalOptions) {
 		fmt.Println(err)
 		os.Exit(1)
 	}
+	verbose := vLong || vShort
 
 	if configPath != "" || len(configData) > 0 {
 		if configPath != "" {
@@ -90,10 +95,10 @@ func handleSnapshot(args []string, opts GlobalOptions) {
 			defer func() { <-sem }()
 
 			// Get remote origin URL
-			url, err := RunGit(dirName, opts.GitPath, "remote", "get-url", "origin")
+			url, err := RunGit(dirName, opts.GitPath, verbose, "remote", "get-url", "origin")
 			if err != nil {
 				// Try getting it via config if get-url fails (older git versions or odd setups)
-				url, err = RunGit(dirName, opts.GitPath, "config", "--get", "remote.origin.url")
+				url, err = RunGit(dirName, opts.GitPath, verbose, "config", "--get", "remote.origin.url")
 				if err != nil {
 					fmt.Printf("Warning: Could not get remote origin for %s. Skipping.\n", dirName)
 					return
@@ -101,7 +106,7 @@ func handleSnapshot(args []string, opts GlobalOptions) {
 			}
 
 			// Get current branch
-			branch, err := RunGit(dirName, opts.GitPath, "rev-parse", "--abbrev-ref", "HEAD")
+			branch, err := RunGit(dirName, opts.GitPath, verbose, "rev-parse", "--abbrev-ref", "HEAD")
 			if err != nil {
 				fmt.Printf("Warning: Could not get current branch for %s.\n", dirName)
 				branch = ""
@@ -111,7 +116,7 @@ func handleSnapshot(args []string, opts GlobalOptions) {
 			// If branch is "HEAD", it's a detached HEAD state
 			if branch == "HEAD" {
 				branch = ""
-				revision, err = RunGit(dirName, opts.GitPath, "rev-parse", "HEAD")
+				revision, err = RunGit(dirName, opts.GitPath, verbose, "rev-parse", "HEAD")
 				if err != nil {
 					fmt.Printf("Warning: Could not get revision for %s.\n", dirName)
 					revision = ""
@@ -200,6 +205,19 @@ func handleSnapshot(args []string, opts GlobalOptions) {
 // that also exist on disk.
 // It returns the JSON content and a unique identifier based on the revisions.
 func GenerateSnapshot(config *Config, gitPath string) ([]byte, string, error) {
+	// GenerateSnapshot is usually called by pr create, which doesn't expose a verbose flag to GenerateSnapshot yet
+	// But `pr create` has verbose. We should add verbose to GenerateSnapshot signature if we want logs inside it.
+	// Currently it calls RunGit. Let's default false unless we update signature.
+	// Wait, I am updating snapshot.go. I should update signature.
+	// But GenerateSnapshot is exported. I need to check callers.
+	// Caller: `pr create` (handlePrCreate in pr.go)
+
+	// I'll update signature to `GenerateSnapshot(config *Config, gitPath string, verbose bool)`
+	return GenerateSnapshotVerbose(config, gitPath, false)
+}
+
+// GenerateSnapshotVerbose creates a snapshot JSON with verbosity control.
+func GenerateSnapshotVerbose(config *Config, gitPath string, verbose bool) ([]byte, string, error) {
 	var currentRepos []Repository
 
 	// Iterate config repos and check if they exist on disk.
@@ -212,7 +230,7 @@ func GenerateSnapshot(config *Config, gitPath string) ([]byte, string, error) {
 
 		// Get current state
 		// URL
-		url, err := RunGit(dir, gitPath, "config", "--get", "remote.origin.url")
+		url, err := RunGit(dir, gitPath, verbose, "config", "--get", "remote.origin.url")
 		if err != nil {
 			// Fallback to config URL if git fails
 			if repo.URL != nil {
@@ -221,13 +239,13 @@ func GenerateSnapshot(config *Config, gitPath string) ([]byte, string, error) {
 		}
 
 		// Branch
-		branch, err := RunGit(dir, gitPath, "rev-parse", "--abbrev-ref", "HEAD")
+		branch, err := RunGit(dir, gitPath, verbose, "rev-parse", "--abbrev-ref", "HEAD")
 		if err != nil {
 			branch = ""
 		}
 
 		// Revision
-		revision, err := RunGit(dir, gitPath, "rev-parse", "HEAD")
+		revision, err := RunGit(dir, gitPath, verbose, "rev-parse", "HEAD")
 		if err != nil {
 			revision = ""
 		}

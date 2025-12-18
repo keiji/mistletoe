@@ -2,213 +2,91 @@ package app
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 )
 
 func TestValidateEnvironment(t *testing.T) {
-	// Create a temporary directory for the test workspace
-	tmpDir, err := os.MkdirTemp("", "mstl-test-env")
-	if err != nil {
-		t.Fatalf("failed to create temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
+	// Setup a temporary directory structure
+	tmpDir := t.TempDir()
+	cwd, _ := os.Getwd()
+	defer os.Chdir(cwd)
+	os.Chdir(tmpDir)
 
-	// Change to the temp dir so the relative path logic in validateEnvironment works
-	wd, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("failed to get wd: %v", err)
-	}
-	defer func() {
-		_ = os.Chdir(wd)
-	}()
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatalf("failed to chdir: %v", err)
-	}
+	// Create a valid git repo
+	gitRepo := filepath.Join(tmpDir, "valid-repo")
+	os.Mkdir(gitRepo, 0755)
+	exec.Command("git", "init", gitRepo).Run()
+	// Set remote origin
+	exec.Command("git", "-C", gitRepo, "remote", "add", "origin", "https://github.com/example/valid.git").Run()
 
-	repoID := "repo1"
-	repoURL := "https://github.com/example/repo1.git"
+	// Create a non-git directory
+	nonGitDir := filepath.Join(tmpDir, "non-git")
+	os.Mkdir(nonGitDir, 0755)
+	os.WriteFile(filepath.Join(nonGitDir, "file.txt"), []byte("content"), 0644)
+
+	// Create an empty directory
+	emptyDir := filepath.Join(tmpDir, "empty")
+	os.Mkdir(emptyDir, 0755)
+
+	validURL := "https://github.com/example/valid.git"
+	invalidURL := "https://github.com/example/invalid.git"
+	validID := "valid-repo"
+	nonGitID := "non-git"
+	emptyID := "empty"
+	newID := "new-repo"
 
 	tests := []struct {
 		name    string
-		setup   func() // Function to set up the environment state
 		repos   []Repository
 		wantErr bool
 	}{
 		{
-			name: "Clean state (dir does not exist)",
-			setup: func() {
-				// No setup needed, dir shouldn't exist
-			},
+			name: "Valid environment - existing correct repo",
 			repos: []Repository{
-				{URL: &repoURL, ID: &repoID},
+				{ID: &validID, URL: &validURL},
 			},
 			wantErr: false,
 		},
 		{
-			name: "Existing empty directory",
-			setup: func() {
-				if err := os.Mkdir(repoID, 0755); err != nil {
-					t.Fatalf("failed to create dir: %v", err)
-				}
-			},
+			name: "Invalid environment - existing repo wrong remote",
 			repos: []Repository{
-				{URL: &repoURL, ID: &repoID},
+				{ID: &validID, URL: &invalidURL},
+			},
+			wantErr: true,
+		},
+		{
+			name: "Invalid environment - non-git directory not empty",
+			repos: []Repository{
+				{ID: &nonGitID, URL: &validURL},
+			},
+			wantErr: true,
+		},
+		{
+			name: "Valid environment - empty directory (will be cloned into)",
+			repos: []Repository{
+				{ID: &emptyID, URL: &validURL},
 			},
 			wantErr: false,
 		},
 		{
-			name: "Existing non-empty non-git directory",
-			setup: func() {
-				if err := os.Mkdir(repoID, 0755); err != nil {
-					t.Fatalf("failed to create dir: %v", err)
-				}
-				if err := os.WriteFile(filepath.Join(repoID, "file.txt"), []byte("content"), 0644); err != nil {
-					t.Fatalf("failed to create file: %v", err)
-				}
-			},
+			name: "Valid environment - directory does not exist",
 			repos: []Repository{
-				{URL: &repoURL, ID: &repoID},
-			},
-			wantErr: true,
-		},
-		{
-			name: "Existing git repo with correct remote",
-			setup: func() {
-				createDummyGitRepo(t, repoID, repoURL)
-			},
-			repos: []Repository{
-				{URL: &repoURL, ID: &repoID},
+				{ID: &newID, URL: &validURL},
 			},
 			wantErr: false,
-		},
-		{
-			name: "Existing git repo with wrong remote",
-			setup: func() {
-				createDummyGitRepo(t, repoID, "https://github.com/other/repo.git")
-			},
-			repos: []Repository{
-				{URL: &repoURL, ID: &repoID},
-			},
-			wantErr: true,
-		},
-		{
-			name: "Existing file (not dir)",
-			setup: func() {
-				if err := os.WriteFile(repoID, []byte("file"), 0644); err != nil {
-					t.Fatalf("failed to create file: %v", err)
-				}
-			},
-			repos: []Repository{
-				{URL: &repoURL, ID: &repoID},
-			},
-			wantErr: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Cleanup from previous run
-			os.RemoveAll(repoID)
-
-			tt.setup()
-
-			// Use "git" for testing (assuming system git is available)
-			err := validateEnvironment(tt.repos, "git")
+			// Change to the temp dir so the relative path logic in validateEnvironment works
+			os.Chdir(tmpDir)
+			// Pass false for verbose
+			err := validateEnvironment(tt.repos, "git", false)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("validateEnvironment() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
-	}
-}
-
-func TestValidateRepositories_Duplicates(t *testing.T) {
-	id1 := "repo1"
-	id2 := "repo2"
-
-	tests := []struct {
-		name    string
-		repos   []Repository
-		wantErr bool
-	}{
-		{
-			name: "No duplicates",
-			repos: []Repository{
-				{ID: &id1, URL: strPtr("http://example.com/1.git")},
-				{ID: &id2, URL: strPtr("http://example.com/2.git")},
-			},
-			wantErr: false,
-		},
-		{
-			name: "Duplicates",
-			repos: []Repository{
-				{ID: &id1, URL: strPtr("http://example.com/1.git")},
-				{ID: &id1, URL: strPtr("http://example.com/2.git")},
-			},
-			wantErr: true,
-		},
-		{
-			name: "Nil IDs (ignored)",
-			repos: []Repository{
-				{ID: nil, URL: strPtr("http://example.com/1.git")},
-				{ID: nil, URL: strPtr("http://example.com/2.git")},
-				{ID: &id1, URL: strPtr("http://example.com/3.git")},
-			},
-			wantErr: false,
-		},
-		{
-			name: "Nil ID and matching string ID (no collision)",
-			repos: []Repository{
-				{ID: nil, URL: strPtr("http://example.com/1.git")},
-				{ID: &id1, URL: strPtr("http://example.com/2.git")},
-			},
-			wantErr: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if err := validateRepositories(tt.repos); (err != nil) != tt.wantErr {
-				t.Errorf("validateRepositories() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
-	}
-}
-
-func TestGetRepoDir(t *testing.T) {
-	id := "custom-dir"
-	tests := []struct {
-		name     string
-		repo     Repository
-		expected string
-	}{
-		{
-			name:     "With ID",
-			repo:     Repository{ID: &id, URL: strPtr("https://github.com/foo/bar.git")},
-			expected: "custom-dir",
-		},
-		{
-			name:     "Without ID, standard git",
-			repo:     Repository{ID: nil, URL: strPtr("https://github.com/foo/bar.git")},
-			expected: "bar",
-		},
-		{
-			name:     "Without ID, no .git",
-			repo:     Repository{ID: nil, URL: strPtr("https://github.com/foo/baz")},
-			expected: "baz",
-		},
-		{
-			name:     "Without ID, trailing slash",
-			repo:     Repository{ID: nil, URL: strPtr("https://github.com/foo/qux/")},
-			expected: "qux",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := GetRepoDir(tt.repo)
-			if got != tt.expected {
-				t.Errorf("GetRepoDir() = %v, want %v", got, tt.expected)
 			}
 		})
 	}

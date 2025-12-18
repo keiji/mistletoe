@@ -7,8 +7,8 @@ import (
 	"sync"
 )
 
-func branchExists(dir, branch, gitPath string) bool {
-	_, err := RunGit(dir, gitPath, "show-ref", "--verify", "--quiet", "refs/heads/"+branch)
+func branchExists(dir, branch, gitPath string, verbose bool) bool {
+	_, err := RunGit(dir, gitPath, verbose, "show-ref", "--verify", "--quiet", "refs/heads/"+branch)
 	return err == nil
 }
 
@@ -16,6 +16,7 @@ func handleSwitch(args []string, opts GlobalOptions) {
 	var fShort, fLong string
 	var createShort, createLong string
 	var pVal, pValShort int
+	var vLong, vShort bool
 
 	fs := flag.NewFlagSet("switch", flag.ExitOnError)
 	fs.StringVar(&fLong, "file", "", "configuration file")
@@ -24,6 +25,8 @@ func handleSwitch(args []string, opts GlobalOptions) {
 	fs.StringVar(&createShort, "c", "", "create branch if it does not exist (short)")
 	fs.IntVar(&pVal, "parallel", DefaultParallel, "number of parallel processes")
 	fs.IntVar(&pValShort, "p", DefaultParallel, "number of parallel processes (short)")
+	fs.BoolVar(&vLong, "verbose", false, "Enable verbose output")
+	fs.BoolVar(&vShort, "v", false, "Enable verbose output (shorthand)")
 
 	if err := ParseFlagsFlexible(fs, args); err != nil {
 		fmt.Println("Error parsing flags:", err)
@@ -35,6 +38,7 @@ func handleSwitch(args []string, opts GlobalOptions) {
 		fmt.Printf("Error: %v\n", err)
 		os.Exit(1)
 	}
+	verbose := vLong || vShort
 
 	createBranchName := createLong
 	if createShort != "" {
@@ -76,6 +80,12 @@ func handleSwitch(args []string, opts GlobalOptions) {
 		create = false
 	}
 
+	// Validate Integrity (Moved after argument parsing)
+	if err := ValidateRepositoriesIntegrity(config, opts.GitPath, verbose); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
 	// Map to store existence status for each repo (keyed by local directory path)
 	dirExists := make(map[string]bool)
 	var mu sync.Mutex
@@ -99,7 +109,7 @@ func handleSwitch(args []string, opts GlobalOptions) {
 				os.Exit(1)
 			}
 
-			exists := branchExists(dir, branchName, opts.GitPath)
+			exists := branchExists(dir, branchName, opts.GitPath, verbose)
 			mu.Lock()
 			dirExists[dir] = exists
 			mu.Unlock()
@@ -135,7 +145,7 @@ func handleSwitch(args []string, opts GlobalOptions) {
 
 				dir := GetRepoDir(repo)
 				fmt.Printf("Switching %s to branch %s...\n", dir, branchName)
-				if err := RunGitInteractive(dir, opts.GitPath, "checkout", branchName); err != nil {
+				if err := RunGitInteractive(dir, opts.GitPath, verbose, "checkout", branchName); err != nil {
 					fmt.Printf("Error switching branch for %s: %v.\n", dir, err)
 					os.Exit(1)
 				}
@@ -158,13 +168,13 @@ func handleSwitch(args []string, opts GlobalOptions) {
 
 				if exists {
 					fmt.Printf("Branch %s exists in %s. Switching...\n", branchName, dir)
-					if err := RunGitInteractive(dir, opts.GitPath, "checkout", branchName); err != nil {
+					if err := RunGitInteractive(dir, opts.GitPath, verbose, "checkout", branchName); err != nil {
 						fmt.Printf("Error switching branch for %s: %v.\n", dir, err)
 						os.Exit(1)
 					}
 				} else {
 					fmt.Printf("Creating and switching to branch %s in %s...\n", branchName, dir)
-					if err := RunGitInteractive(dir, opts.GitPath, "checkout", "-b", branchName); err != nil {
+					if err := RunGitInteractive(dir, opts.GitPath, verbose, "checkout", "-b", branchName); err != nil {
 						fmt.Printf("Error creating branch for %s: %v.\n", dir, err)
 						os.Exit(1)
 					}

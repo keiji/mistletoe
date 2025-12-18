@@ -27,7 +27,7 @@ type StatusRow struct {
 }
 
 // ValidateRepositoriesIntegrity checks if repositories exist and are valid.
-func ValidateRepositoriesIntegrity(config *Config, gitPath string) error {
+func ValidateRepositoriesIntegrity(config *Config, gitPath string, verbose bool) error {
 	for _, repo := range *config.Repositories {
 		targetDir := GetRepoDir(repo)
 		info, err := os.Stat(targetDir)
@@ -48,7 +48,7 @@ func ValidateRepositoriesIntegrity(config *Config, gitPath string) error {
 		}
 
 		// Check remote origin
-		currentURL, err := RunGit(targetDir, gitPath, "config", "--get", "remote.origin.url")
+		currentURL, err := RunGit(targetDir, gitPath, verbose, "config", "--get", "remote.origin.url")
 		if err != nil {
 			return fmt.Errorf("Error: directory %s is a git repo but failed to get remote origin: %v", targetDir, err)
 		}
@@ -60,7 +60,7 @@ func ValidateRepositoriesIntegrity(config *Config, gitPath string) error {
 }
 
 // CollectStatus collects status for all repositories.
-func CollectStatus(config *Config, parallel int, gitPath string) []StatusRow {
+func CollectStatus(config *Config, parallel int, gitPath string, verbose bool) []StatusRow {
 	var rows []StatusRow
 	var mu sync.Mutex
 	var wg sync.WaitGroup
@@ -73,7 +73,7 @@ func CollectStatus(config *Config, parallel int, gitPath string) []StatusRow {
 			sem <- struct{}{}
 			defer func() { <-sem }()
 
-			row := getRepoStatus(repo, gitPath)
+			row := getRepoStatus(repo, gitPath, verbose)
 			if row != nil {
 				mu.Lock()
 				rows = append(rows, *row)
@@ -90,7 +90,7 @@ func CollectStatus(config *Config, parallel int, gitPath string) []StatusRow {
 	return rows
 }
 
-func getRepoStatus(repo Repository, gitPath string) *StatusRow {
+func getRepoStatus(repo Repository, gitPath string, verbose bool) *StatusRow {
 	targetDir := GetRepoDir(repo)
 	repoName := targetDir
 	if repo.ID != nil && *repo.ID != "" {
@@ -102,7 +102,7 @@ func getRepoStatus(repo Repository, gitPath string) *StatusRow {
 	}
 
 	// 1. Get Branch Name (abbrev-ref)
-	branchName, err := RunGit(targetDir, gitPath, "rev-parse", "--abbrev-ref", "HEAD")
+	branchName, err := RunGit(targetDir, gitPath, verbose, "rev-parse", "--abbrev-ref", "HEAD")
 	if err != nil {
 		branchName = ""
 	}
@@ -112,7 +112,7 @@ func getRepoStatus(repo Repository, gitPath string) *StatusRow {
 	}
 
 	// 2. Get Short SHA
-	shortSHA, err := RunGit(targetDir, gitPath, "rev-parse", "--short", "HEAD")
+	shortSHA, err := RunGit(targetDir, gitPath, verbose, "rev-parse", "--short", "HEAD")
 	if err != nil {
 		shortSHA = ""
 	}
@@ -139,7 +139,7 @@ func getRepoStatus(repo Repository, gitPath string) *StatusRow {
 	}
 
 	// Local HEAD Rev (Full SHA for check)
-	localHeadFull, err := RunGit(targetDir, gitPath, "rev-parse", "HEAD")
+	localHeadFull, err := RunGit(targetDir, gitPath, verbose, "rev-parse", "HEAD")
 	if err != nil {
 		localHeadFull = ""
 	}
@@ -152,7 +152,7 @@ func getRepoStatus(repo Repository, gitPath string) *StatusRow {
 	if !isDetached {
 		// Check if remote branch exists
 		// git ls-remote origin <branchName>
-		output, err := RunGit(targetDir, gitPath, "ls-remote", "origin", "refs/heads/"+branchName)
+		output, err := RunGit(targetDir, gitPath, verbose, "ls-remote", "origin", "refs/heads/"+branchName)
 		if err == nil && output != "" {
 			// Output format: <SHA>\trefs/heads/<branch>
 			fields := strings.Fields(output)
@@ -172,7 +172,7 @@ func getRepoStatus(repo Repository, gitPath string) *StatusRow {
 				// If local..remote is not 0, it implies remote has commits local doesn't (pull needed or diverged)
 				// -> "push impossible" -> Yellow
 				if localHeadFull != "" {
-					count, err := RunGit(targetDir, gitPath, "rev-list", "--count", localHeadFull+".."+remoteHeadFull)
+					count, err := RunGit(targetDir, gitPath, verbose, "rev-list", "--count", localHeadFull+".."+remoteHeadFull)
 					if err == nil && count != "0" {
 						remoteColor = ColorYellow
 					}
@@ -188,15 +188,15 @@ func getRepoStatus(repo Repository, gitPath string) *StatusRow {
 
 	if remoteHeadFull != "" && localHeadFull != "" {
 		// Check if we have the remote object locally
-		_, err := RunGit(targetDir, gitPath, "cat-file", "-e", remoteHeadFull)
+		_, err := RunGit(targetDir, gitPath, verbose, "cat-file", "-e", remoteHeadFull)
 		objectMissing := (err != nil)
 
 		if objectMissing {
 			// Fetch to ensure we can calculate status accurately
-			_, err := RunGit(targetDir, gitPath, "fetch", "origin", branchName)
+			_, err := RunGit(targetDir, gitPath, verbose, "fetch", "origin", branchName)
 			if err == nil {
 				// Check if object exists now
-				_, err = RunGit(targetDir, gitPath, "cat-file", "-e", remoteHeadFull)
+				_, err = RunGit(targetDir, gitPath, verbose, "cat-file", "-e", remoteHeadFull)
 				if err == nil {
 					objectMissing = false
 				}
@@ -207,7 +207,7 @@ func getRepoStatus(repo Repository, gitPath string) *StatusRow {
 		// git rev-list --count remote..local
 		if remoteHeadFull != localHeadFull {
 			// If object is still missing, this will fail and return err, hasUnpushed remains false.
-			count, err := RunGit(targetDir, gitPath, "rev-list", "--count", remoteHeadFull+".."+localHeadFull)
+			count, err := RunGit(targetDir, gitPath, verbose, "rev-list", "--count", remoteHeadFull+".."+localHeadFull)
 			if err == nil && count != "0" {
 				hasUnpushed = true
 			}
@@ -223,7 +223,7 @@ func getRepoStatus(repo Repository, gitPath string) *StatusRow {
 				} else {
 					// Object exists locally, check ancestry
 					// git rev-list --count local..remote
-					count, err := RunGit(targetDir, gitPath, "rev-list", "--count", localHeadFull+".."+remoteHeadFull)
+					count, err := RunGit(targetDir, gitPath, verbose, "rev-list", "--count", localHeadFull+".."+remoteHeadFull)
 					if err == nil && count != "0" {
 						isPullable = true
 					}
@@ -232,11 +232,11 @@ func getRepoStatus(repo Repository, gitPath string) *StatusRow {
 				if isPullable && !objectMissing {
 					// Check for conflicts
 					// 2. Merge Base
-					base, err := RunGit(targetDir, gitPath, "merge-base", localHeadFull, remoteHeadFull)
+					base, err := RunGit(targetDir, gitPath, verbose, "merge-base", localHeadFull, remoteHeadFull)
 					if err == nil && base != "" {
 						base = strings.TrimSpace(base)
 						// 3. Merge Tree
-						output, err := RunGit(targetDir, gitPath, "merge-tree", base, localHeadFull, remoteHeadFull)
+						output, err := RunGit(targetDir, gitPath, verbose, "merge-tree", base, localHeadFull, remoteHeadFull)
 						if err == nil {
 							if strings.Contains(output, "<<<<<<<") {
 								hasConflict = true

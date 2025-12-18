@@ -7,12 +7,13 @@
 
 ### コマンドラインインターフェース
 ```bash
-mstl-gh pr checkout -u [PRのURL] [-p parallel]
+mstl-gh pr checkout -u [PRのURL] [-p parallel] [options]
 ```
 
 *   **オプション**:
     *   `-u`, `--url`: **必須**。対象となるGitHub Pull RequestのURL。
     *   `-p`, `--parallel`: 並列実行数（デフォルトは設定または1）。
+    *   `-v`, `--verbose`: デバッグ用の詳細ログを出力（実行された git/gh コマンドを表示）
 
 ### 動作要件
 1.  **環境確認**:
@@ -70,3 +71,6 @@ flowchart TD
 
 3.  **Status処理の再利用**:
     *   既存の `internal/app/pr.go` 内の `CollectPrStatus` および `RenderPrStatusTable` を使用して結果を表示します。
+
+4.  **デバッグ**:
+    *   `--verbose` オプション指定時、実行された `git` および `gh` コマンドとその出力が表示されます。スピナーは無効化されます。

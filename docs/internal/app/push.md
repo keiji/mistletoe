@@ -16,6 +16,7 @@ mstl push [options]
 | :--- | :--- | :--- | :--- |
 | `--file` | `-f` | 設定ファイル (JSON) のパス。 | `mistletoe.json` |
 | `--parallel` | `-p` | 並列プロセス数。 | 1 |
+| `--verbose` | `-v` | デバッグ用の詳細ログを出力（実行された git コマンドを表示） | false |
 
 ## 3. ロジックフロー (Logic Flow)
 

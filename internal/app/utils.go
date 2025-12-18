@@ -9,12 +9,18 @@ import (
 	"time"
 )
 
+// ExecCommand is a variable that holds exec.Command to allow mocking in tests.
+var ExecCommand = exec.Command
+
 // --- Git Helpers ---
 
 // RunGit runs a git command in the specified directory and returns its output (stdout).
 // Leading/trailing whitespace is trimmed.
-func RunGit(dir string, gitPath string, args ...string) (string, error) {
-	cmd := exec.Command(gitPath, args...)
+func RunGit(dir string, gitPath string, verbose bool, args ...string) (string, error) {
+	if verbose {
+		fmt.Fprintf(os.Stderr, "[CMD] %s %s\n", gitPath, strings.Join(args, " "))
+	}
+	cmd := ExecCommand(gitPath, args...)
 	if dir != "" {
 		cmd.Dir = dir
 	}
@@ -26,14 +32,32 @@ func RunGit(dir string, gitPath string, args ...string) (string, error) {
 }
 
 // RunGitInteractive runs a git command connected to os.Stdout/Stderr.
-func RunGitInteractive(dir string, gitPath string, args ...string) error {
-	cmd := exec.Command(gitPath, args...)
+func RunGitInteractive(dir string, gitPath string, verbose bool, args ...string) error {
+	if verbose {
+		fmt.Fprintf(os.Stderr, "[CMD] %s %s\n", gitPath, strings.Join(args, " "))
+	}
+	cmd := ExecCommand(gitPath, args...)
 	if dir != "" {
 		cmd.Dir = dir
 	}
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
+}
+
+// --- GitHub CLI Helpers ---
+
+// RunGh runs a gh command and returns its output (stdout).
+func RunGh(ghPath string, verbose bool, args ...string) (string, error) {
+	if verbose {
+		fmt.Fprintf(os.Stderr, "[CMD] %s %s\n", ghPath, strings.Join(args, " "))
+	}
+	cmd := ExecCommand(ghPath, args...)
+	out, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(out)), nil
 }
 
 // --- Editor Helpers ---
@@ -60,7 +84,7 @@ func RunEditor() (string, error) {
 	defer os.Remove(tmpFile.Name())
 	tmpFile.Close() // Close immediately, let editor open it
 
-	cmd := exec.Command(editor, tmpFile.Name())
+	cmd := ExecCommand(editor, tmpFile.Name())
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr

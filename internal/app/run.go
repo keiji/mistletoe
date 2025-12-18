@@ -112,9 +112,9 @@ func Run(appType Type, version, hash string, args []string, extraHandler func(st
 		handleHelp(subcmdArgs, opts)
 	case CmdVersion:
 		if appType == TypeMstlGh {
-			handleVersionGh(opts)
+			handleVersionGh(subcmdArgs, opts)
 		} else {
-			handleVersionMstl(opts)
+			handleVersionMstl(subcmdArgs, opts)
 		}
 	case "":
 		handleHelp(subcmdArgs, opts)
