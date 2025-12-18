@@ -120,7 +120,7 @@ func getRepoStatus(repo Repository, gitPath string) *StatusRow {
 	// 3. Construct LocalBranchRev
 	localBranchRev := ""
 	if branchName != "" && shortSHA != "" {
-		localBranchRev = fmt.Sprintf("%s/%s", branchName, shortSHA)
+		localBranchRev = fmt.Sprintf("%s:%s", branchName, shortSHA)
 	} else if shortSHA != "" {
 		localBranchRev = shortSHA
 	}
@@ -132,7 +132,7 @@ func getRepoStatus(repo Repository, gitPath string) *StatusRow {
 	}
 	if repo.Revision != nil && *repo.Revision != "" {
 		if configRef != "" {
-			configRef += "/" + *repo.Revision
+			configRef += ":" + *repo.Revision
 		} else {
 			configRef = *repo.Revision
 		}
@@ -166,7 +166,7 @@ func getRepoStatus(repo Repository, gitPath string) *StatusRow {
 				} else {
 					shortRemote = remoteHeadFull
 				}
-				remoteDisplay = fmt.Sprintf("%s/%s", branchName, shortRemote)
+				remoteDisplay = fmt.Sprintf("%s:%s", branchName, shortRemote)
 
 				// Check Pushability (Coloring for Remote Column)
 				// If local..remote is not 0, it implies remote has commits local doesn't (pull needed or diverged)

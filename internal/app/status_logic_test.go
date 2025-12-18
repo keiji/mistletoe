@@ -3,6 +3,7 @@ package app
 import (
 	"os"
 	"os/exec"
+	"strings"
 	"testing"
 )
 
@@ -100,6 +101,21 @@ func TestCollectStatus(t *testing.T) {
 	id1 := "repo-synced"
 	exec.Command("git", "clone", remote1, id1).Run()
 
+	// Verify format of LocalBranchRev (Check 1)
+	master := "master"
+	config1 := Config{
+		Repositories: &[]Repository{
+			{ID: &id1, URL: &remote1, Branch: &master},
+		},
+	}
+	rows1 := CollectStatus(&config1, 1, "git")
+	if len(rows1) == 1 {
+		// Should have master:xxxxxxx
+		if !strings.Contains(rows1[0].LocalBranchRev, ":") {
+			t.Errorf("LocalBranchRev format invalid (should contain :), got %s", rows1[0].LocalBranchRev)
+		}
+	}
+
 	// 2. Unpushed Repo (Ahead)
 	remote2, _ := setupRemoteAndContent(t, 2)
 	id2 := "repo-ahead"
@@ -136,7 +152,6 @@ func TestCollectStatus(t *testing.T) {
 	// Need fetch to know about remote
 	exec.Command("git", "-C", id4, "fetch").Run()
 
-	master := "master"
 	config := Config{
 		Repositories: &[]Repository{
 			{ID: &id1, URL: &remote1, Branch: &master},
