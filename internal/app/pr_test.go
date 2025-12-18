@@ -150,8 +150,7 @@ func handleGitMock(args []string) {
 		os.Exit(0)
 	}
 
-	// Default success for unhandled commands to match real git behavior (which might exit 0 if config key missing? No, 1. But for mocks we want stability)
-	// Actually, if we return success, it might proceed.
+	// Default success
 	os.Exit(0)
 }
 
@@ -176,11 +175,10 @@ func TestVerifyGithubRequirements_Success(t *testing.T) {
 	ExecCommand = fakeExecCommand
 	defer func() { ExecCommand = oldExec }()
 
-	tmpDir := t.TempDir()
-	os.MkdirAll(filepath.Join(tmpDir, ".git"), 0755)
-
+	// Use "." as ID so RunGit runs in CWD, avoiding potential issues with test binary in tmp dir
+	id := "."
 	url := "https://github.com/user/repo.git"
-	id := tmpDir // Use tmpDir as ID so getRepoDir returns it
+
 	repo := Repository{ID: &id, URL: &url}
 	repos := []Repository{repo}
 
@@ -199,11 +197,9 @@ func TestVerifyGithubRequirements_ExistingPR(t *testing.T) {
 	ExecCommand = fakeExecCommand
 	defer func() { ExecCommand = oldExec }()
 
-	tmpDir := t.TempDir()
-	os.MkdirAll(filepath.Join(tmpDir, ".git"), 0755)
-
+	id := "."
 	url := "https://github.com/user/repo.git"
-	id := tmpDir
+
 	repo := Repository{ID: &id, URL: &url}
 	repos := []Repository{repo}
 
@@ -215,7 +211,7 @@ func TestVerifyGithubRequirements_ExistingPR(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
-	if url, ok := existing[tmpDir]; !ok || url != "https://github.com/user/repo/pull/1" {
+	if url, ok := existing[id]; !ok || url != "https://github.com/user/repo/pull/1" {
 		t.Errorf("Expected existing PR URL, got %v", existing)
 	}
 }
@@ -225,11 +221,8 @@ func TestVerifyGithubRequirements_MissingBaseBranch(t *testing.T) {
 	ExecCommand = fakeExecCommand
 	defer func() { ExecCommand = oldExec }()
 
-	tmpDir := t.TempDir()
-	os.MkdirAll(filepath.Join(tmpDir, ".git"), 0755)
-
+	id := "."
 	url := "https://github.com/user/repo.git"
-	id := tmpDir
 	branch := "missing-branch"
 	repo := Repository{ID: &id, URL: &url, Branch: &branch}
 	repos := []Repository{repo}
