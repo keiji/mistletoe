@@ -9,20 +9,25 @@ import (
 	"os"
 	"sort"
 	"strings"
+	"sync"
 )
 
 func handleSnapshot(args []string, opts GlobalOptions) {
 	var (
-		oLong  string
-		oShort string
-		fLong  string
-		fShort string
+		oLong     string
+		oShort    string
+		fLong     string
+		fShort    string
+		pVal      int
+		pValShort int
 	)
 	fs := flag.NewFlagSet("snapshot", flag.ExitOnError)
 	fs.StringVar(&oLong, "output-file", "", "output file path")
 	fs.StringVar(&oShort, "o", "", "output file path (short)")
 	fs.StringVar(&fLong, "file", "", "Configuration file path")
 	fs.StringVar(&fShort, "f", "", "Configuration file path (shorthand)")
+	fs.IntVar(&pVal, "parallel", DefaultParallel, "number of parallel processes")
+	fs.IntVar(&pValShort, "p", DefaultParallel, "number of parallel processes (short)")
 
 	if err := ParseFlagsFlexible(fs, args); err != nil {
 		fmt.Println("Error parsing flags:", err)
@@ -36,12 +41,13 @@ func handleSnapshot(args []string, opts GlobalOptions) {
 
 	// Load Config (Optional) to resolve base branches
 	var config *Config
-	if fLong != "" || fShort != "" {
-		configPath, _, configData, err := ResolveCommonValues(fLong, fShort, 0, 0)
-		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
-		}
+	configPath, parallel, configData, err := ResolveCommonValues(fLong, fShort, pVal, pValShort)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	if configPath != "" || len(configData) > 0 {
 		if configPath != "" {
 			config, err = loadConfigFile(configPath)
 		} else {
@@ -59,94 +65,102 @@ func handleSnapshot(args []string, opts GlobalOptions) {
 		os.Exit(1)
 	}
 
-	var repos []Repository
-
+	// Collect valid git directories
+	var validDirs []string
 	for _, entry := range entries {
 		if !entry.IsDir() {
 			continue
 		}
-
-		dirName := entry.Name()
-		gitDir := fmt.Sprintf("%s/.git", dirName)
-
-		if _, err := os.Stat(gitDir); err != nil {
-			// Not a git repository
-			continue
+		gitDir := fmt.Sprintf("%s/.git", entry.Name())
+		if _, err := os.Stat(gitDir); err == nil {
+			validDirs = append(validDirs, entry.Name())
 		}
+	}
 
-		// Get remote origin URL
-		url, err := RunGit(dirName, opts.GitPath, "remote", "get-url", "origin")
-		if err != nil {
-			// Try getting it via config if get-url fails (older git versions or odd setups)
-			url, err = RunGit(dirName, opts.GitPath, "config", "--get", "remote.origin.url")
+	var repos []Repository
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, parallel)
+
+	for _, dirName := range validDirs {
+		wg.Add(1)
+		go func(dirName string) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+
+			// Get remote origin URL
+			url, err := RunGit(dirName, opts.GitPath, "remote", "get-url", "origin")
 			if err != nil {
-				fmt.Printf("Warning: Could not get remote origin for %s. Skipping.\n", dirName)
-				continue
-			}
-		}
-		// RunGit already trims
-
-		// Get current branch
-		branch, err := RunGit(dirName, opts.GitPath, "rev-parse", "--abbrev-ref", "HEAD")
-		if err != nil {
-			fmt.Printf("Warning: Could not get current branch for %s.\n", dirName)
-			branch = ""
-		}
-
-		revision := ""
-		// If branch is "HEAD", it's a detached HEAD state
-		if branch == "HEAD" {
-			branch = ""
-			revision, err = RunGit(dirName, opts.GitPath, "rev-parse", "HEAD")
-			if err != nil {
-				fmt.Printf("Warning: Could not get revision for %s.\n", dirName)
-				revision = ""
-			}
-		}
-
-		id := dirName
-		// Construct repository
-		var branchPtr *string
-		if branch != "" {
-			branchPtr = &branch
-		}
-		var revisionPtr *string
-		if revision != "" {
-			revisionPtr = &revision
-		}
-		urlPtr := &url
-
-		// Resolve BaseBranch from Config
-		var baseBranchPtr *string
-		if config != nil && config.Repositories != nil {
-			for _, confRepo := range *config.Repositories {
-				confID := GetRepoDir(confRepo)
-				if confID == dirName {
-					// Found matching repo in config
-					// "If base-branch is specified... uses loaded config's branch as base-branch"
-					// "If base-branch not specified... treat base-branch and branch as same."
-					// Implementation:
-					// If confRepo.BaseBranch exists, use it.
-					// If confRepo.BaseBranch missing, use confRepo.Branch.
-					if confRepo.BaseBranch != nil && *confRepo.BaseBranch != "" {
-						baseBranchPtr = confRepo.BaseBranch
-					} else if confRepo.Branch != nil && *confRepo.Branch != "" {
-						baseBranchPtr = confRepo.Branch
-					}
-					break
+				// Try getting it via config if get-url fails (older git versions or odd setups)
+				url, err = RunGit(dirName, opts.GitPath, "config", "--get", "remote.origin.url")
+				if err != nil {
+					fmt.Printf("Warning: Could not get remote origin for %s. Skipping.\n", dirName)
+					return
 				}
 			}
-		}
 
-		repo := Repository{
-			ID:         &id,
-			URL:        urlPtr,
-			Branch:     branchPtr,
-			Revision:   revisionPtr,
-			BaseBranch: baseBranchPtr,
-		}
-		repos = append(repos, repo)
+			// Get current branch
+			branch, err := RunGit(dirName, opts.GitPath, "rev-parse", "--abbrev-ref", "HEAD")
+			if err != nil {
+				fmt.Printf("Warning: Could not get current branch for %s.\n", dirName)
+				branch = ""
+			}
+
+			revision := ""
+			// If branch is "HEAD", it's a detached HEAD state
+			if branch == "HEAD" {
+				branch = ""
+				revision, err = RunGit(dirName, opts.GitPath, "rev-parse", "HEAD")
+				if err != nil {
+					fmt.Printf("Warning: Could not get revision for %s.\n", dirName)
+					revision = ""
+				}
+			}
+
+			id := dirName
+			// Construct repository
+			var branchPtr *string
+			if branch != "" {
+				branchPtr = &branch
+			}
+			var revisionPtr *string
+			if revision != "" {
+				revisionPtr = &revision
+			}
+			urlPtr := &url
+
+			// Resolve BaseBranch from Config
+			var baseBranchPtr *string
+			if config != nil && config.Repositories != nil {
+				for _, confRepo := range *config.Repositories {
+					confID := GetRepoDir(confRepo)
+					if confID == dirName {
+						if confRepo.BaseBranch != nil && *confRepo.BaseBranch != "" {
+							baseBranchPtr = confRepo.BaseBranch
+						} else if confRepo.Branch != nil && *confRepo.Branch != "" {
+							baseBranchPtr = confRepo.Branch
+						}
+						break
+					}
+				}
+			}
+
+			repo := Repository{
+				ID:         &id,
+				URL:        urlPtr,
+				Branch:     branchPtr,
+				Revision:   revisionPtr,
+				BaseBranch: baseBranchPtr,
+			}
+
+			mu.Lock()
+			repos = append(repos, repo)
+			mu.Unlock()
+
+		}(dirName)
 	}
+	wg.Wait()
 
 	if outputFile == "" {
 		identifier := CalculateSnapshotIdentifier(repos)
@@ -157,6 +171,12 @@ func handleSnapshot(args []string, opts GlobalOptions) {
 		fmt.Printf("Error: Output file '%s' exists.\n", outputFile)
 		os.Exit(1)
 	}
+
+	// Sort Repos to match order of CalculateSnapshotIdentifier (and general neatness)
+	// Note: CalculateSnapshotIdentifier also sorts, but we sort here for the Config struct output
+	sort.Slice(repos, func(i, j int) bool {
+		return *repos[i].ID < *repos[j].ID
+	})
 
 	outputConfig := Config{
 		Repositories: &repos,
