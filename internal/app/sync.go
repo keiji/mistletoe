@@ -45,19 +45,15 @@ func handleSync(args []string, opts GlobalOptions) {
 		os.Exit(1)
 	}
 
-	spinner := NewSpinner()
+	spinner := NewSpinner(verbose)
 
 	fail := func(format string, a ...interface{}) {
-		if !verbose {
-			spinner.Stop()
-		}
+		spinner.Stop()
 		fmt.Printf(format, a...)
 		os.Exit(1)
 	}
 
-	if !verbose {
-		spinner.Start()
-	}
+	spinner.Start()
 
 	// Validation Phase
 	if err := ValidateRepositoriesIntegrity(config, opts.GitPath, verbose); err != nil {
@@ -67,9 +63,7 @@ func handleSync(args []string, opts GlobalOptions) {
 	// Status Phase
 	rows := CollectStatus(config, parallel, opts.GitPath, verbose)
 
-	if !verbose {
-		spinner.Stop()
-	}
+	spinner.Stop()
 
 	// Analyze Status
 	needsPull := false

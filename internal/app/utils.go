@@ -155,20 +155,26 @@ func ResolveCommonValues(fLong, fShort string, pVal, pValShort int) (string, int
 
 // Spinner shows a simple progress indicator.
 type Spinner struct {
-	stop chan struct{}
-	done chan struct{}
+	stop     chan struct{}
+	done     chan struct{}
+	disabled bool
 }
 
 // NewSpinner creates a new Spinner instance.
-func NewSpinner() *Spinner {
+// If verbose is true, the spinner is disabled (no-op).
+func NewSpinner(verbose bool) *Spinner {
 	return &Spinner{
-		stop: make(chan struct{}),
-		done: make(chan struct{}),
+		stop:     make(chan struct{}),
+		done:     make(chan struct{}),
+		disabled: verbose,
 	}
 }
 
 // Start starts the spinner in a separate goroutine.
 func (s *Spinner) Start() {
+	if s.disabled {
+		return
+	}
 	go func() {
 		defer close(s.done)
 		chars := []string{"/", "-", "\\", "|"}
@@ -190,6 +196,9 @@ func (s *Spinner) Start() {
 
 // Stop stops the spinner and clears the line.
 func (s *Spinner) Stop() {
+	if s.disabled {
+		return
+	}
 	select {
 	case s.stop <- struct{}{}:
 		<-s.done

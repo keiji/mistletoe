@@ -97,10 +97,8 @@ func handlePrStatus(args []string, opts GlobalOptions) {
 	}
 
 	// Initialize Spinner
-	spinner := NewSpinner()
-	if !verbose {
-		spinner.Start()
-	}
+	spinner := NewSpinner(verbose)
+	spinner.Start()
 
 	// 4. Collect Status
 	rows := CollectStatus(config, parallel, opts.GitPath, verbose)
@@ -108,9 +106,7 @@ func handlePrStatus(args []string, opts GlobalOptions) {
 	// 5. Collect PR Status
 	prRows := CollectPrStatus(rows, config, parallel, opts.GhPath, verbose)
 
-	if !verbose {
-		spinner.Stop()
-	}
+	spinner.Stop()
 
 	// 6. Render
 	RenderPrStatusTable(prRows)
@@ -380,15 +376,11 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 
 	// 5. Collect Status & PR Status (Moved Up)
 	fmt.Println("Collecting repository status and checking for existing Pull Requests...")
-	spinner := NewSpinner()
-	if !verbose {
-		spinner.Start()
-	}
+	spinner := NewSpinner(verbose)
+	spinner.Start()
 	rows := CollectStatus(config, parallel, opts.GitPath, verbose)
 	prRows := CollectPrStatus(rows, config, parallel, opts.GhPath, verbose)
-	if !verbose {
-		spinner.Stop()
-	}
+	spinner.Stop()
 	RenderPrStatusTable(prRows)
 
 	// 6. Check Pushability & Detached HEAD
@@ -544,16 +536,12 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 
 	// 11. Show Status (Final)
 	fmt.Println("Collecting final status...")
-	spinner = NewSpinner()
-	if !verbose {
-		spinner.Start()
-	}
+	spinner = NewSpinner(verbose)
+	spinner.Start()
 	// We re-collect status to show the most up-to-date information including new PRs
 	finalRows := CollectStatus(config, parallel, opts.GitPath, verbose)
 	finalPrRows := CollectPrStatus(finalRows, config, parallel, opts.GhPath, verbose)
-	if !verbose {
-		spinner.Stop()
-	}
+	spinner.Stop()
 	RenderPrStatusTable(finalPrRows)
 
 	fmt.Println("Done.")

@@ -91,15 +91,11 @@ func handlePrCheckout(args []string, opts GlobalOptions) {
 
 	// 5. Status
 	fmt.Println("Verifying status...")
-	spinner := NewSpinner()
-	if !verbose {
-		spinner.Start()
-	}
+	spinner := NewSpinner(verbose)
+	spinner.Start()
 	rows := CollectStatus(config, parallel, opts.GitPath, verbose)
 	prRows := CollectPrStatus(rows, config, parallel, opts.GhPath, verbose)
-	if !verbose {
-		spinner.Stop()
-	}
+	spinner.Stop()
 
 	RenderPrStatusTable(prRows)
 }
