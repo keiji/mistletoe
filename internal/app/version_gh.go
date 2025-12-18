@@ -2,28 +2,14 @@
 package app
 
 import (
-	"flag"
 	"fmt"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 )
 
-func handleVersionGh(args []string, opts GlobalOptions) {
-	// Parse flags for version command
-	fs := flag.NewFlagSet("version", flag.ExitOnError)
-	var vLong, vShort bool
-	fs.BoolVar(&vLong, "verbose", false, "Enable verbose output")
-	fs.BoolVar(&vShort, "v", false, "Enable verbose output (shorthand)")
-
-	if err := ParseFlagsFlexible(fs, args); err != nil {
-		fmt.Println("Error parsing flags:", err)
-		os.Exit(1)
-	}
-	verbose := vLong || vShort
-
-	printCommonVersionInfo(opts, verbose)
+func handleVersionGh(opts GlobalOptions) {
+	printCommonVersionInfo(opts)
 
 	fmt.Println()
 
@@ -35,7 +21,7 @@ func handleVersionGh(args []string, opts GlobalOptions) {
 	}
 	fmt.Printf("gh path: %s\n", displayGhPath)
 
-	outGh, err := RunGh(opts.GhPath, verbose, "--version")
+	outGh, err := RunGh(opts.GhPath, false, "--version")
 	if err == nil {
 		linesGh := strings.Split(outGh, "\n")
 		if len(linesGh) > 0 {

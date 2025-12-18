@@ -2,10 +2,10 @@ package app
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+	"os/exec"
 )
 
 // We need to mock RunGit or the underlying exec.Command to test status logic without real git repos?
@@ -13,38 +13,86 @@ import (
 // See common_test.go for helpers.
 
 func TestValidateRepositoriesIntegrity(t *testing.T) {
-	// ... (Existing test logic using real repos)
-	// We'll reuse the pattern from init_test.go if possible or just fix the call
-
+	// Setup workspace
 	tmpDir := t.TempDir()
-	cwd, _ := os.Getwd()
-	defer os.Chdir(cwd)
+	wd, _ := os.Getwd()
+	defer os.Chdir(wd)
 	os.Chdir(tmpDir)
 
-	// Create valid repo
-	repoDir := filepath.Join(tmpDir, "repo1")
-	// Note: createDummyGitRepo accepts (t, dir, remoteURL) based on common_test.go in memory but error says signature mismatch.
-	// Wait, status_logic_test.go error says: have (T, string), want (T, string, string)
-	// So createDummyGitRepo expects remoteURL as 3rd arg.
-	createDummyGitRepo(t, repoDir, "https://example.com/repo1.git")
+	repoID := "repo1"
+	repoURL := "https://example.com/repo1.git"
+	otherURL := "https://example.com/other.git"
 
-	url := "https://example.com/repo1.git"
-	id := "repo1"
-	repo := Repository{ID: &id, URL: &url}
-	repos := []Repository{repo}
-	config := Config{Repositories: &repos}
-
-	// Test Success
-	if err := ValidateRepositoriesIntegrity(&config, "git", false); err != nil {
-		t.Errorf("Expected success, got %v", err)
+	tests := []struct {
+		name    string
+		setup   func()
+		repos   []Repository
+		wantErr bool
+	}{
+		{
+			name: "Dir does not exist (Skipped)",
+			setup: func() {
+				// No dir
+			},
+			repos: []Repository{
+				{ID: &repoID, URL: &repoURL},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Dir exists but not a git repo",
+			setup: func() {
+				os.Mkdir(repoID, 0755)
+			},
+			repos: []Repository{
+				{ID: &repoID, URL: &repoURL},
+			},
+			wantErr: true,
+		},
+		{
+			name: "Target exists but is file",
+			setup: func() {
+				os.WriteFile(repoID, []byte("file"), 0644)
+			},
+			repos: []Repository{
+				{ID: &repoID, URL: &repoURL},
+			},
+			wantErr: true,
+		},
+		{
+			name: "Git repo with correct remote",
+			setup: func() {
+				createDummyGitRepo(t, repoID, repoURL)
+			},
+			repos: []Repository{
+				{ID: &repoID, URL: &repoURL},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Git repo with wrong remote",
+			setup: func() {
+				createDummyGitRepo(t, repoID, otherURL)
+			},
+			repos: []Repository{
+				{ID: &repoID, URL: &repoURL},
+			},
+			wantErr: true,
+		},
 	}
 
-	// Test Failure (Mismatch URL)
-	badUrl := "https://example.com/other.git"
-	badRepo := Repository{ID: &id, URL: &badUrl}
-	badConfig := Config{Repositories: &[]Repository{badRepo}}
-	if err := ValidateRepositoriesIntegrity(&badConfig, "git", false); err == nil {
-		t.Error("Expected failure for mismatched URL, got nil")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			os.RemoveAll(repoID) // Clean up
+			if tt.setup != nil {
+				tt.setup()
+			}
+			config := Config{Repositories: &tt.repos}
+			err := ValidateRepositoriesIntegrity(&config, "git", false)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ValidateRepositoriesIntegrity() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
 	}
 }
 
@@ -57,11 +105,6 @@ func TestCollectStatus(t *testing.T) {
 	// 1. Clean State (Up-to-date)
 	// We need a remote to compare against. We can fake it by having two local repos acting as one remote to another.
 	remoteDir := filepath.Join(tmpDir, "remote")
-	// Use remoteDir as URL for itself just to init it, or create bare?
-	// createDummyGitRepo creates normal repo.
-	// Let's use setupRemoteAndContent from common_test.go which does bare repo + content repo.
-	// But that returns URL and contentDir.
-	// Let's try to use createDummyGitRepo manually.
 
 	// Create "remote" repo
 	createDummyGitRepo(t, remoteDir, "origin-url-ignored")

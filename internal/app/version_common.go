@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-func printCommonVersionInfo(opts GlobalOptions, verbose bool) {
+func printCommonVersionInfo(opts GlobalOptions) {
 	v := AppVersion
 	if CommitHash != "" {
 		v = fmt.Sprintf("%s-%s", AppVersion, CommitHash)
@@ -31,7 +31,7 @@ func printCommonVersionInfo(opts GlobalOptions, verbose bool) {
 	}
 	fmt.Printf("git path: %s\n", displayPath)
 
-	out, err := RunGit("", opts.GitPath, verbose, "--version")
+	out, err := RunGit("", opts.GitPath, false, "--version")
 	if err != nil {
 		fmt.Println("Error getting git version")
 		return

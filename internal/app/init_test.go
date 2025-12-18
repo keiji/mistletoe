@@ -2,87 +2,107 @@ package app
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"testing"
 )
 
 func TestValidateEnvironment(t *testing.T) {
-	// Setup a temporary directory structure
-	tmpDir := t.TempDir()
-	cwd, _ := os.Getwd()
-	defer os.Chdir(cwd)
-	os.Chdir(tmpDir)
+	// Create a temporary directory for the test workspace
+	tmpDir, err := os.MkdirTemp("", "mstl-test-env")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
 
-	// Create a valid git repo
-	gitRepo := filepath.Join(tmpDir, "valid-repo")
-	os.Mkdir(gitRepo, 0755)
-	exec.Command("git", "init", gitRepo).Run()
-	// Set remote origin
-	exec.Command("git", "-C", gitRepo, "remote", "add", "origin", "https://github.com/example/valid.git").Run()
+	// Change to the temp dir so the relative path logic in validateEnvironment works
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("failed to get wd: %v", err)
+	}
+	defer func() {
+		_ = os.Chdir(wd)
+	}()
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("failed to chdir: %v", err)
+	}
 
-	// Create a non-git directory
-	nonGitDir := filepath.Join(tmpDir, "non-git")
-	os.Mkdir(nonGitDir, 0755)
-	os.WriteFile(filepath.Join(nonGitDir, "file.txt"), []byte("content"), 0644)
-
-	// Create an empty directory
-	emptyDir := filepath.Join(tmpDir, "empty")
-	os.Mkdir(emptyDir, 0755)
-
-	validURL := "https://github.com/example/valid.git"
-	invalidURL := "https://github.com/example/invalid.git"
-	validID := "valid-repo"
-	nonGitID := "non-git"
-	emptyID := "empty"
-	newID := "new-repo"
+	repoID := "repo1"
+	repoURL := "https://github.com/example/repo1.git"
 
 	tests := []struct {
 		name    string
+		setup   func() // Function to set up the environment state
 		repos   []Repository
 		wantErr bool
 	}{
 		{
-			name: "Valid environment - existing correct repo",
+			name: "Clean state (dir does not exist)",
+			setup: func() {
+				// No setup needed, dir shouldn't exist
+			},
 			repos: []Repository{
-				{ID: &validID, URL: &validURL},
+				{URL: &repoURL, ID: &repoID},
 			},
 			wantErr: false,
 		},
 		{
-			name: "Invalid environment - existing repo wrong remote",
+			name: "Existing empty directory",
+			setup: func() {
+				if err := os.Mkdir(repoID, 0755); err != nil {
+					t.Fatalf("failed to create dir: %v", err)
+				}
+			},
 			repos: []Repository{
-				{ID: &validID, URL: &invalidURL},
+				{URL: &repoURL, ID: &repoID},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Existing non-empty non-git directory",
+			setup: func() {
+				if err := os.Mkdir(repoID, 0755); err != nil {
+					t.Fatalf("failed to create dir: %v", err)
+				}
+				if err := os.WriteFile(filepath.Join(repoID, "file.txt"), []byte("content"), 0644); err != nil {
+					t.Fatalf("failed to create file: %v", err)
+				}
+			},
+			repos: []Repository{
+				{URL: &repoURL, ID: &repoID},
 			},
 			wantErr: true,
 		},
 		{
-			name: "Invalid environment - non-git directory not empty",
+			name: "Existing git repo with correct remote",
+			setup: func() {
+				createDummyGitRepo(t, repoID, repoURL)
+			},
 			repos: []Repository{
-				{ID: &nonGitID, URL: &validURL},
+				{URL: &repoURL, ID: &repoID},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Existing git repo with wrong remote",
+			setup: func() {
+				createDummyGitRepo(t, repoID, "https://github.com/other/repo.git")
+			},
+			repos: []Repository{
+				{URL: &repoURL, ID: &repoID},
 			},
 			wantErr: true,
-		},
-		{
-			name: "Valid environment - empty directory (will be cloned into)",
-			repos: []Repository{
-				{ID: &emptyID, URL: &validURL},
-			},
-			wantErr: false,
-		},
-		{
-			name: "Valid environment - directory does not exist",
-			repos: []Repository{
-				{ID: &newID, URL: &validURL},
-			},
-			wantErr: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Change to the temp dir so the relative path logic in validateEnvironment works
-			os.Chdir(tmpDir)
+			// Cleanup from previous run if any (though we use unique IDs mostly, re-using repoID here)
+			os.RemoveAll(repoID)
+
+			if tt.setup != nil {
+				tt.setup()
+			}
+
 			// Pass false for verbose
 			err := validateEnvironment(tt.repos, "git", false)
 			if (err != nil) != tt.wantErr {
