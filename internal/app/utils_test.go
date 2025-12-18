@@ -166,7 +166,7 @@ func TestResolveCommonValues_WithStdin(t *testing.T) {
 
 func TestRunGit(t *testing.T) {
 	// Simple test to ensure RunGit calls exec correctly
-	out, err := RunGit("", "git", "--version")
+	out, err := RunGit(false, "", "git", "--version")
 	if err != nil {
 		t.Fatalf("RunGit failed: %v", err)
 	}

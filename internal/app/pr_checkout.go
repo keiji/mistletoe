@@ -14,12 +14,16 @@ func handlePrCheckout(args []string, opts GlobalOptions) {
 		uShort    string
 		pVal      int
 		pValShort int
+		vLong     bool
+		vShort    bool
 	)
 
 	fs.StringVar(&uLong, "url", "", "Pull Request URL")
 	fs.StringVar(&uShort, "u", "", "Pull Request URL (shorthand)")
 	fs.IntVar(&pVal, "parallel", DefaultParallel, "Number of parallel processes")
 	fs.IntVar(&pValShort, "p", DefaultParallel, "Number of parallel processes (shorthand)")
+	fs.BoolVar(&vLong, "verbose", false, "enable verbose output")
+	fs.BoolVar(&vShort, "v", false, "enable verbose output (short)")
 
 	if err := ParseFlagsFlexible(fs, args); err != nil {
 		fmt.Println(err)
@@ -41,15 +45,17 @@ func handlePrCheckout(args []string, opts GlobalOptions) {
 		parallel = pValShort
 	}
 
+	verbose := vLong || vShort
+
 	// 1. Check gh availability
-	if err := checkGhAvailability(opts.GhPath); err != nil {
+	if err := checkGhAvailability(verbose, opts.GhPath); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
 
 	// 2. Fetch PR Body
 	fmt.Printf("Fetching Pull Request information from %s...\n", prURL)
-	cmd := execCommand(opts.GhPath, "pr", "view", prURL, "--json", "body", "-q", ".body")
+	cmd := handleGhCommand(verbose, opts.GhPath, "pr", "view", prURL, "--json", "body", "-q", ".body")
 	out, err := cmd.Output()
 	if err != nil {
 		fmt.Printf("Error fetching PR body: %v\n", err)
@@ -78,7 +84,7 @@ func handlePrCheckout(args []string, opts GlobalOptions) {
 	fmt.Println("Initializing repositories based on snapshot...")
 	// The snapshot contains the target state. We treat it as the config.
 	// PerformInit handles validation, cloning, and checking out.
-	if err := PerformInit(*config.Repositories, opts.GitPath, parallel, 0); err != nil {
+	if err := PerformInit(verbose, *config.Repositories, opts.GitPath, parallel, 0); err != nil {
 		fmt.Printf("Error during initialization: %v\n", err)
 		// We continue to status even if some failed? Or exit?
 		// Usually Init failure is critical.
@@ -89,8 +95,8 @@ func handlePrCheckout(args []string, opts GlobalOptions) {
 	fmt.Println("Verifying status...")
 	spinner := NewSpinner()
 	spinner.Start()
-	rows := CollectStatus(config, parallel, opts.GitPath)
-	prRows := CollectPrStatus(rows, config, parallel, opts.GhPath)
+	rows := CollectStatus(verbose, config, parallel, opts.GitPath)
+	prRows := CollectPrStatus(verbose, rows, config, parallel, opts.GhPath)
 	spinner.Stop()
 
 	RenderPrStatusTable(prRows)

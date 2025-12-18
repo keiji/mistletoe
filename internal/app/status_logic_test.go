@@ -81,7 +81,7 @@ func TestValidateRepositoriesIntegrity(t *testing.T) {
 			tt.setup()
 
 			config := Config{Repositories: &tt.repos}
-			err := ValidateRepositoriesIntegrity(&config, "git") // Assuming git is in path
+			err := ValidateRepositoriesIntegrity(false, &config, "git") // Assuming git is in path
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ValidateRepositoriesIntegrity() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -146,7 +146,7 @@ func TestCollectStatus(t *testing.T) {
 		},
 	}
 
-	rows := CollectStatus(&config, 1, "git")
+	rows := CollectStatus(false, &config, 1, "git")
 
 	if len(rows) != 4 {
 		t.Fatalf("Expected 4 rows, got %d", len(rows))

@@ -13,7 +13,15 @@ import (
 
 // RunGit runs a git command in the specified directory and returns its output (stdout).
 // Leading/trailing whitespace is trimmed.
-func RunGit(dir string, gitPath string, args ...string) (string, error) {
+func RunGit(verbose bool, dir string, gitPath string, args ...string) (string, error) {
+	if verbose {
+		cmdStr := fmt.Sprintf("[CMD] %s %s", gitPath, strings.Join(args, " "))
+		if dir != "" {
+			cmdStr += fmt.Sprintf(" (in %s)", dir)
+		}
+		fmt.Fprintln(os.Stderr, cmdStr)
+	}
+
 	cmd := exec.Command(gitPath, args...)
 	if dir != "" {
 		cmd.Dir = dir
@@ -26,7 +34,15 @@ func RunGit(dir string, gitPath string, args ...string) (string, error) {
 }
 
 // RunGitInteractive runs a git command connected to os.Stdout/Stderr.
-func RunGitInteractive(dir string, gitPath string, args ...string) error {
+func RunGitInteractive(verbose bool, dir string, gitPath string, args ...string) error {
+	if verbose {
+		cmdStr := fmt.Sprintf("[CMD] %s %s", gitPath, strings.Join(args, " "))
+		if dir != "" {
+			cmdStr += fmt.Sprintf(" (in %s)", dir)
+		}
+		fmt.Fprintln(os.Stderr, cmdStr)
+	}
+
 	cmd := exec.Command(gitPath, args...)
 	if dir != "" {
 		cmd.Dir = dir
