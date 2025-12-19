@@ -7,6 +7,9 @@ import (
 	"os/exec"
 	"strings"
 	"time"
+
+	"golang.org/x/text/language"
+	"golang.org/x/text/message"
 )
 
 // ExecCommand is a variable that holds exec.Command to allow mocking in tests.
@@ -15,29 +18,8 @@ var ExecCommand = exec.Command
 // formatDuration formats a duration in milliseconds with comma separators (e.g., "1,234ms").
 func formatDuration(d time.Duration) string {
 	ms := d.Milliseconds()
-	str := fmt.Sprintf("%d", ms)
-
-	if len(str) <= 3 {
-		return str + "ms"
-	}
-
-	var result []byte
-	count := 0
-	for i := len(str) - 1; i >= 0; i-- {
-		if count == 3 {
-			result = append(result, ',')
-			count = 0
-		}
-		result = append(result, str[i])
-		count++
-	}
-
-	// Reverse the result
-	for i, j := 0, len(result)-1; i < j; i, j = i+1, j-1 {
-		result[i], result[j] = result[j], result[i]
-	}
-
-	return string(result) + "ms"
+	p := message.NewPrinter(language.English)
+	return p.Sprintf("%dms", ms)
 }
 
 // --- Git Helpers ---
@@ -46,9 +28,12 @@ func formatDuration(d time.Duration) string {
 // Leading/trailing whitespace is trimmed.
 func RunGit(dir string, gitPath string, verbose bool, args ...string) (string, error) {
 	start := time.Now()
+	if verbose {
+		fmt.Fprintf(os.Stderr, "[CMD] %s %s ", gitPath, strings.Join(args, " "))
+	}
 	defer func() {
 		if verbose {
-			fmt.Fprintf(os.Stderr, "[CMD] %s %s (%s)\n", gitPath, strings.Join(args, " "), formatDuration(time.Since(start)))
+			fmt.Fprintf(os.Stderr, "(%s)\n", formatDuration(time.Since(start)))
 		}
 	}()
 
@@ -66,9 +51,12 @@ func RunGit(dir string, gitPath string, verbose bool, args ...string) (string, e
 // RunGitInteractive runs a git command connected to os.Stdout/Stderr.
 func RunGitInteractive(dir string, gitPath string, verbose bool, args ...string) error {
 	start := time.Now()
+	if verbose {
+		fmt.Fprintf(os.Stderr, "[CMD] %s %s ", gitPath, strings.Join(args, " "))
+	}
 	defer func() {
 		if verbose {
-			fmt.Fprintf(os.Stderr, "[CMD] %s %s (%s)\n", gitPath, strings.Join(args, " "), formatDuration(time.Since(start)))
+			fmt.Fprintf(os.Stderr, "(%s)\n", formatDuration(time.Since(start)))
 		}
 	}()
 
@@ -86,9 +74,12 @@ func RunGitInteractive(dir string, gitPath string, verbose bool, args ...string)
 // RunGh runs a gh command and returns its output (stdout).
 func RunGh(ghPath string, verbose bool, args ...string) (string, error) {
 	start := time.Now()
+	if verbose {
+		fmt.Fprintf(os.Stderr, "[CMD] %s %s ", ghPath, strings.Join(args, " "))
+	}
 	defer func() {
 		if verbose {
-			fmt.Fprintf(os.Stderr, "[CMD] %s %s (%s)\n", ghPath, strings.Join(args, " "), formatDuration(time.Since(start)))
+			fmt.Fprintf(os.Stderr, "(%s)\n", formatDuration(time.Since(start)))
 		}
 	}()
 
