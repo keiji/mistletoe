@@ -93,7 +93,7 @@ func handlePrCheckout(args []string, opts GlobalOptions) {
 	fmt.Println("Verifying status...")
 	spinner := NewSpinner(verbose)
 	spinner.Start()
-	rows := CollectStatus(config, parallel, opts.GitPath, verbose)
+	rows := CollectStatus(config, parallel, opts.GitPath, verbose, false)
 	prRows := CollectPrStatus(rows, config, parallel, opts.GhPath, verbose, nil)
 	spinner.Stop()
 

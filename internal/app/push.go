@@ -61,7 +61,7 @@ func handlePush(args []string, opts GlobalOptions) {
 	}
 
 	// Output Phase
-	rows := CollectStatus(config, parallel, opts.GitPath, verbose)
+	rows := CollectStatus(config, parallel, opts.GitPath, verbose, false)
 
 	spinner.Stop()
 

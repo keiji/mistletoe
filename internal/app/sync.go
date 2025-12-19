@@ -61,7 +61,7 @@ func handleSync(args []string, opts GlobalOptions) {
 	}
 
 	// Status Phase
-	rows := CollectStatus(config, parallel, opts.GitPath, verbose)
+	rows := CollectStatus(config, parallel, opts.GitPath, verbose, false)
 
 	spinner.Stop()
 
