@@ -61,7 +61,7 @@ func ValidateRepositoriesIntegrity(config *Config, gitPath string, verbose bool)
 }
 
 // CollectStatus collects status for all repositories.
-func CollectStatus(config *Config, parallel int, gitPath string, verbose bool) []StatusRow {
+func CollectStatus(config *Config, parallel int, gitPath string, verbose bool, noFetch bool) []StatusRow {
 	var rows []StatusRow
 	var mu sync.Mutex
 	var wg sync.WaitGroup
@@ -74,7 +74,7 @@ func CollectStatus(config *Config, parallel int, gitPath string, verbose bool) [
 			sem <- struct{}{}
 			defer func() { <-sem }()
 
-			row := getRepoStatus(repo, gitPath, verbose)
+			row := getRepoStatus(repo, gitPath, verbose, noFetch)
 			if row != nil {
 				mu.Lock()
 				rows = append(rows, *row)
@@ -91,7 +91,7 @@ func CollectStatus(config *Config, parallel int, gitPath string, verbose bool) [
 	return rows
 }
 
-func getRepoStatus(repo Repository, gitPath string, verbose bool) *StatusRow {
+func getRepoStatus(repo Repository, gitPath string, verbose bool, noFetch bool) *StatusRow {
 	targetDir := GetRepoDir(repo)
 	repoName := targetDir
 	if repo.ID != nil && *repo.ID != "" {
@@ -102,20 +102,51 @@ func getRepoStatus(repo Repository, gitPath string, verbose bool) *StatusRow {
 		return nil
 	}
 
-	// 1. Get Branch Name (abbrev-ref)
-	branchName, err := RunGit(targetDir, gitPath, verbose, "rev-parse", "--abbrev-ref", "HEAD")
-	if err != nil {
-		branchName = ""
-	}
-	isDetached := false
-	if branchName == "HEAD" {
-		isDetached = true
-	}
+	// 1. Get Local Status (Short SHA, Full SHA, Branch Status)
+	// We use git log -1 --format="%h%n%H%n%D" to get all info in one go.
+	// %h: Short Hash, %H: Full Hash, %D: Ref names
+	output, err := RunGit(targetDir, gitPath, verbose, "log", "-1", "--format=%h%n%H%n%D")
 
-	// 2. Get Short SHA
-	shortSHA, err := RunGit(targetDir, gitPath, verbose, "rev-parse", "--short", "HEAD")
-	if err != nil {
-		shortSHA = ""
+	branchName := ""
+	shortSHA := ""
+	localHeadFull := ""
+	isDetached := false
+
+	if err == nil {
+		lines := strings.Split(strings.TrimSpace(output), "\n")
+		if len(lines) >= 1 {
+			shortSHA = lines[0]
+		}
+		if len(lines) >= 2 {
+			localHeadFull = lines[1]
+		}
+		if len(lines) >= 3 {
+			refs := lines[2]
+			if strings.Contains(refs, "HEAD ->") {
+				parts := strings.Split(refs, "HEAD ->")
+				if len(parts) > 1 {
+					remainder := strings.TrimSpace(parts[1])
+					branchParts := strings.Split(remainder, ",")
+					branchName = strings.TrimSpace(branchParts[0])
+				}
+			} else {
+				isDetached = true
+				branchName = "HEAD"
+			}
+		} else {
+			// Detached with no other refs
+			isDetached = true
+			branchName = "HEAD"
+		}
+	} else {
+		// Fallback for unborn branches (empty repo) where git log fails
+		branchName, err = RunGit(targetDir, gitPath, verbose, "rev-parse", "--abbrev-ref", "HEAD")
+		if err != nil {
+			branchName = ""
+		}
+		if branchName == "HEAD" {
+			isDetached = true
+		}
 	}
 
 	// 3. Construct LocalBranchRev
@@ -124,6 +155,8 @@ func getRepoStatus(repo Repository, gitPath string, verbose bool) *StatusRow {
 		localBranchRev = fmt.Sprintf("%s:%s", branchName, shortSHA)
 	} else if shortSHA != "" {
 		localBranchRev = shortSHA
+	} else if branchName != "" {
+		localBranchRev = branchName // Unborn branch
 	}
 
 	// 4. ConfigRef
@@ -139,12 +172,6 @@ func getRepoStatus(repo Repository, gitPath string, verbose bool) *StatusRow {
 		}
 	}
 
-	// Local HEAD Rev (Full SHA for check)
-	localHeadFull, err := RunGit(targetDir, gitPath, verbose, "rev-parse", "HEAD")
-	if err != nil {
-		localHeadFull = ""
-	}
-
 	// Remote Logic
 	remoteHeadFull := ""
 	remoteDisplay := ""
@@ -152,33 +179,35 @@ func getRepoStatus(repo Repository, gitPath string, verbose bool) *StatusRow {
 
 	if !isDetached {
 		// Check if remote branch exists
-		// git fetch origin <branchName>
-		// This replaces ls-remote + (maybe) fetch with a single fetch.
-		// It ensures we have the latest remote state and objects.
-		_, err := RunGit(targetDir, gitPath, verbose, "fetch", "origin", branchName)
-		if err == nil {
-			// Fetch succeeded, resolve the remote branch tip from refs/remotes/origin/<branchName>
-			output, err := RunGit(targetDir, gitPath, verbose, "rev-parse", "refs/remotes/origin/"+branchName)
-			if err == nil && output != "" {
-				remoteHeadFull = strings.TrimSpace(output)
+		// If noFetch is true, skip explicit fetch and rely on existing refs/remotes/origin
+		if !noFetch {
+			// git fetch origin <branchName>
+			// This replaces ls-remote + (maybe) fetch with a single fetch.
+			// It ensures we have the latest remote state and objects.
+			_, _ = RunGit(targetDir, gitPath, verbose, "fetch", "origin", branchName)
+		}
 
-				// Construct display: branchName/shortSHA
-				shortRemote := remoteHeadFull
-				if len(shortRemote) >= 7 {
-					shortRemote = shortRemote[:7]
-				} else {
-					shortRemote = remoteHeadFull
-				}
-				remoteDisplay = fmt.Sprintf("%s:%s", branchName, shortRemote)
+		// Resolve the remote branch tip from refs/remotes/origin/<branchName>
+		output, err := RunGit(targetDir, gitPath, verbose, "rev-parse", "refs/remotes/origin/"+branchName)
+		if err == nil && output != "" {
+			remoteHeadFull = strings.TrimSpace(output)
 
-				// Check Pushability (Coloring for Remote Column)
-				// If local..remote is not 0, it implies remote has commits local doesn't (pull needed or diverged)
-				// -> "push impossible" -> Yellow
-				if localHeadFull != "" {
-					count, err := RunGit(targetDir, gitPath, verbose, "rev-list", "--count", localHeadFull+".."+remoteHeadFull)
-					if err == nil && count != "0" {
-						remoteColor = ColorYellow
-					}
+			// Construct display: branchName/shortSHA
+			shortRemote := remoteHeadFull
+			if len(shortRemote) >= 7 {
+				shortRemote = shortRemote[:7]
+			} else {
+				shortRemote = remoteHeadFull
+			}
+			remoteDisplay = fmt.Sprintf("%s:%s", branchName, shortRemote)
+
+			// Check Pushability (Coloring for Remote Column)
+			// If local..remote is not 0, it implies remote has commits local doesn't (pull needed or diverged)
+			// -> "push impossible" -> Yellow
+			if localHeadFull != "" {
+				count, err := RunGit(targetDir, gitPath, verbose, "rev-list", "--count", localHeadFull+".."+remoteHeadFull)
+				if err == nil && count != "0" {
+					remoteColor = ColorYellow
 				}
 			}
 		}

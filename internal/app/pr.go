@@ -101,7 +101,7 @@ func handlePrStatus(args []string, opts GlobalOptions) {
 	spinner.Start()
 
 	// 4. Collect Status
-	rows := CollectStatus(config, parallel, opts.GitPath, verbose)
+	rows := CollectStatus(config, parallel, opts.GitPath, verbose, false)
 
 	// 5. Collect PR Status
 	prRows := CollectPrStatus(rows, config, parallel, opts.GhPath, verbose, nil)
@@ -392,7 +392,10 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 	fmt.Println("Collecting repository status and checking for existing Pull Requests...")
 	spinner := NewSpinner(verbose)
 	spinner.Start()
-	rows := CollectStatus(config, parallel, opts.GitPath, verbose)
+	// OPTIMIZATION: Pass noFetch=true to CollectStatus.
+	// We rely on 'git push' later to catch non-fast-forward errors.
+	// This avoids "git fetch" delay.
+	rows := CollectStatus(config, parallel, opts.GitPath, verbose, true)
 	// Initial Check: No known PRs yet
 	prRows := CollectPrStatus(rows, config, parallel, opts.GhPath, verbose, nil)
 	spinner.Stop()
@@ -555,7 +558,8 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 	fmt.Println("Collecting final status...")
 	spinner = NewSpinner(verbose)
 	spinner.Start()
-	finalRows := CollectStatus(config, parallel, opts.GitPath, verbose)
+	// Use noFetch=true for final status as well, since we just pushed.
+	finalRows := CollectStatus(config, parallel, opts.GitPath, verbose, true)
 	// OPTIMIZATION: Pass prMap (known created/updated PRs) to avoid redundant gh pr list calls
 	finalPrRows := CollectPrStatus(finalRows, config, parallel, opts.GhPath, verbose, prMap)
 	spinner.Stop()

@@ -130,7 +130,7 @@ func TestCollectStatus(t *testing.T) {
 	repo1 := Repository{ID: &id, URL: &url, Branch: &branch}
 	config1 := Config{Repositories: &[]Repository{repo1}}
 
-	rows1 := CollectStatus(&config1, 1, "git", false)
+	rows1 := CollectStatus(&config1, 1, "git", false, false)
 	if len(rows1) != 1 {
 		t.Fatalf("Expected 1 row, got %d", len(rows1))
 	}
@@ -140,7 +140,7 @@ func TestCollectStatus(t *testing.T) {
 
 	// 2. Unpushed (Ahead)
 	exec.Command("git", "-C", localDir, "commit", "--allow-empty", "-m", "local-commit").Run()
-	rows2 := CollectStatus(&config1, 1, "git", false)
+	rows2 := CollectStatus(&config1, 1, "git", false, false)
 	if !rows2[0].HasUnpushed {
 		t.Error("Expected Unpushed=true")
 	}
@@ -152,7 +152,7 @@ func TestCollectStatus(t *testing.T) {
 	// Fetch in local so it knows about it
 	exec.Command("git", "-C", localDir, "fetch").Run()
 
-	rows3 := CollectStatus(&config1, 1, "git", false)
+	rows3 := CollectStatus(&config1, 1, "git", false, false)
 	if !rows3[0].IsPullable {
 		t.Error("Expected IsPullable=true")
 	}
@@ -165,7 +165,7 @@ func TestCollectStatus(t *testing.T) {
 	repo := Repository{ID: &id, URL: &url, Branch: &branch}
 	config := Config{Repositories: &[]Repository{repo}}
 
-	rows := CollectStatus(&config, 1, "git", false)
+	rows := CollectStatus(&config, 1, "git", false, false)
 	if !rows[0].HasUnpushed {
 		t.Error("Expected HasUnpushed=true (Diverged)")
 	}
