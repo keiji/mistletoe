@@ -1,9 +1,12 @@
 package app
 
 import (
+	"io"
 	"os"
 	"os/exec"
+	"strings"
 	"testing"
+	"time"
 )
 
 // TestRunGit_Real tests RunGit against the real git command (if available)
@@ -179,5 +182,65 @@ func TestResolveCommonValues_WithStdin(t *testing.T) {
 	}
 	if string(gotData) != testConfig {
 		t.Errorf("ResolveCommonValues() data = %v, want %v", string(gotData), testConfig)
+	}
+}
+
+func TestFormatDuration(t *testing.T) {
+	tests := []struct {
+		input    time.Duration
+		expected string
+	}{
+		{time.Duration(0), "0ms"},
+		{time.Duration(100 * time.Millisecond), "100ms"},
+		{time.Duration(999 * time.Millisecond), "999ms"},
+		{time.Duration(1000 * time.Millisecond), "1,000ms"},
+		{time.Duration(1234 * time.Millisecond), "1,234ms"},
+		{time.Duration(1234567 * time.Millisecond), "1,234,567ms"},
+		{time.Duration(1000000 * time.Millisecond), "1,000,000ms"},
+	}
+
+	for _, tt := range tests {
+		result := formatDuration(tt.input)
+		if result != tt.expected {
+			t.Errorf("formatDuration(%v) = %q, want %q", tt.input, result, tt.expected)
+		}
+	}
+}
+
+func TestRunGit_VerboseLog(t *testing.T) {
+	// Skip if no echo command (e.g. strict windows env without sh)
+	// But usually available.
+	if _, err := exec.LookPath("echo"); err != nil {
+		t.Skip("echo command not found")
+	}
+
+	// Capture stderr
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	oldStderr := os.Stderr
+	os.Stderr = w
+
+	defer func() {
+		os.Stderr = oldStderr
+	}()
+
+	// RunGit with verbose=true
+	// We use "echo" as gitPath to avoid git dependency issues in this specific test
+	// and ensure it runs quickly.
+	_, _ = RunGit("", "echo", true, "hello")
+
+	w.Close()
+
+	out, _ := io.ReadAll(r)
+	output := string(out)
+
+	// Check format: [CMD] echo hello (0ms) or similar
+	if !strings.Contains(output, "[CMD] echo hello (") {
+		t.Errorf("Log output format incorrect or missing: %q", output)
+	}
+	if !strings.HasSuffix(strings.TrimSpace(output), "ms)") {
+		t.Errorf("Log output should end with ms): %q", output)
 	}
 }
