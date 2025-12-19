@@ -7,14 +7,37 @@ import (
 	"os/exec"
 	"strings"
 	"time"
+
+	"golang.org/x/text/language"
+	"golang.org/x/text/message"
 )
+
+// ExecCommand is a variable that holds exec.Command to allow mocking in tests.
+var ExecCommand = exec.Command
+
+// formatDuration formats a duration in milliseconds with comma separators (e.g., "1,234ms").
+func formatDuration(d time.Duration) string {
+	ms := d.Milliseconds()
+	p := message.NewPrinter(language.English)
+	return p.Sprintf("%dms", ms)
+}
 
 // --- Git Helpers ---
 
 // RunGit runs a git command in the specified directory and returns its output (stdout).
 // Leading/trailing whitespace is trimmed.
-func RunGit(dir string, gitPath string, args ...string) (string, error) {
-	cmd := exec.Command(gitPath, args...)
+func RunGit(dir string, gitPath string, verbose bool, args ...string) (string, error) {
+	start := time.Now()
+	if verbose {
+		fmt.Fprintf(os.Stderr, "[CMD] %s %s ", gitPath, strings.Join(args, " "))
+	}
+	defer func() {
+		if verbose {
+			fmt.Fprintf(os.Stderr, "(%s)\n", formatDuration(time.Since(start)))
+		}
+	}()
+
+	cmd := ExecCommand(gitPath, args...)
 	if dir != "" {
 		cmd.Dir = dir
 	}
@@ -26,14 +49,46 @@ func RunGit(dir string, gitPath string, args ...string) (string, error) {
 }
 
 // RunGitInteractive runs a git command connected to os.Stdout/Stderr.
-func RunGitInteractive(dir string, gitPath string, args ...string) error {
-	cmd := exec.Command(gitPath, args...)
+func RunGitInteractive(dir string, gitPath string, verbose bool, args ...string) error {
+	start := time.Now()
+	if verbose {
+		fmt.Fprintf(os.Stderr, "[CMD] %s %s ", gitPath, strings.Join(args, " "))
+	}
+	defer func() {
+		if verbose {
+			fmt.Fprintf(os.Stderr, "(%s)\n", formatDuration(time.Since(start)))
+		}
+	}()
+
+	cmd := ExecCommand(gitPath, args...)
 	if dir != "" {
 		cmd.Dir = dir
 	}
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
+}
+
+// --- GitHub CLI Helpers ---
+
+// RunGh runs a gh command and returns its output (stdout).
+func RunGh(ghPath string, verbose bool, args ...string) (string, error) {
+	start := time.Now()
+	if verbose {
+		fmt.Fprintf(os.Stderr, "[CMD] %s %s ", ghPath, strings.Join(args, " "))
+	}
+	defer func() {
+		if verbose {
+			fmt.Fprintf(os.Stderr, "(%s)\n", formatDuration(time.Since(start)))
+		}
+	}()
+
+	cmd := ExecCommand(ghPath, args...)
+	out, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(out)), nil
 }
 
 // --- Editor Helpers ---
@@ -60,7 +115,7 @@ func RunEditor() (string, error) {
 	defer os.Remove(tmpFile.Name())
 	tmpFile.Close() // Close immediately, let editor open it
 
-	cmd := exec.Command(editor, tmpFile.Name())
+	cmd := ExecCommand(editor, tmpFile.Name())
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -131,20 +186,26 @@ func ResolveCommonValues(fLong, fShort string, pVal, pValShort int) (string, int
 
 // Spinner shows a simple progress indicator.
 type Spinner struct {
-	stop chan struct{}
-	done chan struct{}
+	stop     chan struct{}
+	done     chan struct{}
+	disabled bool
 }
 
 // NewSpinner creates a new Spinner instance.
-func NewSpinner() *Spinner {
+// If verbose is true, the spinner is disabled (no-op).
+func NewSpinner(verbose bool) *Spinner {
 	return &Spinner{
-		stop: make(chan struct{}),
-		done: make(chan struct{}),
+		stop:     make(chan struct{}),
+		done:     make(chan struct{}),
+		disabled: verbose,
 	}
 }
 
 // Start starts the spinner in a separate goroutine.
 func (s *Spinner) Start() {
+	if s.disabled {
+		return
+	}
 	go func() {
 		defer close(s.done)
 		chars := []string{"/", "-", "\\", "|"}
@@ -166,6 +227,9 @@ func (s *Spinner) Start() {
 
 // Stop stops the spinner and clears the line.
 func (s *Spinner) Stop() {
+	if s.disabled {
+		return
+	}
 	select {
 	case s.stop <- struct{}{}:
 		<-s.done

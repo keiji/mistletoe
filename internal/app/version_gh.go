@@ -21,9 +21,9 @@ func handleVersionGh(opts GlobalOptions) {
 	}
 	fmt.Printf("gh path: %s\n", displayGhPath)
 
-	outGh, err := exec.Command(opts.GhPath, "--version").Output()
+	outGh, err := RunGh(opts.GhPath, false, "--version")
 	if err == nil {
-		linesGh := strings.Split(string(outGh), "\n")
+		linesGh := strings.Split(outGh, "\n")
 		if len(linesGh) > 0 {
 			fmt.Println(linesGh[0])
 		}

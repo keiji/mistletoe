@@ -15,8 +15,6 @@ import (
 	"github.com/olekukonko/tablewriter/tw"
 )
 
-var execCommand = exec.Command
-
 // HandlePr handles the 'pr' subcommand.
 func HandlePr(args []string, opts GlobalOptions) {
 	if len(args) == 0 {
@@ -49,12 +47,16 @@ func handlePrStatus(args []string, opts GlobalOptions) {
 		fShort    string
 		pVal      int
 		pValShort int
+		vLong     bool
+		vShort    bool
 	)
 
 	fs.StringVar(&fLong, "file", "", "Configuration file path")
 	fs.StringVar(&fShort, "f", "", "Configuration file path (shorthand)")
 	fs.IntVar(&pVal, "parallel", DefaultParallel, "Number of parallel processes")
 	fs.IntVar(&pValShort, "p", DefaultParallel, "Number of parallel processes (shorthand)")
+	fs.BoolVar(&vLong, "verbose", false, "Enable verbose output")
+	fs.BoolVar(&vShort, "v", false, "Enable verbose output (shorthand)")
 
 	if err := ParseFlagsFlexible(fs, args); err != nil {
 		fmt.Println(err)
@@ -67,9 +69,10 @@ func handlePrStatus(args []string, opts GlobalOptions) {
 		fmt.Println(err)
 		os.Exit(1)
 	}
+	verbose := vLong || vShort
 
 	// 1. Check gh availability
-	if err := checkGhAvailability(opts.GhPath); err != nil {
+	if err := checkGhAvailability(opts.GhPath, verbose); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
@@ -88,20 +91,20 @@ func handlePrStatus(args []string, opts GlobalOptions) {
 	}
 
 	// 3. Validate Integrity
-	if err := ValidateRepositoriesIntegrity(config, opts.GitPath); err != nil {
+	if err := ValidateRepositoriesIntegrity(config, opts.GitPath, verbose); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
 
 	// Initialize Spinner
-	spinner := NewSpinner()
+	spinner := NewSpinner(verbose)
 	spinner.Start()
 
 	// 4. Collect Status
-	rows := CollectStatus(config, parallel, opts.GitPath)
+	rows := CollectStatus(config, parallel, opts.GitPath, verbose)
 
 	// 5. Collect PR Status
-	prRows := CollectPrStatus(rows, config, parallel, opts.GhPath)
+	prRows := CollectPrStatus(rows, config, parallel, opts.GhPath, verbose)
 
 	spinner.Stop()
 
@@ -128,7 +131,7 @@ type PrStatusRow struct {
 }
 
 // CollectPrStatus collects Pull Request status for the given repositories.
-func CollectPrStatus(statusRows []StatusRow, config *Config, parallel int, ghPath string) []PrStatusRow {
+func CollectPrStatus(statusRows []StatusRow, config *Config, parallel int, ghPath string, verbose bool) []PrStatusRow {
 	repoMap := make(map[string]Repository)
 	for _, r := range *config.Repositories {
 		repoMap[getRepoName(r)] = r
@@ -166,11 +169,13 @@ func CollectPrStatus(statusRows []StatusRow, config *Config, parallel int, ghPat
 						args = append(args, "--base", baseBranch)
 					}
 
-					cmd := execCommand(ghPath, args...)
-					out, err := cmd.Output()
+					// Use RunGh but need raw output
+					// If we switch to RunGh, we get stdout and logging.
+					// However, we need to handle errors gracefully here (if gh command fails, assume no PR or error)
+					out, err := RunGh(ghPath, verbose, args...)
 					if err == nil {
 						var prs []PrInfo
-						if err := json.Unmarshal(out, &prs); err == nil && len(prs) > 0 {
+						if err := json.Unmarshal([]byte(out), &prs); err == nil && len(prs) > 0 {
 							pr := prs[0]
 							prRow.PrNumber = fmt.Sprintf("#%d", pr.Number)
 							prRow.PrState = "Ready"
@@ -276,6 +281,8 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 		bShort     string
 		dLong      string
 		dShort     string
+		vLong      bool
+		vShort     bool
 	)
 
 	fs.StringVar(&fLong, "file", "", "Configuration file path")
@@ -288,6 +295,8 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 	fs.StringVar(&bShort, "b", "", "Pull Request body (shorthand)")
 	fs.StringVar(&dLong, "dependencies", "", "Dependency graph file path")
 	fs.StringVar(&dShort, "d", "", "Dependency graph file path (shorthand)")
+	fs.BoolVar(&vLong, "verbose", false, "Enable verbose output")
+	fs.BoolVar(&vShort, "v", false, "Enable verbose output (shorthand)")
 
 	if err := ParseFlagsFlexible(fs, args); err != nil {
 		fmt.Println(err)
@@ -300,6 +309,7 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 		fmt.Println(err)
 		os.Exit(1)
 	}
+	verbose := vLong || vShort
 
 	// Resolve title, body, dependency file
 	prTitle := tLong
@@ -316,7 +326,7 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 	}
 
 	// 1. Check gh availability
-	if err := checkGhAvailability(opts.GhPath); err != nil {
+	if err := checkGhAvailability(opts.GhPath, verbose); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
@@ -359,17 +369,17 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 	}
 
 	// 4. Validate Integrity
-	if err := ValidateRepositoriesIntegrity(config, opts.GitPath); err != nil {
+	if err := ValidateRepositoriesIntegrity(config, opts.GitPath, verbose); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
 
 	// 5. Collect Status & PR Status (Moved Up)
 	fmt.Println("Collecting repository status and checking for existing Pull Requests...")
-	spinner := NewSpinner()
+	spinner := NewSpinner(verbose)
 	spinner.Start()
-	rows := CollectStatus(config, parallel, opts.GitPath)
-	prRows := CollectPrStatus(rows, config, parallel, opts.GhPath)
+	rows := CollectStatus(config, parallel, opts.GitPath, verbose)
+	prRows := CollectPrStatus(rows, config, parallel, opts.GhPath, verbose)
 	spinner.Stop()
 	RenderPrStatusTable(prRows)
 
@@ -391,7 +401,7 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 
 	// 6.5 Filter repos with no changes relative to base
 	fmt.Println("Checking for changes relative to base branch...")
-	activeRepos, skippedRepos := filterPushableRepos(*config.Repositories, parallel, opts.GitPath)
+	activeRepos, skippedRepos := filterPushableRepos(*config.Repositories, parallel, opts.GitPath, verbose)
 
 	if len(skippedRepos) > 0 {
 		fmt.Println("The following repositories will be skipped (all local commits are already in base branch):")
@@ -484,7 +494,7 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 
 	fmt.Println("Verifying GitHub permissions and base branches...")
 	// Pass knownPRs to optimize check
-	existingPrURLs, err := verifyGithubRequirements(activeRepos, parallel, opts.GitPath, opts.GhPath, knownPRs)
+	existingPrURLs, err := verifyGithubRequirements(activeRepos, parallel, opts.GitPath, opts.GhPath, verbose, knownPRs)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -511,7 +521,7 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 	// 9. Execution: Push & Create PR
 	fmt.Println("Pushing changes and creating Pull Requests...")
 	// executePrCreation returns a map of [RepoID] -> URL
-	prMap, err := executePrCreation(activeRepos, parallel, opts.GitPath, opts.GhPath, existingPrURLs, prTitle, prBodyWithSnapshot)
+	prMap, err := executePrCreation(activeRepos, parallel, opts.GitPath, opts.GhPath, verbose, existingPrURLs, prTitle, prBodyWithSnapshot)
 	if err != nil {
 		fmt.Printf("Error during execution: %v\n", err)
 		os.Exit(1)
@@ -519,18 +529,18 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 
 	// 10. Post-processing: Update Descriptions
 	fmt.Println("Updating Pull Request descriptions...")
-	if err := updatePrDescriptions(prMap, parallel, opts.GhPath, string(snapshotData), filename, deps, depContent); err != nil {
+	if err := updatePrDescriptions(prMap, parallel, opts.GhPath, verbose, string(snapshotData), filename, deps, depContent); err != nil {
 		fmt.Printf("Error updating descriptions: %v\n", err)
 		os.Exit(1)
 	}
 
 	// 11. Show Status (Final)
 	fmt.Println("Collecting final status...")
-	spinner = NewSpinner()
+	spinner = NewSpinner(verbose)
 	spinner.Start()
 	// We re-collect status to show the most up-to-date information including new PRs
-	finalRows := CollectStatus(config, parallel, opts.GitPath)
-	finalPrRows := CollectPrStatus(finalRows, config, parallel, opts.GhPath)
+	finalRows := CollectStatus(config, parallel, opts.GitPath, verbose)
+	finalPrRows := CollectPrStatus(finalRows, config, parallel, opts.GhPath, verbose)
 	spinner.Stop()
 	RenderPrStatusTable(finalPrRows)
 
@@ -538,7 +548,7 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 }
 
 // filterPushableRepos filters out repositories where local branch commits are fully contained in the base branch.
-func filterPushableRepos(repos []Repository, parallel int, gitPath string) ([]Repository, []string) {
+func filterPushableRepos(repos []Repository, parallel int, gitPath string, verbose bool) ([]Repository, []string) {
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, parallel)
 
@@ -567,7 +577,7 @@ func filterPushableRepos(repos []Repository, parallel int, gitPath string) ([]Re
 				// To do this without fetching (to avoid changing local state), we use git ls-remote to get the hash of the remote base branch.
 
 				// 1. Get Remote Hash for baseBranch
-				lsOut, err := RunGit(repoDir, gitPath, "ls-remote", "origin", baseBranch)
+				lsOut, err := RunGit(repoDir, gitPath, verbose, "ls-remote", "origin", baseBranch)
 				// ls-remote output format: <hash>\trefs/heads/<branch>\n
 				// We expect one line if it matches exactly, or we need to parse carefully.
 				// Since baseBranch is usually simple name (main), ls-remote origin main matches refs/heads/main usually.
@@ -592,7 +602,7 @@ func filterPushableRepos(repos []Repository, parallel int, gitPath string) ([]Re
 
 				if remoteHash != "" {
 					// 2. Check if we have this object locally
-					err := execCommand(gitPath, "-C", repoDir, "cat-file", "-e", remoteHash).Run()
+					_, err := RunGit(repoDir, gitPath, verbose, "cat-file", "-e", remoteHash)
 					if err != nil {
 						// Remote object missing locally. This means remote has advanced (we are behind or diverged)
 						// and we haven't fetched it.
@@ -607,11 +617,11 @@ func filterPushableRepos(repos []Repository, parallel int, gitPath string) ([]Re
 						// If exit 0: Yes, remote is ancestor. (Local is ahead or same)
 						// If exit 1: No. (Diverged or Local is behind)
 
-						err := execCommand(gitPath, "-C", repoDir, "merge-base", "--is-ancestor", remoteHash, "HEAD").Run()
+						_, err := RunGit(repoDir, gitPath, verbose, "merge-base", "--is-ancestor", remoteHash, "HEAD")
 						if err == nil {
 							// Remote is ancestor.
 							// Check if they are the same commit.
-							headHash, _ := RunGit(repoDir, gitPath, "rev-parse", "HEAD")
+							headHash, _ := RunGit(repoDir, gitPath, verbose, "rev-parse", "HEAD")
 							if remoteHash == headHash {
 								// Identical. No new commits.
 								keep = false
@@ -655,13 +665,13 @@ func filterPushableRepos(repos []Repository, parallel int, gitPath string) ([]Re
 // Mockable lookPath for testing
 var lookPath = exec.LookPath
 
-func checkGhAvailability(ghPath string) error {
+func checkGhAvailability(ghPath string, verbose bool) error {
 	_, err := lookPath(ghPath)
 	if err != nil {
 		return errors.New("Error: 'gh' command not found. Please install GitHub CLI.")
 	}
-	cmd := execCommand(ghPath, "auth", "status")
-	if err := cmd.Run(); err != nil {
+	_, err = RunGh(ghPath, verbose, "auth", "status")
+	if err != nil {
 		return errors.New("Error: 'gh' is not authenticated. Please run 'gh auth login'.")
 	}
 	return nil
@@ -670,7 +680,7 @@ func checkGhAvailability(ghPath string) error {
 // verifyGithubRequirements checks GitHub URL, permissions, base branch existence, and existing PRs.
 // It returns a map of RepoName -> Existing PR URL.
 // Accepts knownPRs map[string]string (ID -> URL) to optimize existing PR check.
-func verifyGithubRequirements(repos []Repository, parallel int, gitPath, ghPath string, knownPRs map[string]string) (map[string]string, error) {
+func verifyGithubRequirements(repos []Repository, parallel int, gitPath, ghPath string, verbose bool, knownPRs map[string]string) (map[string]string, error) {
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, parallel)
@@ -695,15 +705,14 @@ func verifyGithubRequirements(repos []Repository, parallel int, gitPath, ghPath 
 			}
 
 			// 2. Check Permission
-			cmd := execCommand(ghPath, "repo", "view", *r.URL, "--json", "viewerPermission", "-q", ".viewerPermission")
-			out, err := cmd.Output()
+			out, err := RunGh(ghPath, verbose, "repo", "view", *r.URL, "--json", "viewerPermission", "-q", ".viewerPermission")
 			if err != nil {
 				mu.Lock()
 				errs = append(errs, fmt.Sprintf("Failed to check permission for %s: %v", repoName, err))
 				mu.Unlock()
 				return
 			}
-			perm := strings.TrimSpace(string(out))
+			perm := strings.TrimSpace(out)
 			if perm != "ADMIN" && perm != "MAINTAIN" && perm != "WRITE" {
 				mu.Lock()
 				errs = append(errs, fmt.Sprintf("Insufficient permission for %s: %s (need WRITE or better)", repoName, perm))
@@ -725,15 +734,14 @@ func verifyGithubRequirements(repos []Repository, parallel int, gitPath, ghPath 
 				// We check if the branch exists on remote using git ls-remote.
 				// We need to use origin as the remote name (standard in this tool).
 				// We run this command inside the repo directory.
-				lsCmd := execCommand(gitPath, "-C", repoDir, "ls-remote", "--heads", "origin", baseBranch)
-				lsOut, lsErr := lsCmd.Output()
+				lsOut, lsErr := RunGit(repoDir, gitPath, verbose, "ls-remote", "--heads", "origin", baseBranch)
 				if lsErr != nil {
 					mu.Lock()
 					errs = append(errs, fmt.Sprintf("[%s] Failed to check base branch '%s': %v", repoName, baseBranch, lsErr))
 					mu.Unlock()
 					return
 				}
-				if strings.TrimSpace(string(lsOut)) == "" {
+				if strings.TrimSpace(lsOut) == "" {
 					mu.Lock()
 					errs = append(errs, fmt.Sprintf("[%s] Base branch '%s' does not exist on remote", repoName, baseBranch))
 					mu.Unlock()
@@ -754,7 +762,7 @@ func verifyGithubRequirements(repos []Repository, parallel int, gitPath, ghPath 
 
 			// Fallback to query
 			repoDir := GetRepoDir(r)
-			branchName, err := RunGit(repoDir, gitPath, "rev-parse", "--abbrev-ref", "HEAD")
+			branchName, err := RunGit(repoDir, gitPath, verbose, "rev-parse", "--abbrev-ref", "HEAD")
 			if err != nil {
 				mu.Lock()
 				errs = append(errs, fmt.Sprintf("[%s] Failed to get branch for PR check: %v", repoName, err))
@@ -762,15 +770,14 @@ func verifyGithubRequirements(repos []Repository, parallel int, gitPath, ghPath 
 				return
 			}
 
-			checkCmd := execCommand(ghPath, "pr", "list", "--repo", *r.URL, "--head", branchName, "--json", "url", "-q", ".[0].url")
-			out, errCheck := checkCmd.Output()
+			out, errCheck := RunGh(ghPath, verbose, "pr", "list", "--repo", *r.URL, "--head", branchName, "--json", "url", "-q", ".[0].url")
 			if errCheck != nil {
 				mu.Lock()
 				errs = append(errs, fmt.Sprintf("[%s] Failed to check for existing PR: %v", repoName, errCheck))
 				mu.Unlock()
 				return
 			}
-			prURL := strings.TrimSpace(string(out))
+			prURL := strings.TrimSpace(out)
 
 			if prURL != "" {
 				mu.Lock()
@@ -790,7 +797,7 @@ func verifyGithubRequirements(repos []Repository, parallel int, gitPath, ghPath 
 
 // executePrCreation pushes changes and creates PRs.
 // Returns a map of RepoName -> PR URL.
-func executePrCreation(repos []Repository, parallel int, gitPath, ghPath string, existingPRs map[string]string, title, body string) (map[string]string, error) {
+func executePrCreation(repos []Repository, parallel int, gitPath, ghPath string, verbose bool, existingPRs map[string]string, title, body string) (map[string]string, error) {
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, parallel)
@@ -813,7 +820,7 @@ func executePrCreation(repos []Repository, parallel int, gitPath, ghPath string,
 			repoName := getRepoName(r)
 
 			// 1. Push
-			branchName, err := RunGit(repoDir, gitPath, "rev-parse", "--abbrev-ref", "HEAD")
+			branchName, err := RunGit(repoDir, gitPath, verbose, "rev-parse", "--abbrev-ref", "HEAD")
 			if err != nil {
 				mu.Lock()
 				errs = append(errs, fmt.Sprintf("[%s] Failed to get branch: %v", repoName, err))
@@ -822,7 +829,7 @@ func executePrCreation(repos []Repository, parallel int, gitPath, ghPath string,
 			}
 
 			fmt.Printf("[%s] Pushing to origin/%s...\n", repoName, branchName)
-			if _, err := RunGit(repoDir, gitPath, "push", "origin", branchName); err != nil {
+			if _, err := RunGit(repoDir, gitPath, verbose, "push", "origin", branchName); err != nil {
 				mu.Lock()
 				errs = append(errs, fmt.Sprintf("[%s] Push failed: %v", repoName, err))
 				mu.Unlock()
@@ -863,16 +870,16 @@ func executePrCreation(repos []Repository, parallel int, gitPath, ghPath string,
 				args = append(args, "--base", baseBranch)
 			}
 
-			createCmd := execCommand(ghPath, args...)
-			createOut, err := createCmd.Output()
+			createOut, err := RunGh(ghPath, verbose, args...)
 			if err != nil {
+				// Need to check stderr for "already exists"
+				// RunGh uses cmd.Output() which returns *exec.ExitError with Stderr
 				var exitErr *exec.ExitError
 				if errors.As(err, &exitErr) {
 					stderr := string(exitErr.Stderr)
 					if strings.Contains(stderr, "already exists") {
-						checkCmd := execCommand(ghPath, "pr", "list", "--repo", *r.URL, "--head", branchName, "--json", "url", "-q", ".[0].url")
-						out, _ := checkCmd.Output()
-						prURL := strings.TrimSpace(string(out))
+						out, _ := RunGh(ghPath, verbose, "pr", "list", "--repo", *r.URL, "--head", branchName, "--json", "url", "-q", ".[0].url")
+						prURL := strings.TrimSpace(out)
 						if prURL != "" {
 							fmt.Printf("[%s] Pull Request already exists: %s\n", repoName, prURL)
 							mu.Lock()
@@ -909,7 +916,7 @@ func executePrCreation(repos []Repository, parallel int, gitPath, ghPath string,
 	return prMap, nil
 }
 
-func updatePrDescriptions(prMap map[string]string, parallel int, ghPath string, snapshotData, snapshotFilename string, deps *DependencyGraph, depContent string) error {
+func updatePrDescriptions(prMap map[string]string, parallel int, ghPath string, verbose bool, snapshotData, snapshotFilename string, deps *DependencyGraph, depContent string) error {
 	if len(prMap) == 0 {
 		return nil
 	}
@@ -927,8 +934,7 @@ func updatePrDescriptions(prMap map[string]string, parallel int, ghPath string, 
 			defer func() { <-sem }()
 
 			// Check PR State
-			stateCmd := execCommand(ghPath, "pr", "view", targetURL, "--json", "state", "-q", ".state")
-			stateOut, err := stateCmd.Output()
+			stateOut, err := RunGh(ghPath, verbose, "pr", "view", targetURL, "--json", "state", "-q", ".state")
 			if err != nil {
 				mu.Lock()
 				errs = append(errs, fmt.Sprintf("Failed to check state for PR %s: %v", targetURL, err))
@@ -941,8 +947,7 @@ func updatePrDescriptions(prMap map[string]string, parallel int, ghPath string, 
 			}
 
 			// Get current body
-			viewCmd := execCommand(ghPath, "pr", "view", targetURL, "--json", "body", "-q", ".body")
-			bodyOut, err := viewCmd.Output()
+			bodyOut, err := RunGh(ghPath, verbose, "pr", "view", targetURL, "--json", "body", "-q", ".body")
 			if err != nil {
 				mu.Lock()
 				errs = append(errs, fmt.Sprintf("Failed to view PR %s: %v", targetURL, err))
@@ -958,8 +963,8 @@ func updatePrDescriptions(prMap map[string]string, parallel int, ghPath string, 
 			newBody := EmbedMistletoeBody(originalBody, newBlock)
 
 			// Update
-			editCmd := execCommand(ghPath, "pr", "edit", targetURL, "--body", newBody)
-			if err := editCmd.Run(); err != nil {
+			_, err = RunGh(ghPath, verbose, "pr", "edit", targetURL, "--body", newBody)
+			if err != nil {
 				mu.Lock()
 				errs = append(errs, fmt.Sprintf("Failed to edit PR %s: %v", targetURL, err))
 				mu.Unlock()

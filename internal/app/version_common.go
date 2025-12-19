@@ -31,12 +31,12 @@ func printCommonVersionInfo(opts GlobalOptions) {
 	}
 	fmt.Printf("git path: %s\n", displayPath)
 
-	out, err := exec.Command(opts.GitPath, "--version").Output()
+	out, err := RunGit("", opts.GitPath, false, "--version")
 	if err != nil {
 		fmt.Println("Error getting git version")
 		return
 	}
-	lines := strings.Split(string(out), "\n")
+	lines := strings.Split(out, "\n")
 	if len(lines) > 0 {
 		fmt.Println(lines[0])
 	}

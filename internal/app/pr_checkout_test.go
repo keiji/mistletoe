@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"strings"
+	"path/filepath"
 	"testing"
+	"strings"
 )
 
 // TestCheckoutHelperProcess is a helper process for mocking exec.Command
@@ -56,7 +57,7 @@ func TestCheckoutHelperProcess(t *testing.T) {
 				body := `
 Some description...
 
-----------------
+------------------
 ## Mistletoe
 <details>
 <summary>mistletoe-snapshot-1234.json</summary>
@@ -72,7 +73,7 @@ Some description...
 ` + "```" + `
 </details>
 
-----------------
+------------------
 `
 				if queryBody {
 					// Output raw body
@@ -98,22 +99,29 @@ Some description...
 }
 
 func TestHandlePrCheckout(t *testing.T) {
-	// Swap execCommand
-	execCommand = func(name string, arg ...string) *exec.Cmd {
+	// Swap ExecCommand
+	ExecCommand = func(name string, arg ...string) *exec.Cmd {
 		cs := []string{"-test.run=TestCheckoutHelperProcess", "--", name}
 		cs = append(cs, arg...)
-		cmd := exec.Command(os.Args[0], cs...)
+
+		// Ensure executable path is absolute to handle RunGit changing cmd.Dir
+		testBin, err := filepath.Abs(os.Args[0])
+		if err != nil {
+			testBin = os.Args[0] // Fallback
+		}
+
+		cmd := exec.Command(testBin, cs...)
 		cmd.Env = append(os.Environ(), "GO_WANT_HELPER_PROCESS=1")
 		return cmd
 	}
-	defer func() { execCommand = exec.Command }()
+	defer func() { ExecCommand = exec.Command }()
 
 	// We verify parsing logic via public ParseMistletoeBlock
 	// Note: ParseMistletoeBlock requires separators.
 	body := `
 Some description...
 
-----------------
+------------------
 ## Mistletoe
 <details>
 <summary>mistletoe-snapshot-1234.json</summary>
@@ -129,7 +137,7 @@ Some description...
 ` + "```" + `
 </details>
 
-----------------
+------------------
 `
 	config, _, err := ParseMistletoeBlock(body)
 	if err != nil {
@@ -148,7 +156,7 @@ Some description...
 	bodyRelated := `
 Some description...
 
-----------------
+------------------
 ## Mistletoe
 <details>
 <summary>mistletoe-snapshot-1234.json</summary>
@@ -174,7 +182,7 @@ Some description...
 ` + "```" + `
 </details>
 
-----------------
+------------------
 `
 	config2, related, err := ParseMistletoeBlock(bodyRelated)
 	if err != nil {

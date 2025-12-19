@@ -14,12 +14,16 @@ func handlePrCheckout(args []string, opts GlobalOptions) {
 		uShort    string
 		pVal      int
 		pValShort int
+		vLong     bool
+		vShort    bool
 	)
 
 	fs.StringVar(&uLong, "url", "", "Pull Request URL")
 	fs.StringVar(&uShort, "u", "", "Pull Request URL (shorthand)")
 	fs.IntVar(&pVal, "parallel", DefaultParallel, "Number of parallel processes")
 	fs.IntVar(&pValShort, "p", DefaultParallel, "Number of parallel processes (shorthand)")
+	fs.BoolVar(&vLong, "verbose", false, "Enable verbose output")
+	fs.BoolVar(&vShort, "v", false, "Enable verbose output (shorthand)")
 
 	if err := ParseFlagsFlexible(fs, args); err != nil {
 		fmt.Println(err)
@@ -40,17 +44,17 @@ func handlePrCheckout(args []string, opts GlobalOptions) {
 	if pValShort != DefaultParallel {
 		parallel = pValShort
 	}
+	verbose := vLong || vShort
 
 	// 1. Check gh availability
-	if err := checkGhAvailability(opts.GhPath); err != nil {
+	if err := checkGhAvailability(opts.GhPath, verbose); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
 
 	// 2. Fetch PR Body
 	fmt.Printf("Fetching Pull Request information from %s...\n", prURL)
-	cmd := execCommand(opts.GhPath, "pr", "view", prURL, "--json", "body", "-q", ".body")
-	out, err := cmd.Output()
+	out, err := RunGh(opts.GhPath, verbose, "pr", "view", prURL, "--json", "body", "-q", ".body")
 	if err != nil {
 		fmt.Printf("Error fetching PR body: %v\n", err)
 		os.Exit(1)
@@ -78,7 +82,7 @@ func handlePrCheckout(args []string, opts GlobalOptions) {
 	fmt.Println("Initializing repositories based on snapshot...")
 	// The snapshot contains the target state. We treat it as the config.
 	// PerformInit handles validation, cloning, and checking out.
-	if err := PerformInit(*config.Repositories, opts.GitPath, parallel, 0); err != nil {
+	if err := PerformInit(*config.Repositories, opts.GitPath, parallel, 0, verbose); err != nil {
 		fmt.Printf("Error during initialization: %v\n", err)
 		// We continue to status even if some failed? Or exit?
 		// Usually Init failure is critical.
@@ -87,10 +91,10 @@ func handlePrCheckout(args []string, opts GlobalOptions) {
 
 	// 5. Status
 	fmt.Println("Verifying status...")
-	spinner := NewSpinner()
+	spinner := NewSpinner(verbose)
 	spinner.Start()
-	rows := CollectStatus(config, parallel, opts.GitPath)
-	prRows := CollectPrStatus(rows, config, parallel, opts.GhPath)
+	rows := CollectStatus(config, parallel, opts.GitPath, verbose)
+	prRows := CollectPrStatus(rows, config, parallel, opts.GhPath, verbose)
 	spinner.Stop()
 
 	RenderPrStatusTable(prRows)

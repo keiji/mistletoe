@@ -16,6 +16,7 @@ mstl-gh pr status [options]
 | :--- | :--- | :--- | :--- |
 | `--file` | `-f` | 設定ファイル (JSON) のパス。 | `mistletoe.json` |
 | `--parallel` | `-p` | 並列プロセス数。 | 1 |
+| `--verbose` | `-v` | デバッグ用の詳細ログを出力（実行された git/gh コマンドを表示） | false |
 
 ## 3. 出力形式 (Output Format)
 
@@ -63,3 +64,7 @@ flowchart TD
 2.  設定ファイルから Base Branch を決定します。`base-branch` キーがある場合はそれを使用し、ない場合は `branch` キーを使用します。
 3.  `gh` CLI を使用して、指定された Base Branch に向けた、現在のブランチからの PR を検索します。
 4.  PR が見つかった場合、その URL を表示。見つからない場合、ハイフンを表示。
+
+### 4.3. デバッグ (Debugging)
+
+`--verbose` オプションが指定された場合、実行される `git` および `gh` コマンドが標準エラー出力に出力されます。また、スピナー（進行状況インジケータ）は無効化されます。

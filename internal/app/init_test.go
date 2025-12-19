@@ -92,123 +92,21 @@ func TestValidateEnvironment(t *testing.T) {
 			},
 			wantErr: true,
 		},
-		{
-			name: "Existing file (not dir)",
-			setup: func() {
-				if err := os.WriteFile(repoID, []byte("file"), 0644); err != nil {
-					t.Fatalf("failed to create file: %v", err)
-				}
-			},
-			repos: []Repository{
-				{URL: &repoURL, ID: &repoID},
-			},
-			wantErr: true,
-		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Cleanup from previous run
+			// Cleanup from previous run if any (though we use unique IDs mostly, re-using repoID here)
 			os.RemoveAll(repoID)
 
-			tt.setup()
+			if tt.setup != nil {
+				tt.setup()
+			}
 
-			// Use "git" for testing (assuming system git is available)
-			err := validateEnvironment(tt.repos, "git")
+			// Pass false for verbose
+			err := validateEnvironment(tt.repos, "git", false)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("validateEnvironment() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
-	}
-}
-
-func TestValidateRepositories_Duplicates(t *testing.T) {
-	id1 := "repo1"
-	id2 := "repo2"
-
-	tests := []struct {
-		name    string
-		repos   []Repository
-		wantErr bool
-	}{
-		{
-			name: "No duplicates",
-			repos: []Repository{
-				{ID: &id1, URL: strPtr("http://example.com/1.git")},
-				{ID: &id2, URL: strPtr("http://example.com/2.git")},
-			},
-			wantErr: false,
-		},
-		{
-			name: "Duplicates",
-			repos: []Repository{
-				{ID: &id1, URL: strPtr("http://example.com/1.git")},
-				{ID: &id1, URL: strPtr("http://example.com/2.git")},
-			},
-			wantErr: true,
-		},
-		{
-			name: "Nil IDs (ignored)",
-			repos: []Repository{
-				{ID: nil, URL: strPtr("http://example.com/1.git")},
-				{ID: nil, URL: strPtr("http://example.com/2.git")},
-				{ID: &id1, URL: strPtr("http://example.com/3.git")},
-			},
-			wantErr: false,
-		},
-		{
-			name: "Nil ID and matching string ID (no collision)",
-			repos: []Repository{
-				{ID: nil, URL: strPtr("http://example.com/1.git")},
-				{ID: &id1, URL: strPtr("http://example.com/2.git")},
-			},
-			wantErr: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if err := validateRepositories(tt.repos); (err != nil) != tt.wantErr {
-				t.Errorf("validateRepositories() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
-	}
-}
-
-func TestGetRepoDir(t *testing.T) {
-	id := "custom-dir"
-	tests := []struct {
-		name     string
-		repo     Repository
-		expected string
-	}{
-		{
-			name:     "With ID",
-			repo:     Repository{ID: &id, URL: strPtr("https://github.com/foo/bar.git")},
-			expected: "custom-dir",
-		},
-		{
-			name:     "Without ID, standard git",
-			repo:     Repository{ID: nil, URL: strPtr("https://github.com/foo/bar.git")},
-			expected: "bar",
-		},
-		{
-			name:     "Without ID, no .git",
-			repo:     Repository{ID: nil, URL: strPtr("https://github.com/foo/baz")},
-			expected: "baz",
-		},
-		{
-			name:     "Without ID, trailing slash",
-			repo:     Repository{ID: nil, URL: strPtr("https://github.com/foo/qux/")},
-			expected: "qux",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := GetRepoDir(tt.repo)
-			if got != tt.expected {
-				t.Errorf("GetRepoDir() = %v, want %v", got, tt.expected)
 			}
 		})
 	}

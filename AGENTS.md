@@ -13,6 +13,9 @@ Before creating a Pull Request, ensure that you verify not only that the build s
     *   This project uses `golangci-lint` with `revive` enabled (e.g., `args: --enable=revive --tests=false`).
     *   **Zero Tolerance**: All linting errors, including "unused" variables or functions, must be resolved before submission.
     *   Test files (`_test.go`) are excluded from linting.
+*   **Test Requirements**:
+    *   You **MUST** ensure that all tests pass before committing code.
+    *   Run `go test -v ./...` to verify functionality locally.
 
 ## How to run revive (for Agents)
 

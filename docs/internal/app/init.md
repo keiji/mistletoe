@@ -19,6 +19,7 @@ cat config.json | mstl init [options]
 | `--file` | `-f` | 設定ファイル (JSON) のパス。標準入力を使用する場合は省略可 | - |
 | `--depth` | | 指定されたコミット数に履歴を切り詰めてシャロークローンを作成 | 0 (フルクローン) |
 | `--parallel` | `-p` | クローン/チェックアウトに使用する並列プロセス数 | 1 |
+| `--verbose` | `-v` | デバッグ用の詳細ログを出力（実行された git コマンドを表示） | false |
 
 ## 3. 設定構造 (Configuration Structure)
 
@@ -130,3 +131,7 @@ flowchart TD
     *   **Revision のみ**: `revision` をチェックアウトし、リポジトリを Detached HEAD 状態に変更
     *   **Branch のみ**: 既存の `branch` への切り替え
     *   **どちらもなし**: クローン後、何もしない（デフォルトブランチのまま）
+
+### 4.4 デバッグ (Debugging)
+
+`--verbose` オプションが指定された場合、実行される `git` コマンドが標準エラー出力に出力されます。

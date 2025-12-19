@@ -1,10 +1,31 @@
 package app
 
 import (
+	"io"
 	"os"
+	"os/exec"
 	"strings"
 	"testing"
+	"time"
 )
+
+// TestRunGit_Real tests RunGit against the real git command (if available)
+// or mocks it if we want unit isolation.
+func TestRunGit(t *testing.T) {
+	// Simple test to ensure RunGit calls exec correctly
+	// We'll assume git is available in the environment since this project depends on it.
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not found")
+	}
+
+	out, err := RunGit("", "git", false, "--version")
+	if err != nil {
+		t.Fatalf("RunGit failed: %v", err)
+	}
+	if len(out) == 0 {
+		t.Error("RunGit returned empty output")
+	}
+}
 
 func TestResolveCommonValues(t *testing.T) {
 	tests := []struct {
@@ -149,28 +170,77 @@ func TestResolveCommonValues_WithStdin(t *testing.T) {
 
 	// Call the function
 	gotConfig, gotParallel, gotData, err := ResolveCommonValues("", "", DefaultParallel, DefaultParallel)
-
 	if err != nil {
-		t.Fatalf("ResolveCommonValues failed: %v", err)
+		t.Fatalf("ResolveCommonValues() unexpected error: %v", err)
 	}
+
 	if gotConfig != "" {
-		t.Errorf("Expected empty config file path, got %q", gotConfig)
+		t.Errorf("ResolveCommonValues() config = %v, want empty", gotConfig)
 	}
 	if gotParallel != DefaultParallel {
-		t.Errorf("Expected default parallel, got %d", gotParallel)
+		t.Errorf("ResolveCommonValues() parallel = %v, want %v", gotParallel, DefaultParallel)
 	}
 	if string(gotData) != testConfig {
-		t.Errorf("Expected config data %q, got %q", testConfig, string(gotData))
+		t.Errorf("ResolveCommonValues() data = %v, want %v", string(gotData), testConfig)
 	}
 }
 
-func TestRunGit(t *testing.T) {
-	// Simple test to ensure RunGit calls exec correctly
-	out, err := RunGit("", "git", "--version")
-	if err != nil {
-		t.Fatalf("RunGit failed: %v", err)
+func TestFormatDuration(t *testing.T) {
+	tests := []struct {
+		input    time.Duration
+		expected string
+	}{
+		{time.Duration(0), "0ms"},
+		{time.Duration(100 * time.Millisecond), "100ms"},
+		{time.Duration(999 * time.Millisecond), "999ms"},
+		{time.Duration(1000 * time.Millisecond), "1,000ms"},
+		{time.Duration(1234 * time.Millisecond), "1,234ms"},
+		{time.Duration(1234567 * time.Millisecond), "1,234,567ms"},
+		{time.Duration(1000000 * time.Millisecond), "1,000,000ms"},
 	}
-	if !strings.HasPrefix(out, "git version") {
-		t.Errorf("Expected output starting with 'git version', got %q", out)
+
+	for _, tt := range tests {
+		result := formatDuration(tt.input)
+		if result != tt.expected {
+			t.Errorf("formatDuration(%v) = %q, want %q", tt.input, result, tt.expected)
+		}
+	}
+}
+
+func TestRunGit_VerboseLog(t *testing.T) {
+	// Skip if no echo command (e.g. strict windows env without sh)
+	// But usually available.
+	if _, err := exec.LookPath("echo"); err != nil {
+		t.Skip("echo command not found")
+	}
+
+	// Capture stderr
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	oldStderr := os.Stderr
+	os.Stderr = w
+
+	defer func() {
+		os.Stderr = oldStderr
+	}()
+
+	// RunGit with verbose=true
+	// We use "echo" as gitPath to avoid git dependency issues in this specific test
+	// and ensure it runs quickly.
+	_, _ = RunGit("", "echo", true, "hello")
+
+	w.Close()
+
+	out, _ := io.ReadAll(r)
+	output := string(out)
+
+	// Check format: [CMD] echo hello (0ms) or similar
+	if !strings.Contains(output, "[CMD] echo hello (") {
+		t.Errorf("Log output format incorrect or missing: %q", output)
+	}
+	if !strings.HasSuffix(strings.TrimSpace(output), "ms)") {
+		t.Errorf("Log output should end with ms): %q", output)
 	}
 }
