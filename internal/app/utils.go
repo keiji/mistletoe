@@ -7,19 +7,36 @@ import (
 	"os/exec"
 	"strings"
 	"time"
+
+	"golang.org/x/text/language"
+	"golang.org/x/text/message"
 )
 
 // ExecCommand is a variable that holds exec.Command to allow mocking in tests.
 var ExecCommand = exec.Command
+
+// formatDuration formats a duration in milliseconds with comma separators (e.g., "1,234ms").
+func formatDuration(d time.Duration) string {
+	ms := d.Milliseconds()
+	p := message.NewPrinter(language.English)
+	return p.Sprintf("%dms", ms)
+}
 
 // --- Git Helpers ---
 
 // RunGit runs a git command in the specified directory and returns its output (stdout).
 // Leading/trailing whitespace is trimmed.
 func RunGit(dir string, gitPath string, verbose bool, args ...string) (string, error) {
+	start := time.Now()
 	if verbose {
-		fmt.Fprintf(os.Stderr, "[CMD] %s %s\n", gitPath, strings.Join(args, " "))
+		fmt.Fprintf(os.Stderr, "[CMD] %s %s ", gitPath, strings.Join(args, " "))
 	}
+	defer func() {
+		if verbose {
+			fmt.Fprintf(os.Stderr, "(%s)\n", formatDuration(time.Since(start)))
+		}
+	}()
+
 	cmd := ExecCommand(gitPath, args...)
 	if dir != "" {
 		cmd.Dir = dir
@@ -33,9 +50,16 @@ func RunGit(dir string, gitPath string, verbose bool, args ...string) (string, e
 
 // RunGitInteractive runs a git command connected to os.Stdout/Stderr.
 func RunGitInteractive(dir string, gitPath string, verbose bool, args ...string) error {
+	start := time.Now()
 	if verbose {
-		fmt.Fprintf(os.Stderr, "[CMD] %s %s\n", gitPath, strings.Join(args, " "))
+		fmt.Fprintf(os.Stderr, "[CMD] %s %s ", gitPath, strings.Join(args, " "))
 	}
+	defer func() {
+		if verbose {
+			fmt.Fprintf(os.Stderr, "(%s)\n", formatDuration(time.Since(start)))
+		}
+	}()
+
 	cmd := ExecCommand(gitPath, args...)
 	if dir != "" {
 		cmd.Dir = dir
@@ -49,9 +73,16 @@ func RunGitInteractive(dir string, gitPath string, verbose bool, args ...string)
 
 // RunGh runs a gh command and returns its output (stdout).
 func RunGh(ghPath string, verbose bool, args ...string) (string, error) {
+	start := time.Now()
 	if verbose {
-		fmt.Fprintf(os.Stderr, "[CMD] %s %s\n", ghPath, strings.Join(args, " "))
+		fmt.Fprintf(os.Stderr, "[CMD] %s %s ", ghPath, strings.Join(args, " "))
 	}
+	defer func() {
+		if verbose {
+			fmt.Fprintf(os.Stderr, "(%s)\n", formatDuration(time.Since(start)))
+		}
+	}()
+
 	cmd := ExecCommand(ghPath, args...)
 	out, err := cmd.Output()
 	if err != nil {
