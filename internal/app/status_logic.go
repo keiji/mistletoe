@@ -151,13 +151,15 @@ func getRepoStatus(repo Repository, gitPath string, verbose bool) *StatusRow {
 
 	if !isDetached {
 		// Check if remote branch exists
-		// git ls-remote origin <branchName>
-		output, err := RunGit(targetDir, gitPath, verbose, "ls-remote", "origin", "refs/heads/"+branchName)
-		if err == nil && output != "" {
-			// Output format: <SHA>\trefs/heads/<branch>
-			fields := strings.Fields(output)
-			if len(fields) > 0 {
-				remoteHeadFull = fields[0]
+		// git fetch origin <branchName>
+		// This replaces ls-remote + (maybe) fetch with a single fetch.
+		// It ensures we have the latest remote state and objects.
+		_, err := RunGit(targetDir, gitPath, verbose, "fetch", "origin", branchName)
+		if err == nil {
+			// Fetch succeeded, resolve the remote branch tip from refs/remotes/origin/<branchName>
+			output, err := RunGit(targetDir, gitPath, verbose, "rev-parse", "refs/remotes/origin/"+branchName)
+			if err == nil && output != "" {
+				remoteHeadFull = strings.TrimSpace(output)
 
 				// Construct display: branchName/shortSHA
 				shortRemote := remoteHeadFull
@@ -187,21 +189,8 @@ func getRepoStatus(repo Repository, gitPath string, verbose bool) *StatusRow {
 	hasConflict := false
 
 	if remoteHeadFull != "" && localHeadFull != "" {
-		// Check if we have the remote object locally
-		_, err := RunGit(targetDir, gitPath, verbose, "cat-file", "-e", remoteHeadFull)
-		objectMissing := (err != nil)
-
-		if objectMissing {
-			// Fetch to ensure we can calculate status accurately
-			_, err := RunGit(targetDir, gitPath, verbose, "fetch", "origin", branchName)
-			if err == nil {
-				// Check if object exists now
-				_, err = RunGit(targetDir, gitPath, verbose, "cat-file", "-e", remoteHeadFull)
-				if err == nil {
-					objectMissing = false
-				}
-			}
-		}
+		// Since we fetched above, we assume we have the objects.
+		// Proceed directly to ancestry checks.
 
 		// Check Unpushed (Ahead)
 		// git rev-list --count remote..local
@@ -217,19 +206,14 @@ func getRepoStatus(repo Repository, gitPath string, verbose bool) *StatusRow {
 		// Only if current branch matches config branch (Existing logic preserved for Status Symbol)
 		if repo.Branch != nil && *repo.Branch != "" && *repo.Branch == branchName {
 			if remoteHeadFull != localHeadFull {
-				if objectMissing {
-					// Still missing after fetch attempt? Then we can't really tell, but usually means it's pullable (remote has something we don't have).
+				// Object exists locally, check ancestry
+				// git rev-list --count local..remote
+				count, err := RunGit(targetDir, gitPath, verbose, "rev-list", "--count", localHeadFull+".."+remoteHeadFull)
+				if err == nil && count != "0" {
 					isPullable = true
-				} else {
-					// Object exists locally, check ancestry
-					// git rev-list --count local..remote
-					count, err := RunGit(targetDir, gitPath, verbose, "rev-list", "--count", localHeadFull+".."+remoteHeadFull)
-					if err == nil && count != "0" {
-						isPullable = true
-					}
 				}
 
-				if isPullable && !objectMissing {
+				if isPullable {
 					// Check for conflicts
 					// 2. Merge Base
 					base, err := RunGit(targetDir, gitPath, verbose, "merge-base", localHeadFull, remoteHeadFull)
