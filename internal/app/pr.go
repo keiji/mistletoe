@@ -514,8 +514,23 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 		os.Exit(1)
 	}
 
+	// 9. Execution: Push & Create PR (with Placeholder)
+	fmt.Println("Pushing changes and creating Pull Requests...")
+
+	// Create placeholder body
+	placeholderBlock := GeneratePlaceholderMistletoeBody()
+	prBodyWithPlaceholder := EmbedMistletoeBody(prBody, placeholderBlock)
+
+	// Pass rows to avoid re-fetching branch names during push/create
+	prMap, err := executePrCreation(activeRepos, rows, parallel, opts.GitPath, opts.GhPath, verbose, existingPrURLs, prTitle, prBodyWithPlaceholder)
+	if err != nil {
+		fmt.Printf("Error during execution: %v\n", err)
+		os.Exit(1)
+	}
+
 	fmt.Println("Generating configuration snapshot...")
 	// OPTIMIZATION: Use GenerateSnapshotFromStatus
+	// We do this AFTER creation to satisfy "Just get URL, then construct description"
 	snapshotData, snapshotID, err := GenerateSnapshotFromStatus(config, rows)
 	if err != nil {
 		fmt.Printf("Error generating snapshot: %v\n", err)
@@ -528,18 +543,6 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 		os.Exit(1)
 	}
 	fmt.Printf("Snapshot saved to %s\n", filename)
-
-	initialMistletoeBlock := GenerateMistletoeBody(string(snapshotData), filename, "", make(map[string]string), deps, depContent)
-	prBodyWithSnapshot := EmbedMistletoeBody(prBody, initialMistletoeBlock)
-
-	// 9. Execution: Push & Create PR
-	fmt.Println("Pushing changes and creating Pull Requests...")
-	// Pass rows to avoid re-fetching branch names during push/create
-	prMap, err := executePrCreation(activeRepos, rows, parallel, opts.GitPath, opts.GhPath, verbose, existingPrURLs, prTitle, prBodyWithSnapshot)
-	if err != nil {
-		fmt.Printf("Error during execution: %v\n", err)
-		os.Exit(1)
-	}
 
 	// 10. Post-processing: Update Descriptions
 	fmt.Println("Updating Pull Request descriptions...")

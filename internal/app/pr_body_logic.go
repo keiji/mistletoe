@@ -200,6 +200,36 @@ func GenerateMistletoeBody(snapshotData string, snapshotFilename string, current
 	return sb.String()
 }
 
+// GeneratePlaceholderMistletoeBody creates a placeholder body content.
+func GeneratePlaceholderMistletoeBody() string {
+	// Seed random number generator
+	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
+
+	// Generate N: random number [4, 16]
+	n := rng.Intn(13) + 4
+
+	topSep := strings.Repeat("-", n)
+
+	// Calculate bottom separator length
+	var bottomLen int
+	if n%2 != 0 {
+		bottomLen = n*2 - 2
+	} else {
+		bottomLen = n*2 - 1
+	}
+
+	bottomSep := strings.Repeat("-", bottomLen)
+
+	var sb strings.Builder
+	sb.WriteString("\n\n")
+	sb.WriteString(topSep + "\n")
+	sb.WriteString("## Mistletoe\n")
+	sb.WriteString("This content is auto-generated. Manual edits may be lost.\n\n")
+	sb.WriteString("**Work in progress...** (Generation of snapshot and links is pending)\n")
+	sb.WriteString(bottomSep + "\n")
+	return sb.String()
+}
+
 // EmbedMistletoeBody replaces existing Mistletoe block or appends new one.
 func EmbedMistletoeBody(originalBody, newBlock string) string {
 	lines := strings.Split(originalBody, "\n")
