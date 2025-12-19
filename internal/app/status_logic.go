@@ -24,6 +24,7 @@ type StatusRow struct {
 	IsPullable     bool
 	HasConflict    bool
 	RepoDir        string
+	LocalHeadFull  string
 }
 
 // ValidateRepositoriesIntegrity checks if repositories exist and are valid.
@@ -247,6 +248,7 @@ func getRepoStatus(repo Repository, gitPath string, verbose bool) *StatusRow {
 		IsPullable:     isPullable,
 		HasConflict:    hasConflict,
 		RepoDir:        targetDir,
+		LocalHeadFull:  localHeadFull,
 	}
 }
 
