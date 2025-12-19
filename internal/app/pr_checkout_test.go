@@ -11,7 +11,7 @@ import (
 )
 
 // TestCheckoutHelperProcess is a helper process for mocking exec.Command
-func TestCheckoutHelperProcess(t *testing.T) {
+func TestCheckoutHelperProcess(_ *testing.T) {
 	if os.Getenv("GO_WANT_HELPER_PROCESS") != "1" {
 		return
 	}

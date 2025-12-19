@@ -303,6 +303,88 @@ func GenerateSnapshotVerbose(config *Config, gitPath string, verbose bool) ([]by
 	return data, identifier, nil
 }
 
+// GenerateSnapshotFromStatus creates a snapshot JSON using cached status rows.
+func GenerateSnapshotFromStatus(config *Config, statusRows []StatusRow) ([]byte, string, error) {
+	var currentRepos []Repository
+	statusMap := make(map[string]StatusRow)
+	for _, row := range statusRows {
+		statusMap[row.Repo] = row
+	}
+
+	for _, repo := range *config.Repositories {
+		repoName := GetRepoDir(repo)
+		if repo.ID != nil && *repo.ID != "" {
+			repoName = *repo.ID
+		}
+
+		row, ok := statusMap[repoName]
+		if !ok {
+			// Repo not found in status (maybe directory missing), skip
+			continue
+		}
+
+		// Use cached data
+		// URL: we don't store URL in StatusRow, but we have it in Config.
+		// However, GenerateSnapshot checked `git config --get remote.origin.url`.
+		// StatusRow validation ensures URL matches config. So we can use config URL safely.
+		url := ""
+		if repo.URL != nil {
+			url = *repo.URL
+		}
+		urlPtr := &url
+
+		// Branch
+		branch := row.BranchName
+		if branch == "HEAD" {
+			branch = ""
+		}
+
+		// Revision
+		// LocalHeadFull was added to StatusRow for this purpose
+		revision := row.LocalHeadFull
+
+		// Use ID from config if present
+		id := repoName
+
+		var branchPtr *string
+		if branch != "" {
+			branchPtr = &branch
+		}
+		var revisionPtr *string
+		if revision != "" {
+			revisionPtr = &revision
+		}
+
+		// Resolve BaseBranch
+		var baseBranchPtr *string
+		if repo.BaseBranch != nil && *repo.BaseBranch != "" {
+			baseBranchPtr = repo.BaseBranch
+		} else if repo.Branch != nil && *repo.Branch != "" {
+			baseBranchPtr = repo.Branch
+		}
+
+		currentRepos = append(currentRepos, Repository{
+			ID:         &id,
+			URL:        urlPtr,
+			Branch:     branchPtr,
+			Revision:   revisionPtr,
+			BaseBranch: baseBranchPtr,
+		})
+	}
+
+	identifier := CalculateSnapshotIdentifier(currentRepos)
+
+	snapshotConfig := Config{
+		Repositories: &currentRepos,
+	}
+	data, err := json.MarshalIndent(snapshotConfig, "", "  ")
+	if err != nil {
+		return nil, "", err
+	}
+
+	return data, identifier, nil
+}
+
 // CalculateSnapshotIdentifier calculates the unique identifier for a list of repositories.
 // It sorts the repositories by ID to ensure a deterministic hash.
 func CalculateSnapshotIdentifier(repos []Repository) string {

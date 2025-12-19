@@ -104,7 +104,7 @@ func handlePrStatus(args []string, opts GlobalOptions) {
 	rows := CollectStatus(config, parallel, opts.GitPath, verbose)
 
 	// 5. Collect PR Status
-	prRows := CollectPrStatus(rows, config, parallel, opts.GhPath, verbose)
+	prRows := CollectPrStatus(rows, config, parallel, opts.GhPath, verbose, nil)
 
 	spinner.Stop()
 
@@ -131,7 +131,8 @@ type PrStatusRow struct {
 }
 
 // CollectPrStatus collects Pull Request status for the given repositories.
-func CollectPrStatus(statusRows []StatusRow, config *Config, parallel int, ghPath string, verbose bool) []PrStatusRow {
+// knownPRs is an optional map of [RepoID] -> URL to skip querying existing PRs.
+func CollectPrStatus(statusRows []StatusRow, config *Config, parallel int, ghPath string, verbose bool, knownPRs map[string]string) []PrStatusRow {
 	repoMap := make(map[string]Repository)
 	for _, r := range *config.Repositories {
 		repoMap[getRepoName(r)] = r
@@ -151,6 +152,22 @@ func CollectPrStatus(statusRows []StatusRow, config *Config, parallel int, ghPat
 
 			prRow := PrStatusRow{StatusRow: r}
 
+			isKnown := false
+			if knownPRs != nil {
+				if url, ok := knownPRs[r.Repo]; ok && url != "" {
+					isKnown = true
+					prRow.PrURL = url
+					parts := strings.Split(url, "/")
+					if len(parts) > 0 {
+						prRow.PrNumber = "#" + parts[len(parts)-1]
+					} else {
+						prRow.PrNumber = "?"
+					}
+					// Approximation since we don't store state in map
+					prRow.PrState = "Ready"
+				}
+			}
+
 			conf, ok := repoMap[r.Repo]
 			if ok && conf.URL != nil {
 				baseBranch := ""
@@ -163,15 +180,12 @@ func CollectPrStatus(statusRows []StatusRow, config *Config, parallel int, ghPat
 					prRow.Base = baseBranch
 				}
 
-				if r.RepoDir != "" && r.BranchName != "HEAD" && r.BranchName != "" {
+				if !isKnown && r.RepoDir != "" && r.BranchName != "HEAD" && r.BranchName != "" {
 					args := []string{"pr", "list", "--repo", *conf.URL, "--head", r.BranchName, "--json", "number,state,isDraft,url,baseRefName"}
 					if baseBranch != "" {
 						args = append(args, "--base", baseBranch)
 					}
 
-					// Use RunGh but need raw output
-					// If we switch to RunGh, we get stdout and logging.
-					// However, we need to handle errors gracefully here (if gh command fails, assume no PR or error)
 					out, err := RunGh(ghPath, verbose, args...)
 					if err == nil {
 						var prs []PrInfo
@@ -193,7 +207,7 @@ func CollectPrStatus(statusRows []StatusRow, config *Config, parallel int, ghPat
 					} else {
 						prRow.PrNumber = "N/A"
 					}
-				} else {
+				} else if !isKnown {
 					prRow.PrNumber = "N/A"
 				}
 			}
@@ -379,7 +393,8 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 	spinner := NewSpinner(verbose)
 	spinner.Start()
 	rows := CollectStatus(config, parallel, opts.GitPath, verbose)
-	prRows := CollectPrStatus(rows, config, parallel, opts.GhPath, verbose)
+	// Initial Check: No known PRs yet
+	prRows := CollectPrStatus(rows, config, parallel, opts.GhPath, verbose, nil)
 	spinner.Stop()
 	RenderPrStatusTable(prRows)
 
@@ -401,7 +416,9 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 
 	// 6.5 Filter repos with no changes relative to base
 	fmt.Println("Checking for changes relative to base branch...")
-	activeRepos, skippedRepos := filterPushableRepos(*config.Repositories, parallel, opts.GitPath, verbose)
+	// OPTIMIZATION: Pass rows to avoid some git calls if possible, but filterPushableRepos needs logic not fully in rows.
+	// But we can optimize fetching HEAD.
+	activeRepos, skippedRepos := filterPushableRepos(*config.Repositories, rows, parallel, opts.GitPath, verbose)
 
 	if len(skippedRepos) > 0 {
 		fmt.Println("The following repositories will be skipped (all local commits are already in base branch):")
@@ -416,15 +433,12 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 	knownPRs := make(map[string]string)
 
 	countPRs := 0
-	// We need to check existence ONLY for activeRepos.
-	// But prRows contains info for ALL repos.
 	activeMap := make(map[string]bool)
 	for _, r := range activeRepos {
 		activeMap[getRepoName(r)] = true
 	}
 
 	for _, row := range prRows {
-		// Only consider active repos for "allExist" logic
 		if activeMap[row.Repo] {
 			if row.PrURL != "" && row.PrURL != "-" {
 				knownPRs[row.Repo] = row.PrURL
@@ -493,15 +507,16 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 	}
 
 	fmt.Println("Verifying GitHub permissions and base branches...")
-	// Pass knownPRs to optimize check
-	existingPrURLs, err := verifyGithubRequirements(activeRepos, parallel, opts.GitPath, opts.GhPath, verbose, knownPRs)
+	// Pass knownPRs and rows to optimize check
+	existingPrURLs, err := verifyGithubRequirements(activeRepos, rows, parallel, opts.GitPath, opts.GhPath, verbose, knownPRs)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
 
 	fmt.Println("Generating configuration snapshot...")
-	snapshotData, snapshotID, err := GenerateSnapshot(config, opts.GitPath)
+	// OPTIMIZATION: Use GenerateSnapshotFromStatus
+	snapshotData, snapshotID, err := GenerateSnapshotFromStatus(config, rows)
 	if err != nil {
 		fmt.Printf("Error generating snapshot: %v\n", err)
 		os.Exit(1)
@@ -514,14 +529,13 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 	}
 	fmt.Printf("Snapshot saved to %s\n", filename)
 
-	// Generate initial Mistletoe block without related PRs (pass empty map)
 	initialMistletoeBlock := GenerateMistletoeBody(string(snapshotData), filename, "", make(map[string]string), deps, depContent)
 	prBodyWithSnapshot := EmbedMistletoeBody(prBody, initialMistletoeBlock)
 
 	// 9. Execution: Push & Create PR
 	fmt.Println("Pushing changes and creating Pull Requests...")
-	// executePrCreation returns a map of [RepoID] -> URL
-	prMap, err := executePrCreation(activeRepos, parallel, opts.GitPath, opts.GhPath, verbose, existingPrURLs, prTitle, prBodyWithSnapshot)
+	// Pass rows to avoid re-fetching branch names during push/create
+	prMap, err := executePrCreation(activeRepos, rows, parallel, opts.GitPath, opts.GhPath, verbose, existingPrURLs, prTitle, prBodyWithSnapshot)
 	if err != nil {
 		fmt.Printf("Error during execution: %v\n", err)
 		os.Exit(1)
@@ -538,9 +552,9 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 	fmt.Println("Collecting final status...")
 	spinner = NewSpinner(verbose)
 	spinner.Start()
-	// We re-collect status to show the most up-to-date information including new PRs
 	finalRows := CollectStatus(config, parallel, opts.GitPath, verbose)
-	finalPrRows := CollectPrStatus(finalRows, config, parallel, opts.GhPath, verbose)
+	// OPTIMIZATION: Pass prMap (known created/updated PRs) to avoid redundant gh pr list calls
+	finalPrRows := CollectPrStatus(finalRows, config, parallel, opts.GhPath, verbose, prMap)
 	spinner.Stop()
 	RenderPrStatusTable(finalPrRows)
 
@@ -548,11 +562,17 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 }
 
 // filterPushableRepos filters out repositories where local branch commits are fully contained in the base branch.
-func filterPushableRepos(repos []Repository, parallel int, gitPath string, verbose bool) ([]Repository, []string) {
+func filterPushableRepos(repos []Repository, rows []StatusRow, parallel int, gitPath string, verbose bool) ([]Repository, []string) {
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, parallel)
 
 	shouldKeep := make([]bool, len(repos))
+
+	// Map rows for quick lookup
+	statusMap := make(map[string]StatusRow)
+	for _, r := range rows {
+		statusMap[r.Repo] = r
+	}
 
 	for i, repo := range repos {
 		wg.Add(1)
@@ -562,6 +582,7 @@ func filterPushableRepos(repos []Repository, parallel int, gitPath string, verbo
 			defer func() { <-sem }()
 
 			repoDir := GetRepoDir(r)
+			repoName := getRepoName(r)
 
 			// Resolve Base Branch
 			baseBranch := ""
@@ -573,14 +594,7 @@ func filterPushableRepos(repos []Repository, parallel int, gitPath string, verbo
 
 			keep := true
 			if baseBranch != "" {
-				// We want to check if the local branch has any commits not present in the remote base branch.
-				// To do this without fetching (to avoid changing local state), we use git ls-remote to get the hash of the remote base branch.
-
-				// 1. Get Remote Hash for baseBranch
 				lsOut, err := RunGit(repoDir, gitPath, verbose, "ls-remote", "origin", baseBranch)
-				// ls-remote output format: <hash>\trefs/heads/<branch>\n
-				// We expect one line if it matches exactly, or we need to parse carefully.
-				// Since baseBranch is usually simple name (main), ls-remote origin main matches refs/heads/main usually.
 
 				var remoteHash string
 				if err == nil && lsOut != "" {
@@ -588,10 +602,6 @@ func filterPushableRepos(repos []Repository, parallel int, gitPath string, verbo
 					for _, line := range lines {
 						parts := strings.Fields(line)
 						if len(parts) >= 2 {
-							// Check if ref matches exact branch (refs/heads/baseBranch)
-							// Or if we just trust the first one if exact match wasn't enforced by ls-remote arg?
-							// "git ls-remote origin baseBranch" usually returns refs/heads/baseBranch if ambiguous,
-							// or just that ref.
 							if strings.HasSuffix(parts[1], "/"+baseBranch) {
 								remoteHash = parts[0]
 								break
@@ -601,44 +611,31 @@ func filterPushableRepos(repos []Repository, parallel int, gitPath string, verbo
 				}
 
 				if remoteHash != "" {
-					// 2. Check if we have this object locally
 					_, err := RunGit(repoDir, gitPath, verbose, "cat-file", "-e", remoteHash)
 					if err != nil {
-						// Remote object missing locally. This means remote has advanced (we are behind or diverged)
-						// and we haven't fetched it.
-						// In this case, we definitely cannot do a clean push or PR creation without pulling/fetching.
-						// So we consider this "not pushable/PR-ready" in the context of "just creating PR for local changes".
-						// We skip it.
 						keep = false
 					} else {
-						// 3. Object exists. Check ancestry.
-						// Is remoteHash an ancestor of HEAD?
-						// git merge-base --is-ancestor <remote> <local>
-						// If exit 0: Yes, remote is ancestor. (Local is ahead or same)
-						// If exit 1: No. (Diverged or Local is behind)
-
 						_, err := RunGit(repoDir, gitPath, verbose, "merge-base", "--is-ancestor", remoteHash, "HEAD")
 						if err == nil {
 							// Remote is ancestor.
-							// Check if they are the same commit.
-							headHash, _ := RunGit(repoDir, gitPath, verbose, "rev-parse", "HEAD")
+							// Reuse HEAD from statusMap if possible
+							headHash := ""
+							if row, ok := statusMap[repoName]; ok && row.LocalHeadFull != "" {
+								headHash = row.LocalHeadFull
+							} else {
+								headHash, _ = RunGit(repoDir, gitPath, verbose, "rev-parse", "HEAD")
+							}
+
 							if remoteHash == headHash {
-								// Identical. No new commits.
 								keep = false
 							} else {
-								// Ahead. Keep.
 								keep = true
 							}
 						} else {
-							// Diverged or Behind. Skip.
 							keep = false
 						}
 					}
 				} else {
-					// Remote branch not found?
-					// If verifyGithubRequirements doesn't catch it, we default to keep?
-					// Or if remote branch missing, then everything is new?
-					// Let's Keep.
 					keep = true
 				}
 			}
@@ -680,12 +677,17 @@ func checkGhAvailability(ghPath string, verbose bool) error {
 // verifyGithubRequirements checks GitHub URL, permissions, base branch existence, and existing PRs.
 // It returns a map of RepoName -> Existing PR URL.
 // Accepts knownPRs map[string]string (ID -> URL) to optimize existing PR check.
-func verifyGithubRequirements(repos []Repository, parallel int, gitPath, ghPath string, verbose bool, knownPRs map[string]string) (map[string]string, error) {
+func verifyGithubRequirements(repos []Repository, rows []StatusRow, parallel int, gitPath, ghPath string, verbose bool, knownPRs map[string]string) (map[string]string, error) {
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, parallel)
 	var errs []string
 	existingPRs := make(map[string]string)
+
+	statusMap := make(map[string]StatusRow)
+	for _, r := range rows {
+		statusMap[r.Repo] = r
+	}
 
 	for _, repo := range repos {
 		wg.Add(1)
@@ -721,7 +723,6 @@ func verifyGithubRequirements(repos []Repository, parallel int, gitPath, ghPath 
 			}
 
 			// 3. Check Base Branch Existence
-			// Resolve Base Branch: base-branch >> branch
 			baseBranch := ""
 			if r.BaseBranch != nil && *r.BaseBranch != "" {
 				baseBranch = *r.BaseBranch
@@ -731,9 +732,6 @@ func verifyGithubRequirements(repos []Repository, parallel int, gitPath, ghPath 
 
 			if baseBranch != "" {
 				repoDir := GetRepoDir(r)
-				// We check if the branch exists on remote using git ls-remote.
-				// We need to use origin as the remote name (standard in this tool).
-				// We run this command inside the repo directory.
 				lsOut, lsErr := RunGit(repoDir, gitPath, verbose, "ls-remote", "--heads", "origin", baseBranch)
 				if lsErr != nil {
 					mu.Lock()
@@ -750,7 +748,6 @@ func verifyGithubRequirements(repos []Repository, parallel int, gitPath, ghPath 
 			}
 
 			// 4. Check for existing PR
-			// Use knownPRs if available
 			if knownPRs != nil {
 				if url, ok := knownPRs[repoName]; ok && url != "" {
 					mu.Lock()
@@ -762,12 +759,20 @@ func verifyGithubRequirements(repos []Repository, parallel int, gitPath, ghPath 
 
 			// Fallback to query
 			repoDir := GetRepoDir(r)
-			branchName, err := RunGit(repoDir, gitPath, verbose, "rev-parse", "--abbrev-ref", "HEAD")
-			if err != nil {
-				mu.Lock()
-				errs = append(errs, fmt.Sprintf("[%s] Failed to get branch for PR check: %v", repoName, err))
-				mu.Unlock()
-				return
+			branchName := ""
+
+			if row, ok := statusMap[repoName]; ok && row.BranchName != "" {
+				branchName = row.BranchName
+			} else {
+				// Redundant fallback
+				b, err := RunGit(repoDir, gitPath, verbose, "rev-parse", "--abbrev-ref", "HEAD")
+				if err != nil {
+					mu.Lock()
+					errs = append(errs, fmt.Sprintf("[%s] Failed to get branch for PR check: %v", repoName, err))
+					mu.Unlock()
+					return
+				}
+				branchName = b
 			}
 
 			out, errCheck := RunGh(ghPath, verbose, "pr", "list", "--repo", *r.URL, "--head", branchName, "--json", "url", "-q", ".[0].url")
@@ -797,7 +802,7 @@ func verifyGithubRequirements(repos []Repository, parallel int, gitPath, ghPath 
 
 // executePrCreation pushes changes and creates PRs.
 // Returns a map of RepoName -> PR URL.
-func executePrCreation(repos []Repository, parallel int, gitPath, ghPath string, verbose bool, existingPRs map[string]string, title, body string) (map[string]string, error) {
+func executePrCreation(repos []Repository, rows []StatusRow, parallel int, gitPath, ghPath string, verbose bool, existingPRs map[string]string, title, body string) (map[string]string, error) {
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, parallel)
@@ -807,6 +812,11 @@ func executePrCreation(repos []Repository, parallel int, gitPath, ghPath string,
 	// Pre-populate prMap with existing PRs
 	for k, v := range existingPRs {
 		prMap[k] = v
+	}
+
+	statusMap := make(map[string]StatusRow)
+	for _, r := range rows {
+		statusMap[r.Repo] = r
 	}
 
 	for _, repo := range repos {
@@ -820,12 +830,18 @@ func executePrCreation(repos []Repository, parallel int, gitPath, ghPath string,
 			repoName := getRepoName(r)
 
 			// 1. Push
-			branchName, err := RunGit(repoDir, gitPath, verbose, "rev-parse", "--abbrev-ref", "HEAD")
-			if err != nil {
-				mu.Lock()
-				errs = append(errs, fmt.Sprintf("[%s] Failed to get branch: %v", repoName, err))
-				mu.Unlock()
-				return
+			branchName := ""
+			if row, ok := statusMap[repoName]; ok && row.BranchName != "" {
+				branchName = row.BranchName
+			} else {
+				b, err := RunGit(repoDir, gitPath, verbose, "rev-parse", "--abbrev-ref", "HEAD")
+				if err != nil {
+					mu.Lock()
+					errs = append(errs, fmt.Sprintf("[%s] Failed to get branch: %v", repoName, err))
+					mu.Unlock()
+					return
+				}
+				branchName = b
 			}
 
 			fmt.Printf("[%s] Pushing to origin/%s...\n", repoName, branchName)
@@ -858,7 +874,7 @@ func executePrCreation(repos []Repository, parallel int, gitPath, ghPath string,
 				args = append(args, "--fill")
 			}
 
-			// Resolve Base Branch: base-branch >> branch
+			// Resolve Base Branch
 			baseBranch := ""
 			if r.BaseBranch != nil && *r.BaseBranch != "" {
 				baseBranch = *r.BaseBranch
@@ -872,8 +888,6 @@ func executePrCreation(repos []Repository, parallel int, gitPath, ghPath string,
 
 			createOut, err := RunGh(ghPath, verbose, args...)
 			if err != nil {
-				// Need to check stderr for "already exists"
-				// RunGh uses cmd.Output() which returns *exec.ExitError with Stderr
 				var exitErr *exec.ExitError
 				if errors.As(err, &exitErr) {
 					stderr := string(exitErr.Stderr)

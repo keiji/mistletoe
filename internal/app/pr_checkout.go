@@ -94,7 +94,7 @@ func handlePrCheckout(args []string, opts GlobalOptions) {
 	spinner := NewSpinner(verbose)
 	spinner.Start()
 	rows := CollectStatus(config, parallel, opts.GitPath, verbose)
-	prRows := CollectPrStatus(rows, config, parallel, opts.GhPath, verbose)
+	prRows := CollectPrStatus(rows, config, parallel, opts.GhPath, verbose, nil)
 	spinner.Stop()
 
 	RenderPrStatusTable(prRows)
