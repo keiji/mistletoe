@@ -26,9 +26,7 @@ func fakeExecCommand(command string, args ...string) *exec.Cmd {
 	cmd := exec.Command(testBin, cs...)
 	// Pass environment variables to identify specific test cases
 	// Important: Append to os.Environ() to preserve PATH and other settings
-	cmd.Env = append(os.Environ(), "GO_WANT_HELPER_PROCESS=1", "MOCK_GIT_LS_REMOTE_MISSING="+os.Getenv("MOCK_GIT_LS_REMOTE_MISSING"))
-	// Pipe stderr to see errors from the helper process during debugging
-	cmd.Stderr = os.Stderr
+	cmd.Env = append(os.Environ(), "GO_WANT_HELPER_PROCESS=1", "MOCK_GIT_LS_REMOTE_MISSING="+os.Getenv("MOCK_GIT_LS_REMOTE_MISSING"), "MOCK_GH_NO_COMMITS="+os.Getenv("MOCK_GH_NO_COMMITS"))
 	return cmd
 }
 
@@ -92,6 +90,10 @@ func handleGhMock(args []string) {
 		}
 		// pr create
 		if len(args) > 1 && args[1] == "create" {
+			if os.Getenv("MOCK_GH_NO_COMMITS") == "1" {
+				fmt.Fprintln(os.Stderr, "pull request create failed: GraphQL: No commits between main and tmp (createPullRequest)")
+				os.Exit(1)
+			}
 			// Output the URL
 			fmt.Println("https://github.com/user/repo/pull/2")
 			os.Exit(0)
@@ -237,5 +239,33 @@ func TestVerifyGithubRequirements_MissingBaseBranch(t *testing.T) {
 	}
 	if err != nil && !strings.Contains(err.Error(), "does not exist on remote") {
 		t.Errorf("Expected error message about missing base branch, got: %v", err)
+	}
+}
+
+func TestExecutePrCreation_NoCommitsError(t *testing.T) {
+	oldExec := ExecCommand
+	ExecCommand = fakeExecCommand
+	defer func() { ExecCommand = oldExec }()
+
+	id := "."
+	url := "https://github.com/user/repo.git"
+	repo := Repository{ID: &id, URL: &url}
+	repos := []Repository{repo}
+
+	// Dummy StatusRow needed for branch name resolution
+	row := StatusRow{Repo: id, BranchName: "feature-branch"}
+	rows := []StatusRow{row}
+
+	// Set env to mock "No commits" error
+	os.Setenv("MOCK_GH_NO_COMMITS", "1")
+	defer os.Unsetenv("MOCK_GH_NO_COMMITS")
+
+	// Should not return error, but should not have created PR (not in map)
+	prMap, err := executePrCreation(repos, rows, 1, "git", "gh", false, nil, "Title", "Body")
+	if err != nil {
+		t.Errorf("Expected no error (should skip), got: %v", err)
+	}
+	if len(prMap) != 0 {
+		t.Errorf("Expected empty PR map, got %v", prMap)
 	}
 }

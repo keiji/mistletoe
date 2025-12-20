@@ -601,23 +601,9 @@ func filterPushableRepos(repos []Repository, rows []StatusRow, parallel int, git
 
 			keep := true
 			if baseBranch != "" {
-				lsOut, err := RunGit(repoDir, gitPath, verbose, "ls-remote", "origin", baseBranch)
+				remoteHash, err := resolveRemoteBranchHash(repoDir, gitPath, baseBranch, verbose)
 
-				var remoteHash string
-				if err == nil && lsOut != "" {
-					lines := strings.Split(lsOut, "\n")
-					for _, line := range lines {
-						parts := strings.Fields(line)
-						if len(parts) >= 2 {
-							if strings.HasSuffix(parts[1], "/"+baseBranch) {
-								remoteHash = parts[0]
-								break
-							}
-						}
-					}
-				}
-
-				if remoteHash != "" {
+				if err == nil && remoteHash != "" {
 					_, err := RunGit(repoDir, gitPath, verbose, "cat-file", "-e", remoteHash)
 					if err != nil {
 						keep = false
@@ -739,14 +725,14 @@ func verifyGithubRequirements(repos []Repository, rows []StatusRow, parallel int
 
 			if baseBranch != "" {
 				repoDir := GetRepoDir(r)
-				lsOut, lsErr := RunGit(repoDir, gitPath, verbose, "ls-remote", "--heads", "origin", baseBranch)
-				if lsErr != nil {
+				remoteHash, err := resolveRemoteBranchHash(repoDir, gitPath, baseBranch, verbose)
+				if err != nil {
 					mu.Lock()
-					errs = append(errs, fmt.Sprintf("[%s] Failed to check base branch '%s': %v", repoName, baseBranch, lsErr))
+					errs = append(errs, fmt.Sprintf("[%s] Failed to check base branch '%s': %v", repoName, baseBranch, err))
 					mu.Unlock()
 					return
 				}
-				if strings.TrimSpace(lsOut) == "" {
+				if remoteHash == "" {
 					mu.Lock()
 					errs = append(errs, fmt.Sprintf("[%s] Base branch '%s' does not exist on remote", repoName, baseBranch))
 					mu.Unlock()
@@ -910,6 +896,11 @@ func executePrCreation(repos []Repository, rows []StatusRow, parallel int, gitPa
 						}
 					}
 
+					if strings.Contains(stderr, "No commits between") {
+						fmt.Printf("[%s] No commits between %s and %s. Skipping PR creation.\n", repoName, baseBranch, branchName)
+						return
+					}
+
 					mu.Lock()
 					errs = append(errs, fmt.Sprintf("[%s] PR Create failed: %s", repoName, stderr))
 					mu.Unlock()
@@ -1007,4 +998,34 @@ func getRepoName(r Repository) string {
 	}
 	// Fallback to dir name
 	return GetRepoDir(r)
+}
+
+// resolveRemoteBranchHash tries to resolve the remote branch hash locally first,
+// and falls back to ls-remote if necessary.
+func resolveRemoteBranchHash(repoDir, gitPath, branchName string, verbose bool) (string, error) {
+	// 1. Try local ref (fast)
+	// checks refs/remotes/origin/<branchName>
+	out, err := RunGit(repoDir, gitPath, verbose, "rev-parse", "--verify", "refs/remotes/origin/"+branchName)
+	if err == nil && out != "" {
+		return strings.TrimSpace(out), nil
+	}
+
+	// 2. Fallback to ls-remote (network, slow)
+	lsOut, err := RunGit(repoDir, gitPath, verbose, "ls-remote", "--heads", "origin", branchName)
+	if err != nil {
+		return "", err
+	}
+
+	lines := strings.Split(lsOut, "\n")
+	for _, line := range lines {
+		parts := strings.Fields(line)
+		if len(parts) >= 2 {
+			// exact match for branch
+			if parts[1] == "refs/heads/"+branchName {
+				return parts[0], nil
+			}
+		}
+	}
+
+	return "", nil
 }
