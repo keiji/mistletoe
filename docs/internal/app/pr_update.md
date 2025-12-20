@@ -2,9 +2,12 @@
 
 ## 1. 概要 (Overview)
 
-`pr update` サブコマンドは、既に存在するPull Request (PR) のDescriptionに含まれるMistletoeブロック（スナップショット情報および依存関係グラフ）を更新します。
-新しいPRの作成や、GitリポジトリへのPushは行いません。
-ローカルリポジトリの状態に基づき、最新のコミットハッシュ情報と指定された依存関係グラフを既存のPRに反映させるために使用します。
+`pr update` サブコマンドは、既に存在するPull Request (PR) を更新します。
+対象となるリポジトリ（OpenまたはDraft状態のPRが存在するもの）に対して、以下の処理を行います：
+1.  **Push**: ローカルブランチがリモートより進んでいる場合、変更をPushします。
+2.  **Description更新**: PRのDescriptionに含まれるMistletoeブロック（スナップショット情報および依存関係グラフ）を最新の状態に更新します。
+
+新しいPRの作成は行いません。
 
 ## 2. 使用方法 (Usage)
 
@@ -41,7 +44,11 @@ flowchart TD
     Categorize --> CheckTarget{"更新可能なPRがあるか？\n(Open/Draft)"}
 
     CheckTarget -- "No" --> Stop(["終了 (更新対象なし)"])
-    CheckTarget -- "Yes" --> GenSnapshot["スナップショット生成"]
+    CheckTarget -- "Yes" --> VerifyPush{"Pushが必要か？\n(Ahead)"}
+
+    VerifyPush -- "Yes" --> ExecPush["Push実行"]
+    VerifyPush -- "No" --> GenSnapshot["スナップショット生成"]
+    ExecPush --> GenSnapshot
 
     GenSnapshot --> ExecUpdate["PR本文更新\n(スナップショット埋め込み)"]
     ExecUpdate --> ShowFinalStatus["最終ステータス表示"]
@@ -53,41 +60,32 @@ flowchart TD
 ステータス収集後、各リポジトリの状態に基づいて処理を決定します。
 
 1.  **Pullが必要 (Behind)**:
-    *   **条件**: ローカルブランチがリモートブランチより遅れている（リモートにありローカルにないコミットがある）。
-    *   **アクション**: **エラー停止**。スナップショットが古くなる可能性があるため、更新前にPullを要求します。
+    *   **条件**: ローカルブランチがリモートブランチより遅れている。
+    *   **アクション**: **エラー停止**。
 
 2.  **競合 (Conflict)**:
     *   **条件**: マージ競合が発生している。
     *   **アクション**: **エラー停止**。
 
-3.  **Detached HEAD**:
-    *   **条件**: ブランチ上にいない。
-    *   **アクション**: **エラー停止**。
-
-4.  **Pull Requestの更新 (Update PR)**:
+3.  **Pull Requestの更新 (Update PR)**:
     *   **条件**: 有効な（OpenまたはDraft状態の）Pull Requestが存在する。
     *   **アクション**:
-        *   スナップショットを生成し、PRのDescriptionにあるMistletoeブロックを置換（なければ追記）します。
-        *   `--dependencies` が指定されている場合、依存関係グラフも更新されます。
-        *   `create` コマンドとは異なり、ローカルが `Ahead` であってもPushは行いません。あくまでメタデータの更新のみです。
+        *   **Push**: ローカルがリモートより進んでいる場合 (`Ahead`)、`git push origin <branch>` を実行します。
+        *   **Update**: DescriptionのMistletoeブロックを置換・追記します。
 
 ### 3.3. 依存関係の解析 (Dependency Parsing)
 
-`pr create` と同様のルールで依存関係ファイルを解析します。
-
-*   **形式**: Markdownファイル内のMermaidグラフ。
-*   **検証**: グラフ内のノードIDは、設定ファイル内のリポジトリIDと一致する必要があります。
+`pr create` と同様。
 
 ### 3.4. Mistletoe ブロック (Mistletoe Block)
 
 PR 本文の更新仕様は `pr create` と完全に同一です。
-既存のMistletoeブロック（`## Mistletoe` ヘッダーと区切り線で識別）が存在する場合はその範囲を置換し、存在しない場合は末尾に追記します。
 
 ### 3.5. 制約事項 (Constraints)
 
 *   **GitHub のみ**: URL が GitHub を指していないリポジトリはスキップまたはエラー。
 *   **クリーンな状態**: コンフリクトやBehind状態のリポジトリがある場合は実行できません。
-*   **Pushなし**: このコマンドはコードのPushを行いません。コードの変更を反映させたい場合は `git push` を手動で行うか、`pr create` を使用してください。
+*   **PR作成なし**: このコマンドは新しいPRを作成しません。新規作成が必要な場合は `pr create` を使用してください。
 
 ### 3.6. デバッグ (Debugging)
 

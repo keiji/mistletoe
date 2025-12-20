@@ -170,6 +170,41 @@ func handlePrUpdate(args []string, opts GlobalOptions) {
 		return
 	}
 
+	// 7.5 Check for Push (Ahead)
+	// If any active repo is ahead, we push it before updating description.
+	var pushList []Repository
+	statusMap := make(map[string]StatusRow)
+	for _, r := range rows {
+		statusMap[r.Repo] = r
+	}
+
+	for _, repo := range activeRepos {
+		repoName := getRepoName(repo)
+		if status, ok := statusMap[repoName]; ok {
+			if status.HasUnpushed {
+				pushList = append(pushList, repo)
+			}
+		}
+	}
+
+	if len(pushList) > 0 {
+		fmt.Println("Pushing changes for repositories with active Pull Requests...")
+		if err := executePush(pushList, rows, parallel, opts.GitPath, verbose); err != nil {
+			fmt.Printf("Error during push: %v\n", err)
+			os.Exit(1)
+		}
+		// Re-collect status after push?
+		// We need updated commit hashes for snapshot!
+		// But CollectStatus uses 'rows' for snapshot generation logic (GenerateSnapshotFromStatus uses 'rows').
+		// The rows contain the commit hash (LocalBranchRev) which is what matters for snapshot.
+		// If we push, the commit hash doesn't change, only the remote ref status changes.
+		// The snapshot records the *local* (which is now pushed) state.
+		// So we don't strictly need to re-collect status for the snapshot's sake.
+		// However, GenerateSnapshotFromStatus uses 'rows' which has 'LocalBranchRev'.
+		// 'LocalBranchRev' is derived from local commit.
+		// So it remains valid.
+	}
+
 	// 8. Generate Snapshot
 	fmt.Println("Generating configuration snapshot...")
 	snapshotData, snapshotID, err := GenerateSnapshotFromStatus(config, rows)
