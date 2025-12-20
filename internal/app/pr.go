@@ -258,12 +258,14 @@ func sortPrs(prs []PrInfo) {
 		switch strings.ToUpper(state) {
 		case "OPEN":
 			return 0
-		case "MERGED":
+		case "DRAFT":
 			return 1
-		case "CLOSED":
+		case "MERGED":
 			return 2
-		default:
+		case "CLOSED":
 			return 3
+		default:
+			return 4
 		}
 	}
 
