@@ -1,9 +1,10 @@
+// Package main is the entry point for the mstl-gh application.
 package main
 
 import (
 	"os"
 
-	"github.com/keiji/mistletoe/internal/app"
+	"mistletoe/internal/app"
 )
 
 var (
