@@ -18,8 +18,8 @@ type relatedPRsJSON struct {
 }
 
 // GenerateMistletoeBody creates the structured body content.
-// It accepts a map of all related PRs (RepoID -> URL), an optional dependency graph, and the raw dependency content.
-func GenerateMistletoeBody(snapshotData string, snapshotFilename string, currentRepoID string, allPRs map[string]string, deps *DependencyGraph, dependencyContent string) string {
+// It accepts a map of all related PRs (RepoID -> []URL), an optional dependency graph, and the raw dependency content.
+func GenerateMistletoeBody(snapshotData string, snapshotFilename string, currentRepoID string, allPRs map[string][]string, deps *DependencyGraph, dependencyContent string) string {
 	// Seed random number generator
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 
@@ -48,10 +48,10 @@ func GenerateMistletoeBody(snapshotData string, snapshotFilename string, current
 	sb.WriteString("This content is auto-generated. Manual edits may be lost.\n\n")
 
 	// Filter out self
-	targets := make(map[string]string)
-	for id, url := range allPRs {
+	targets := make(map[string][]string)
+	for id, urls := range allPRs {
 		if id != currentRepoID {
-			targets[id] = url
+			targets[id] = urls
 		}
 	}
 
@@ -64,8 +64,8 @@ func GenerateMistletoeBody(snapshotData string, snapshotFilename string, current
 	var others []string
 
 	if deps == nil {
-		for _, u := range targets {
-			flatList = append(flatList, u)
+		for _, urls := range targets {
+			flatList = append(flatList, urls...)
 		}
 		sort.Strings(flatList)
 		relatedJSON.Others = flatList
@@ -86,18 +86,18 @@ func GenerateMistletoeBody(snapshotData string, snapshotFilename string, current
 			}
 		}
 
-		for id, url := range targets {
+		for id, urls := range targets {
 			isDep := forwardDeps[id]
 			isDeper := reverseDeps[id]
 
 			if isDep {
-				dependencies = append(dependencies, url)
+				dependencies = append(dependencies, urls...)
 			}
 			if isDeper {
-				dependents = append(dependents, url)
+				dependents = append(dependents, urls...)
 			}
 			if !isDep && !isDeper {
-				others = append(others, url)
+				others = append(others, urls...)
 			}
 		}
 
