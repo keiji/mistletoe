@@ -19,6 +19,7 @@ mstl-gh pr create [options]
 | `--body` | `-b` | PR の本文。 | (エディタで入力) |
 | `--file` | `-f` | 設定ファイル (JSON) のパス。 | `mistletoe.json` |
 | `--dependencies` | `-d` | 依存関係グラフ（Mermaid形式）のMarkdownファイルパス。 | (なし) |
+| `--parallel` | `-p` | 並列実行数。 | 1 |
 | `--verbose` | `-v` | デバッグ用の詳細ログを出力（実行された git/gh コマンドを表示） | false |
 
 ## 3. ロジックフロー (Logic Flow)
@@ -50,7 +51,7 @@ flowchart TD
 
     VerifyBase -- "エラー" --> ErrorState
     VerifyBase -- "OK" --> CheckEditor{"エディタ起動？"}
-    CheckEditor -- "Yes" --> InputContent["タイトル・本文入力 (エディタ)"]
+    CheckEditor -- "Yes" --> InputContent["タイトル・本文入力 (エディタ)\n(解析ルール適用)"]
     CheckEditor -- "No" --> GenSnapshot["スナップショット生成"]
     InputContent --> GenSnapshot
 
@@ -173,3 +174,36 @@ PR 本文の末尾に、自動生成された不可視（または折りたた�
 ### 3.7. デバッグ (Debugging)
 
 `--verbose` オプションが指定された場合、実行される `git` および `gh` コマンドが標準エラー出力に出力されます。また、スピナー（進行状況インジケータ）は無効化されます。
+
+### 3.8. エディタ入力の解析ルール (Editor Input Parsing Rules)
+
+エディタから入力されたテキストは、以下のルールに従って「タイトル」と「本文」に分割されます。
+PRタイトルの最大文字数 (`PrTitleMaxLength`) は 256 文字です。
+
+1.  **1行目が最大文字数を超える場合**:
+    *   **タイトル**: 1行目を `PrTitleMaxLength - 3` 文字で切り出し、末尾に `...` を付与します。
+    *   **本文**: 入力されたテキスト全体（1行目を含む）。
+2.  **1行目の直下が空行の場合** (標準的な Git コミットメッセージ形式):
+    *   **タイトル**: 1行目。
+    *   **本文**: 3行目以降のすべてのテキスト。
+3.  **上記以外**:
+    *   **タイトル**: 1行目。
+    *   **本文**: 入力されたテキスト全体（1行目を含む）。
+
+**例**:
+*   *入力*:
+    ```
+    Title line
+
+    Body line 1
+    Body line 2
+    ```
+    *解析結果*: Title="Title line", Body="Body line 1\nBody line 2"
+
+*   *入力*:
+    ```
+    Title line
+    Body line 1
+    Body line 2
+    ```
+    *解析結果*: Title="Title line", Body="Title line\nBody line 1\nBody line 2"
