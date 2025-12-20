@@ -710,10 +710,11 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 	var displayRows []PrStatusRow
 	for _, row := range finalPrRows {
 		// GitHub API treats both regular Open PRs and Draft PRs as having the state "OPEN".
-		// Checking for this state correctly includes both [Open] and [Draft] while excluding [Merged] and [Closed].
-		if strings.EqualFold(row.PrState, GitHubPrStateOpen) {
-			displayRows = append(displayRows, row)
+		// If it is NOT Open (e.g., Merged, Closed, or N/A), we mask the PR display with "-".
+		if !strings.EqualFold(row.PrState, GitHubPrStateOpen) {
+			row.PrDisplay = "-"
 		}
+		displayRows = append(displayRows, row)
 	}
 	RenderPrStatusTable(displayRows)
 
