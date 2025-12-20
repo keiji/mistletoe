@@ -125,10 +125,11 @@ type PrInfo struct {
 // PrStatusRow represents a row in the PR status table.
 type PrStatusRow struct {
 	StatusRow
-	PrNumber string
-	PrState  string
-	PrURL    string
-	Base     string
+	PrNumber  string
+	PrState   string
+	PrURL     string
+	PrDisplay string
+	Base      string
 }
 
 // CollectPrStatus collects Pull Request status for the given repositories.
@@ -158,6 +159,7 @@ func CollectPrStatus(statusRows []StatusRow, config *Config, parallel int, ghPat
 				if url, ok := knownPRs[r.Repo]; ok && url != "" {
 					isKnown = true
 					prRow.PrURL = url
+					prRow.PrDisplay = fmt.Sprintf("%s [Ready]", url)
 					parts := strings.Split(url, "/")
 					if len(parts) > 0 {
 						prRow.PrNumber = "#" + parts[len(parts)-1]
@@ -216,10 +218,11 @@ func CollectPrStatus(statusRows []StatusRow, config *Config, parallel int, ghPat
 
 								prLines = append(prLines, fmt.Sprintf("%s [%s]", pr.URL, displayState))
 							}
-							prRow.PrURL = strings.Join(prLines, "\n")
+							prRow.PrDisplay = strings.Join(prLines, "\n")
 
 							// Set other fields based on the first (most relevant) PR
 							topPr := prs[0]
+							prRow.PrURL = topPr.URL
 							prRow.PrNumber = fmt.Sprintf("#%d", topPr.Number)
 							prRow.PrState = topPr.State // Raw state
 
@@ -324,7 +327,7 @@ func RenderPrStatusTable(rows []PrStatusRow) {
 			statusStr = "-"
 		}
 
-		prContent := row.PrURL
+		prContent := row.PrDisplay
 		if prContent == "" {
 			prContent = "-"
 		}
