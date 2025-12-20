@@ -217,7 +217,11 @@ func CollectPrStatus(statusRows []StatusRow, config *Config, parallel int, ghPat
 							var prLines []string
 							for _, pr := range prs {
 								displayState := getPrDisplayState(pr)
-								prLines = append(prLines, fmt.Sprintf("%s [%s]", pr.URL, displayState))
+								line := fmt.Sprintf("%s [%s]", pr.URL, displayState)
+								if displayState == DisplayPrStateMerged || displayState == DisplayPrStateClosed {
+									line = AnsiFgGray + line + AnsiReset
+								}
+								prLines = append(prLines, line)
 							}
 							prRow.PrDisplay = strings.Join(prLines, "\n")
 
@@ -321,23 +325,16 @@ func RenderPrStatusTable(rows []PrStatusRow) {
 	// Change Header Order: Repository, Base, Branch/Rev, Status, PR
 	table.Header("Repository", "Base", "Branch/Rev", "Status", "PR")
 
-	const (
-		Reset    = "\033[0m"
-		FgRed    = "\033[31m"
-		FgGreen  = "\033[32m"
-		FgYellow = "\033[33m"
-	)
-
 	for _, row := range rows {
 		statusStr := ""
 		if row.HasUnpushed {
-			statusStr += FgGreen + StatusSymbolUnpushed + Reset
+			statusStr += AnsiFgGreen + StatusSymbolUnpushed + AnsiReset
 		}
 
 		if row.HasConflict {
-			statusStr += FgYellow + StatusSymbolConflict + Reset
+			statusStr += AnsiFgYellow + StatusSymbolConflict + AnsiReset
 		} else if row.IsPullable {
-			statusStr += FgYellow + StatusSymbolPullable + Reset
+			statusStr += AnsiFgYellow + StatusSymbolPullable + AnsiReset
 		}
 
 		if statusStr == "" {
