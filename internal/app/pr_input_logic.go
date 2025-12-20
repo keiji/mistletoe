@@ -15,7 +15,7 @@ import (
 //    Body = Line 3+
 // 3. Otherwise:
 //    Title = Line 1
-//    Body = Line 2+
+//    Body = Full Input
 func ParsePrTitleBody(input string) (string, string) {
 	input = strings.ReplaceAll(input, "\r\n", "\n")
 	lines := strings.Split(input, "\n")
@@ -39,8 +39,8 @@ func ParsePrTitleBody(input string) (string, string) {
 			return line1, body
 		}
 		// Case: Line 1, Line 2... (No empty separator)
-		body := strings.Join(lines[1:], "\n")
-		return line1, body
+		// Body = Full Input
+		return line1, input
 	}
 
 	// Single line

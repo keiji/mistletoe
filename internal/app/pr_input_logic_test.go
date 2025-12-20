@@ -39,7 +39,8 @@ It has multiple lines.`,
 			input: `My PR Title
 This is the body immediately.`,
 			expectedTitle: "My PR Title",
-			expectedBody:  "This is the body immediately.",
+			expectedBody: `My PR Title
+This is the body immediately.`,
 		},
 		{
 			name: "Long Title (Overflow)",
@@ -56,9 +57,11 @@ This is the body immediately.`,
 				// Exact 256 chars
 				return strings.Repeat("A", 256) + "\nBody"
 			}(),
-			// Should NOT truncate if it's exactly 256
+			// Exact limit without newline separator falls into Condition 3 (No separator)
 			expectedTitle: strings.Repeat("A", 256),
-			expectedBody:  "Body",
+			expectedBody: func() string {
+				return strings.Repeat("A", 256) + "\nBody"
+			}(),
 		},
 		{
 			name: "Long Title (Limit + 1)",

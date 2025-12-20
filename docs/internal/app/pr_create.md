@@ -188,7 +188,7 @@ PRタイトルの最大文字数 (`PrTitleMaxLength`) は 256 文字です。
     *   **本文**: 3行目以降のすべてのテキスト。
 3.  **上記以外**:
     *   **タイトル**: 1行目。
-    *   **本文**: 2行目以降のすべてのテキスト。
+    *   **本文**: 入力されたテキスト全体（1行目を含む）。
 
 **例**:
 *   *入力*:
@@ -202,7 +202,8 @@ PRタイトルの最大文字数 (`PrTitleMaxLength`) は 256 文字です。
 
 *   *入力*:
     ```
-    Very long title line... (exceeds 256 chars) ...
-    Body line
+    Title line
+    Body line 1
+    Body line 2
     ```
-    *解析結果*: Title="Very long title line... (truncated)...", Body="(Full input text)"
+    *解析結果*: Title="Title line", Body="Title line\nBody line 1\nBody line 2"
