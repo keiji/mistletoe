@@ -27,8 +27,6 @@ func fakeExecCommand(command string, args ...string) *exec.Cmd {
 	// Pass environment variables to identify specific test cases
 	// Important: Append to os.Environ() to preserve PATH and other settings
 	cmd.Env = append(os.Environ(), "GO_WANT_HELPER_PROCESS=1", "MOCK_GIT_LS_REMOTE_MISSING="+os.Getenv("MOCK_GIT_LS_REMOTE_MISSING"), "MOCK_GH_NO_COMMITS="+os.Getenv("MOCK_GH_NO_COMMITS"))
-	// Pipe stderr to see errors from the helper process during debugging
-	cmd.Stderr = os.Stderr
 	return cmd
 }
 
