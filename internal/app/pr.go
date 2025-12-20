@@ -199,24 +199,24 @@ func CollectPrStatus(statusRows []StatusRow, config *Config, parallel int, ghPat
 							for _, pr := range prs {
 								state := pr.State
 								if pr.IsDraft {
-									state = "Draft"
+									state = GitHubPrStateDraft
 								}
-								// Capitalize first letter strictly just in case, though GH API usually returns UPPERCASE
-								// Example output wants: [Open], [Merged], [Closed]
-								// GH returns: OPEN, MERGED, CLOSED
+
+								// Convert GH API state to Display state
 								displayState := state
 								switch state {
-								case "OPEN":
-									displayState = "Open"
-								case "MERGED":
-									displayState = "Merged"
-								case "CLOSED":
-									displayState = "Closed"
-								case "DRAFT":
-									displayState = "Draft"
+								case GitHubPrStateOpen:
+									displayState = DisplayPrStateOpen
+								case GitHubPrStateMerged:
+									displayState = DisplayPrStateMerged
+								case GitHubPrStateClosed:
+									displayState = DisplayPrStateClosed
+								case GitHubPrStateDraft:
+									displayState = DisplayPrStateDraft
 								}
-								if pr.IsDraft && state == "OPEN" {
-									displayState = "Draft"
+								// Double check draft logic
+								if pr.IsDraft && state == GitHubPrStateOpen {
+									displayState = DisplayPrStateDraft
 								}
 
 								prLines = append(prLines, fmt.Sprintf("%s [%s]", pr.URL, displayState))
@@ -256,13 +256,13 @@ func CollectPrStatus(statusRows []StatusRow, config *Config, parallel int, ghPat
 func sortPrs(prs []PrInfo) {
 	stateRank := func(state string) int {
 		switch strings.ToUpper(state) {
-		case "OPEN":
+		case GitHubPrStateOpen:
 			return 0
-		case "DRAFT":
+		case GitHubPrStateDraft:
 			return 1
-		case "MERGED":
+		case GitHubPrStateMerged:
 			return 2
-		case "CLOSED":
+		case GitHubPrStateClosed:
 			return 3
 		default:
 			return 4
