@@ -1,23 +1,18 @@
-// Package main is the entry point for the mstl-gh application.
 package main
 
 import (
 	"os"
 
-	"mistletoe/internal/app"
+	"github.com/keiji/mistletoe/internal/app"
 )
 
 var (
-	appVersion = "0.1.0-beta"
-	commitHash string
+	// Version is injected at build time
+	Version = "dev"
+	// CommitHash is injected at build time
+	CommitHash = "none"
 )
 
 func main() {
-	app.Run(app.TypeMstlGh, appVersion, commitHash, os.Args, func(cmd string, args []string, opts app.GlobalOptions) bool {
-		if cmd == app.CmdPr {
-			app.HandlePr(args, opts)
-			return true
-		}
-		return false
-	})
+	app.Run(app.AppTypeMstlGh, "0.0.2", CommitHash, os.Args)
 }
