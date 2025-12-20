@@ -120,6 +120,7 @@ type PrInfo struct {
 	IsDraft     bool   `json:"isDraft"`
 	URL         string `json:"url"`
 	BaseRefName string `json:"baseRefName"`
+	HeadRefOid  string `json:"headRefOid"`
 }
 
 // PrStatusRow represents a row in the PR status table.
@@ -161,7 +162,7 @@ func CollectPrStatus(statusRows []StatusRow, config *Config, parallel int, ghPat
 					prRow.PrURL = url
 
 					// Fetch Status for known URL
-					args := []string{"pr", "view", url, "--json", "number,state,isDraft,baseRefName"}
+					args := []string{"pr", "view", url, "--json", "number,state,isDraft,baseRefName,headRefOid"}
 					out, err := RunGh(ghPath, verbose, args...)
 					if err == nil {
 						var pr PrInfo
@@ -201,7 +202,7 @@ func CollectPrStatus(statusRows []StatusRow, config *Config, parallel int, ghPat
 				}
 
 				if !isKnown && r.RepoDir != "" && r.BranchName != "HEAD" && r.BranchName != "" {
-					args := []string{"pr", "list", "--repo", *conf.URL, "--head", r.BranchName, "--state", "all", "--json", "number,state,isDraft,url,baseRefName"}
+					args := []string{"pr", "list", "--repo", *conf.URL, "--head", r.BranchName, "--state", "all", "--json", "number,state,isDraft,url,baseRefName,headRefOid"}
 					if baseBranch != "" {
 						args = append(args, "--base", baseBranch)
 					}
@@ -210,29 +211,47 @@ func CollectPrStatus(statusRows []StatusRow, config *Config, parallel int, ghPat
 					if err == nil {
 						var prs []PrInfo
 						if err := json.Unmarshal([]byte(out), &prs); err == nil && len(prs) > 0 {
-							// Sort PRs
-							sortPrs(prs)
-
-							// Format PR column
-							var prLines []string
+							// Filter PRs
+							var filteredPrs []PrInfo
 							for _, pr := range prs {
-								displayState := getPrDisplayState(pr)
-								line := fmt.Sprintf("%s [%s]", pr.URL, displayState)
-								if displayState == DisplayPrStateMerged || displayState == DisplayPrStateClosed {
-									line = AnsiFgGray + line + AnsiReset
+								if strings.EqualFold(pr.State, GitHubPrStateOpen) || (pr.IsDraft && strings.EqualFold(pr.State, GitHubPrStateOpen)) {
+									filteredPrs = append(filteredPrs, pr)
+								} else {
+									// Closed or Merged
+									// Include only if HeadRefOid matches LocalHeadFull
+									if r.LocalHeadFull != "" && pr.HeadRefOid == r.LocalHeadFull {
+										filteredPrs = append(filteredPrs, pr)
+									}
 								}
-								prLines = append(prLines, line)
 							}
-							prRow.PrDisplay = strings.Join(prLines, "\n")
 
-							// Set other fields based on the first (most relevant) PR
-							topPr := prs[0]
-							prRow.PrURL = topPr.URL
-							prRow.PrNumber = fmt.Sprintf("#%d", topPr.Number)
-							prRow.PrState = topPr.State // Raw state
+							if len(filteredPrs) == 0 {
+								prRow.PrNumber = "N/A"
+							} else {
+								// Sort PRs
+								sortPrs(filteredPrs)
 
-							if prRow.Base == "" {
-								prRow.Base = topPr.BaseRefName
+								// Format PR column
+								var prLines []string
+								for _, pr := range filteredPrs {
+									displayState := getPrDisplayState(pr)
+									line := fmt.Sprintf("%s [%s]", pr.URL, displayState)
+									if displayState == DisplayPrStateMerged || displayState == DisplayPrStateClosed {
+										line = AnsiFgGray + line + AnsiReset
+									}
+									prLines = append(prLines, line)
+								}
+								prRow.PrDisplay = strings.Join(prLines, "\n")
+
+								// Set other fields based on the first (most relevant) PR
+								topPr := filteredPrs[0]
+								prRow.PrURL = topPr.URL
+								prRow.PrNumber = fmt.Sprintf("#%d", topPr.Number)
+								prRow.PrState = topPr.State // Raw state
+
+								if prRow.Base == "" {
+									prRow.Base = topPr.BaseRefName
+								}
 							}
 						} else {
 							prRow.PrNumber = "N/A"
