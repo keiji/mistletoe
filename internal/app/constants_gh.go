@@ -13,7 +13,7 @@ const (
 	GitHubPrStateOpen   = "OPEN"
 	GitHubPrStateMerged = "MERGED"
 	GitHubPrStateClosed = "CLOSED"
-	GitHubPrStateDraft  = "DRAFT"
+	// DRAFT is not a valid state in GitHub API (it's Open + IsDraft)
 
 	DisplayPrStateOpen   = "Open"
 	DisplayPrStateMerged = "Merged"

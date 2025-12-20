@@ -197,26 +197,21 @@ func CollectPrStatus(statusRows []StatusRow, config *Config, parallel int, ghPat
 							// Format PR column
 							var prLines []string
 							for _, pr := range prs {
-								state := pr.State
-								if pr.IsDraft {
-									state = GitHubPrStateDraft
-								}
-
-								// Convert GH API state to Display state
-								displayState := state
-								switch state {
-								case GitHubPrStateOpen:
-									displayState = DisplayPrStateOpen
-								case GitHubPrStateMerged:
-									displayState = DisplayPrStateMerged
-								case GitHubPrStateClosed:
-									displayState = DisplayPrStateClosed
-								case GitHubPrStateDraft:
+								displayState := ""
+								// Determine display state
+								if pr.IsDraft && pr.State == GitHubPrStateOpen {
 									displayState = DisplayPrStateDraft
-								}
-								// Double check draft logic
-								if pr.IsDraft && state == GitHubPrStateOpen {
-									displayState = DisplayPrStateDraft
+								} else {
+									switch pr.State {
+									case GitHubPrStateOpen:
+										displayState = DisplayPrStateOpen
+									case GitHubPrStateMerged:
+										displayState = DisplayPrStateMerged
+									case GitHubPrStateClosed:
+										displayState = DisplayPrStateClosed
+									default:
+										displayState = pr.State // Fallback
+									}
 								}
 
 								prLines = append(prLines, fmt.Sprintf("%s [%s]", pr.URL, displayState))
@@ -254,12 +249,15 @@ func CollectPrStatus(statusRows []StatusRow, config *Config, parallel int, ghPat
 }
 
 func sortPrs(prs []PrInfo) {
-	stateRank := func(state string) int {
-		switch strings.ToUpper(state) {
+	stateRank := func(pr PrInfo) int {
+		// Handle Draft explicitly
+		if pr.IsDraft && strings.ToUpper(pr.State) == GitHubPrStateOpen {
+			return 1
+		}
+
+		switch strings.ToUpper(pr.State) {
 		case GitHubPrStateOpen:
 			return 0
-		case GitHubPrStateDraft:
-			return 1
 		case GitHubPrStateMerged:
 			return 2
 		case GitHubPrStateClosed:
@@ -270,8 +268,8 @@ func sortPrs(prs []PrInfo) {
 	}
 
 	sort.Slice(prs, func(i, j int) bool {
-		rankI := stateRank(prs[i].State)
-		rankJ := stateRank(prs[j].State)
+		rankI := stateRank(prs[i])
+		rankJ := stateRank(prs[j])
 
 		if rankI != rankJ {
 			return rankI < rankJ
