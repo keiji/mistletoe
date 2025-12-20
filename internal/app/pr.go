@@ -129,7 +129,7 @@ type PrStatusRow struct {
 	PrNumber  string
 	PrState   string
 	PrURL     string
-	PrURLs    []string
+	PrItems   []PrInfo
 	PrDisplay string
 	Base      string
 }
@@ -178,33 +178,55 @@ func CollectPrStatus(statusRows []StatusRow, config *Config, parallel int, ghPat
 					// We can just set PrURLs = urls.
 					// And we should probably fetch status for at least the "Main" one to get state.
 
-					prRow.PrURLs = urls
 					// Pick the first as representative for singular fields (Top)
 					url := urls[0]
 					prRow.PrURL = url
 
-					// Fetch Status for known URL
-					args := []string{"pr", "view", url, "--json", "number,state,isDraft,baseRefName,headRefOid"}
-					out, err := RunGh(ghPath, verbose, args...)
-					if err == nil {
-						var pr PrInfo
-						if err := json.Unmarshal([]byte(out), &pr); err == nil {
-							pr.URL = url // Ensure URL is set
-							displayState := getPrDisplayState(pr)
-							prRow.PrDisplay = fmt.Sprintf("%s [%s]", pr.URL, displayState)
-							prRow.PrNumber = fmt.Sprintf("#%d", pr.Number)
-							prRow.PrState = pr.State
-							if pr.BaseRefName != "" {
-								prRow.Base = pr.BaseRefName
+					// Fetch Status for known URL. Since we have multiple URLs potentially,
+					// strictly we should fetch all. But knownPRs usually implies re-checking.
+					// For now, let's fetch the first one to populate singular fields and assume it's the "active" one if any.
+					// AND populates PrItems with just this one?
+					// Or do we loop?
+					// If we only fetch one, PrItems will have 1 item.
+					// If 'urls' has multiple, we lose info if we don't fetch all.
+					// Let's loop.
+
+					var items []PrInfo
+					var displays []string
+
+					for _, u := range urls {
+						args := []string{"pr", "view", u, "--json", "number,state,isDraft,baseRefName,headRefOid"}
+						out, err := RunGh(ghPath, verbose, args...)
+						if err == nil {
+							var pr PrInfo
+							if err := json.Unmarshal([]byte(out), &pr); err == nil {
+								pr.URL = u
+								items = append(items, pr)
+
+								displayState := getPrDisplayState(pr)
+								line := fmt.Sprintf("%s [%s]", pr.URL, displayState)
+								if displayState == DisplayPrStateMerged || displayState == DisplayPrStateClosed {
+									line = AnsiFgGray + line + AnsiReset
+								}
+								displays = append(displays, line)
 							}
-						} else {
-							prRow.PrDisplay = fmt.Sprintf("%s [Error]", url)
-							prRow.PrState = "Error"
-							prRow.PrNumber = "N/A"
+						}
+					}
+
+					prRow.PrItems = items
+					prRow.PrDisplay = strings.Join(displays, "\n")
+
+					if len(items) > 0 {
+						// Set Top fields based on first
+						topPr := items[0]
+						prRow.PrNumber = fmt.Sprintf("#%d", topPr.Number)
+						prRow.PrState = topPr.State
+						if topPr.BaseRefName != "" {
+							prRow.Base = topPr.BaseRefName
 						}
 					} else {
-						// Fallback if view fails
-						prRow.PrDisplay = fmt.Sprintf("%s [Error]", url)
+						// Fallback if all lookups failed
+						prRow.PrDisplay = fmt.Sprintf("%s [Error]", url) // Show first url
 						prRow.PrState = "Error"
 						prRow.PrNumber = "N/A"
 					}
@@ -261,11 +283,11 @@ func CollectPrStatus(statusRows []StatusRow, config *Config, parallel int, ghPat
 								prRow.PrNumber = "N/A"
 							} else {
 								// Sort PRs
-								sortPrs(filteredPrs)
+								SortPrs(filteredPrs)
 
-								// Format PR column & Collect URLs
+								// Format PR column & Collect Items
 								var prLines []string
-								var prURLs []string
+								var items []PrInfo
 								for _, pr := range filteredPrs {
 									displayState := getPrDisplayState(pr)
 									line := fmt.Sprintf("%s [%s]", pr.URL, displayState)
@@ -273,10 +295,10 @@ func CollectPrStatus(statusRows []StatusRow, config *Config, parallel int, ghPat
 										line = AnsiFgGray + line + AnsiReset
 									}
 									prLines = append(prLines, line)
-									prURLs = append(prURLs, pr.URL)
+									items = append(items, pr)
 								}
 								prRow.PrDisplay = strings.Join(prLines, "\n")
-								prRow.PrURLs = prURLs
+								prRow.PrItems = items
 
 								// Set other fields based on the first (most relevant) PR
 								topPr := filteredPrs[0]
@@ -326,7 +348,8 @@ func getPrDisplayState(pr PrInfo) string {
 	}
 }
 
-func sortPrs(prs []PrInfo) {
+// Export SortPrs for use in pr_body_logic.go
+func SortPrs(prs []PrInfo) {
 	stateRank := func(pr PrInfo) int {
 		// Handle Draft explicitly
 		if pr.IsDraft && strings.ToUpper(pr.State) == GitHubPrStateOpen {
@@ -566,10 +589,10 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 	}
 
 	// Map to track PR existence
-	prExistsMap := make(map[string][]string) // RepoName -> []URL
+	prExistsMap := make(map[string][]PrInfo) // RepoName -> []PrInfo
 	for _, prRow := range prRows {
-		if len(prRow.PrURLs) > 0 {
-			prExistsMap[prRow.Repo] = prRow.PrURLs
+		if len(prRow.PrItems) > 0 {
+			prExistsMap[prRow.Repo] = prRow.PrItems
 		}
 	}
 
@@ -608,23 +631,13 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 		// If YES -> Update List.
 		// If NO -> Create List (if ahead).
 
-		// Find the row for this repo
-		var myRow PrStatusRow
-		foundRow := false
-		for _, r := range prRows {
-			if r.Repo == repoName {
-				myRow = r
-				foundRow = true
-				break
-			}
-		}
-
 		isOpen := false
-		if foundRow {
-			// PrState comes from the "Top" PR. CollectPrStatus sorts Open PRs to the top.
-			// So if PrState is OPEN, we have an active PR.
-			if strings.EqualFold(myRow.PrState, GitHubPrStateOpen) {
-				isOpen = true
+		if items, ok := prExistsMap[repoName]; ok {
+			for _, item := range items {
+				if strings.EqualFold(item.State, GitHubPrStateOpen) {
+					isOpen = true
+					break
+				}
 			}
 		}
 
@@ -717,7 +730,18 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 	// We pass existing PR map to optimize check
 	// verifyGithubRequirements returns valid existing PRs, but we already have `prExistsMap`.
 	// However, it also checks PERMISSIONS and BASE BRANCH existence.
-	_, err = verifyGithubRequirements(activeRepos, rows, parallel, opts.GitPath, opts.GhPath, verbose, prExistsMap)
+
+	// Convert prExistsMap (map[string][]PrInfo) to map[string][]string for verifyGithubRequirements
+	prExistsMapURLs := make(map[string][]string)
+	for k, items := range prExistsMap {
+		var urls []string
+		for _, item := range items {
+			urls = append(urls, item.URL)
+		}
+		prExistsMapURLs[k] = urls
+	}
+
+	_, err = verifyGithubRequirements(activeRepos, rows, parallel, opts.GitPath, opts.GhPath, verbose, prExistsMapURLs)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -734,7 +758,7 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 
 	// 9. Execution Phase 2: Create PRs
 	// We need a map of ALL PR URLs (existing + newly created) for the snapshot/related-pr logic.
-	finalPrMap := make(map[string][]string)
+	finalPrMap := make(map[string][]PrInfo)
 	for k, v := range prExistsMap {
 		finalPrMap[k] = v
 	}
@@ -750,8 +774,9 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 			fmt.Printf("Error during PR creation: %v\n", err)
 			os.Exit(1)
 		}
-		for k, v := range createdMap {
-			finalPrMap[k] = append(finalPrMap[k], v)
+		for k, url := range createdMap {
+			// Created PR is always OPEN
+			finalPrMap[k] = append(finalPrMap[k], PrInfo{URL: url, State: "OPEN"})
 		}
 	}
 
@@ -774,11 +799,11 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 	fmt.Println("Updating Pull Request descriptions...")
 	// Determine targets for update: All activeRepos should have a PR in finalPrMap now.
 	// But we only update if they are in activeRepos (Create List + Update List).
-	targetPrMap := make(map[string][]string)
+	targetPrMap := make(map[string][]PrInfo)
 	for _, r := range activeRepos {
 		rID := getRepoName(r)
-		if urls, ok := finalPrMap[rID]; ok {
-			targetPrMap[rID] = urls
+		if items, ok := finalPrMap[rID]; ok {
+			targetPrMap[rID] = items
 		}
 	}
 
@@ -792,7 +817,22 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 	spinner = NewSpinner(verbose)
 	spinner.Start()
 	finalRows := CollectStatus(config, parallel, opts.GitPath, verbose, true)
-	finalPrRows := CollectPrStatus(finalRows, config, parallel, opts.GhPath, verbose, finalPrMap)
+
+	// Convert finalPrMap to the expected format for CollectPrStatus if necessary
+	// CollectPrStatus expects map[string][]string for knownPRs (URL strings)
+	// But finalPrMap is map[string][]PrInfo.
+	// We need to convert.
+
+	knownPRsForStatus := make(map[string][]string)
+	for k, items := range finalPrMap {
+		var urls []string
+		for _, item := range items {
+			urls = append(urls, item.URL)
+		}
+		knownPRsForStatus[k] = urls
+	}
+
+	finalPrRows := CollectPrStatus(finalRows, config, parallel, opts.GhPath, verbose, knownPRsForStatus)
 	spinner.Stop()
 
 	// Filter for Display (Open or Draft only)
@@ -972,7 +1012,7 @@ func executePrCreationOnly(repos []Repository, rows []StatusRow, parallel int, g
 	return prMap, nil
 }
 
-func updatePrDescriptions(prMap map[string][]string, parallel int, ghPath string, verbose bool, snapshotData, snapshotFilename string, deps *DependencyGraph, depContent string) error {
+func updatePrDescriptions(prMap map[string][]PrInfo, parallel int, ghPath string, verbose bool, snapshotData, snapshotFilename string, deps *DependencyGraph, depContent string) error {
 	if len(prMap) == 0 {
 		return nil
 	}
@@ -988,9 +1028,9 @@ func updatePrDescriptions(prMap map[string][]string, parallel int, ghPath string
 		url    string
 	}
 	var tasks []task
-	for id, urls := range prMap {
-		for _, u := range urls {
-			tasks = append(tasks, task{repoID: id, url: u})
+	for id, items := range prMap {
+		for _, item := range items {
+			tasks = append(tasks, task{repoID: id, url: item.URL})
 		}
 	}
 
