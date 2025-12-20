@@ -175,20 +175,15 @@ func CollectPrStatus(statusRows []StatusRow, config *Config, parallel int, ghPat
 								prRow.Base = pr.BaseRefName
 							}
 						} else {
-							prRow.PrDisplay = fmt.Sprintf("%s [Ready]", url)
-							prRow.PrState = "Ready"
-							prRow.PrNumber = "?"
+							prRow.PrDisplay = fmt.Sprintf("%s [Error]", url)
+							prRow.PrState = "Error"
+							prRow.PrNumber = "Error"
 						}
 					} else {
 						// Fallback if view fails
-						prRow.PrDisplay = fmt.Sprintf("%s [Ready]", url)
-						prRow.PrState = "Ready"
-						parts := strings.Split(url, "/")
-						if len(parts) > 0 {
-							prRow.PrNumber = "#" + parts[len(parts)-1]
-						} else {
-							prRow.PrNumber = "?"
-						}
+						prRow.PrDisplay = fmt.Sprintf("%s [Error]", url)
+						prRow.PrState = "Error"
+						prRow.PrNumber = "Error"
 					}
 				}
 			}
