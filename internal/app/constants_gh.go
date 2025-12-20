@@ -20,3 +20,12 @@ const (
 	DisplayPrStateClosed = "Closed"
 	DisplayPrStateDraft  = "Draft"
 )
+
+// ANSI Color Codes
+const (
+	AnsiReset    = "\033[0m"
+	AnsiFgRed    = "\033[31m"
+	AnsiFgGreen  = "\033[32m"
+	AnsiFgYellow = "\033[33m"
+	AnsiFgGray   = "\033[90m"
+)
