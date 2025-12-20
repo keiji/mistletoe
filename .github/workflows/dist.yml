@@ -31,32 +31,40 @@ jobs:
         run: echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
 
       - name: Build Linux
-        run: GOOS=linux GOARCH=amd64 go build -trimpath -ldflags "-s -w -X main.commitHash=${{ env.SHORT_SHA }}" -o mstl-linux-amd64 ./cmd/mstl
+        run: |
+          mkdir -p dist/linux-amd64
+          GOOS=linux GOARCH=amd64 go build -trimpath -ldflags "-s -w -X main.commitHash=${{ env.SHORT_SHA }}" -o dist/linux-amd64/mstl ./cmd/mstl
+          GOOS=linux GOARCH=amd64 go build -trimpath -ldflags "-s -w -X main.commitHash=${{ env.SHORT_SHA }}" -o dist/linux-amd64/mstl-gh ./cmd/mstl-gh
 
       - name: Build Mac
-        run: GOOS=darwin GOARCH=amd64 go build -trimpath -ldflags "-s -w -X main.commitHash=${{ env.SHORT_SHA }}" -o mstl-darwin-amd64 ./cmd/mstl
+        run: |
+          mkdir -p dist/darwin-amd64
+          GOOS=darwin GOARCH=amd64 go build -trimpath -ldflags "-s -w -X main.commitHash=${{ env.SHORT_SHA }}" -o dist/darwin-amd64/mstl ./cmd/mstl
+          GOOS=darwin GOARCH=amd64 go build -trimpath -ldflags "-s -w -X main.commitHash=${{ env.SHORT_SHA }}" -o dist/darwin-amd64/mstl-gh ./cmd/mstl-gh
 
       - name: Build Windows
-        run: GOOS=windows GOARCH=amd64 go build -trimpath -ldflags "-s -w -X main.commitHash=${{ env.SHORT_SHA }}" -o mstl-windows-amd64.exe ./cmd/mstl
+        run: |
+          mkdir -p dist/windows-amd64
+          GOOS=windows GOARCH=amd64 go build -trimpath -ldflags "-s -w -X main.commitHash=${{ env.SHORT_SHA }}" -o dist/windows-amd64/mstl.exe ./cmd/mstl
+          GOOS=windows GOARCH=amd64 go build -trimpath -ldflags "-s -w -X main.commitHash=${{ env.SHORT_SHA }}" -o dist/windows-amd64/mstl-gh.exe ./cmd/mstl-gh
 
-      - name: Build Linux (mstl-gh)
-        run: GOOS=linux GOARCH=amd64 go build -trimpath -ldflags "-s -w -X main.commitHash=${{ env.SHORT_SHA }}" -o mstl-gh-linux-amd64 ./cmd/mstl-gh
-
-      - name: Build Mac (mstl-gh)
-        run: GOOS=darwin GOARCH=amd64 go build -trimpath -ldflags "-s -w -X main.commitHash=${{ env.SHORT_SHA }}" -o mstl-gh-darwin-amd64 ./cmd/mstl-gh
-
-      - name: Build Windows (mstl-gh)
-        run: GOOS=windows GOARCH=amd64 go build -trimpath -ldflags "-s -w -X main.commitHash=${{ env.SHORT_SHA }}" -o mstl-gh-windows-amd64.exe ./cmd/mstl-gh
-
-      - name: Upload Artifacts
+      - name: Upload Artifacts Linux
         uses: actions/upload-artifact@v4
         with:
-          name: mstl-binaries
-          path: |
-            mstl-linux-amd64
-            mstl-darwin-amd64
-            mstl-windows-amd64.exe
-            mstl-gh-linux-amd64
-            mstl-gh-darwin-amd64
-            mstl-gh-windows-amd64.exe
+          name: mstl-binaries-linux-amd64
+          path: dist/linux-amd64/
+          retention-days: 1
+
+      - name: Upload Artifacts Mac
+        uses: actions/upload-artifact@v4
+        with:
+          name: mstl-binaries-darwin-amd64
+          path: dist/darwin-amd64/
+          retention-days: 1
+
+      - name: Upload Artifacts Windows
+        uses: actions/upload-artifact@v4
+        with:
+          name: mstl-binaries-windows-amd64
+          path: dist/windows-amd64/
           retention-days: 1
