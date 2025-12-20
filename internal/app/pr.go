@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"sort"
 	"strings"
 	"sync"
 
@@ -181,7 +182,7 @@ func CollectPrStatus(statusRows []StatusRow, config *Config, parallel int, ghPat
 				}
 
 				if !isKnown && r.RepoDir != "" && r.BranchName != "HEAD" && r.BranchName != "" {
-					args := []string{"pr", "list", "--repo", *conf.URL, "--head", r.BranchName, "--json", "number,state,isDraft,url,baseRefName"}
+					args := []string{"pr", "list", "--repo", *conf.URL, "--head", r.BranchName, "--state", "all", "--json", "number,state,isDraft,url,baseRefName"}
 					if baseBranch != "" {
 						args = append(args, "--base", baseBranch)
 					}
@@ -190,16 +191,40 @@ func CollectPrStatus(statusRows []StatusRow, config *Config, parallel int, ghPat
 					if err == nil {
 						var prs []PrInfo
 						if err := json.Unmarshal([]byte(out), &prs); err == nil && len(prs) > 0 {
-							pr := prs[0]
-							prRow.PrNumber = fmt.Sprintf("#%d", pr.Number)
-							prRow.PrState = "Ready"
-							if pr.IsDraft {
-								prRow.PrState = "Draft"
+							// Sort PRs
+							sortPrs(prs)
+
+							// Format PR column
+							var prLines []string
+							for _, pr := range prs {
+								displayState := ""
+								// Determine display state
+								if pr.IsDraft && pr.State == GitHubPrStateOpen {
+									displayState = DisplayPrStateDraft
+								} else {
+									switch pr.State {
+									case GitHubPrStateOpen:
+										displayState = DisplayPrStateOpen
+									case GitHubPrStateMerged:
+										displayState = DisplayPrStateMerged
+									case GitHubPrStateClosed:
+										displayState = DisplayPrStateClosed
+									default:
+										displayState = pr.State // Fallback
+									}
+								}
+
+								prLines = append(prLines, fmt.Sprintf("%s [%s]", pr.URL, displayState))
 							}
-							prRow.PrURL = pr.URL
+							prRow.PrURL = strings.Join(prLines, "\n")
+
+							// Set other fields based on the first (most relevant) PR
+							topPr := prs[0]
+							prRow.PrNumber = fmt.Sprintf("#%d", topPr.Number)
+							prRow.PrState = topPr.State // Raw state
 
 							if prRow.Base == "" {
-								prRow.Base = pr.BaseRefName
+								prRow.Base = topPr.BaseRefName
 							}
 						} else {
 							prRow.PrNumber = "N/A"
@@ -221,6 +246,37 @@ func CollectPrStatus(statusRows []StatusRow, config *Config, parallel int, ghPat
 	wg.Wait()
 
 	return prRows
+}
+
+func sortPrs(prs []PrInfo) {
+	stateRank := func(pr PrInfo) int {
+		// Handle Draft explicitly
+		if pr.IsDraft && strings.ToUpper(pr.State) == GitHubPrStateOpen {
+			return 1
+		}
+
+		switch strings.ToUpper(pr.State) {
+		case GitHubPrStateOpen:
+			return 0
+		case GitHubPrStateMerged:
+			return 2
+		case GitHubPrStateClosed:
+			return 3
+		default:
+			return 4
+		}
+	}
+
+	sort.Slice(prs, func(i, j int) bool {
+		rankI := stateRank(prs[i])
+		rankJ := stateRank(prs[j])
+
+		if rankI != rankJ {
+			return rankI < rankJ
+		}
+		// Same state, sort by number descending
+		return prs[i].Number > prs[j].Number
+	})
 }
 
 // RenderPrStatusTable renders the PR status table.
