@@ -120,15 +120,17 @@ type PrInfo struct {
 	IsDraft     bool   `json:"isDraft"`
 	URL         string `json:"url"`
 	BaseRefName string `json:"baseRefName"`
+	HeadRefOid  string `json:"headRefOid"`
 }
 
 // PrStatusRow represents a row in the PR status table.
 type PrStatusRow struct {
 	StatusRow
-	PrNumber string
-	PrState  string
-	PrURL    string
-	Base     string
+	PrNumber  string
+	PrState   string
+	PrURL     string
+	Base      string
+	PrHeadOID string
 }
 
 // CollectPrStatus collects Pull Request status for the given repositories.
@@ -182,7 +184,7 @@ func CollectPrStatus(statusRows []StatusRow, config *Config, parallel int, ghPat
 				}
 
 				if !isKnown && r.RepoDir != "" && r.BranchName != "HEAD" && r.BranchName != "" {
-					args := []string{"pr", "list", "--repo", *conf.URL, "--head", r.BranchName, "--state", "all", "--json", "number,state,isDraft,url,baseRefName"}
+					args := []string{"pr", "list", "--repo", *conf.URL, "--head", r.BranchName, "--state", "all", "--json", "number,state,isDraft,url,baseRefName,headRefOid"}
 					if baseBranch != "" {
 						args = append(args, "--base", baseBranch)
 					}
@@ -226,6 +228,7 @@ func CollectPrStatus(statusRows []StatusRow, config *Config, parallel int, ghPat
 							topPr := prs[0]
 							prRow.PrNumber = fmt.Sprintf("#%d", topPr.Number)
 							prRow.PrState = topPr.State // Raw state
+							prRow.PrHeadOID = topPr.HeadRefOid
 
 							if prRow.Base == "" {
 								prRow.Base = topPr.BaseRefName
@@ -495,7 +498,24 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 	prExistsMap := make(map[string]string) // RepoName -> URL
 	for _, prRow := range prRows {
 		if prRow.PrURL != "" && prRow.PrURL != "-" && prRow.PrURL != "N/A" {
-			prExistsMap[prRow.Repo] = prRow.PrURL
+			// Check if PR should be considered "related" / "existing"
+			keep := false
+			if prRow.PrState == GitHubPrStateOpen {
+				keep = true
+			} else if prRow.PrState == GitHubPrStateMerged || prRow.PrState == GitHubPrStateClosed {
+				// Only keep if local HEAD matches PR HEAD
+				if prRow.PrHeadOID != "" && prRow.PrHeadOID == prRow.LocalHeadFull {
+					keep = true
+				}
+			} else {
+				// Fallback for other states (should be covered by Open check if using standard constants)
+				// If strictly unknown state, default to keep or check?
+				// Assuming standard states.
+			}
+
+			if keep {
+				prExistsMap[prRow.Repo] = prRow.PrURL
+			}
 		}
 	}
 
