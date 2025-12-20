@@ -495,11 +495,7 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 				fmt.Printf("Error getting message: %v\n", err)
 				os.Exit(1)
 			}
-			lines := strings.Split(content, "\n")
-			if len(lines) > 0 {
-				prTitle = lines[0]
-				prBody = content
-			}
+			prTitle, prBody = ParsePrTitleBody(content)
 		}
 	}
 
