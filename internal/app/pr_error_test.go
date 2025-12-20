@@ -30,8 +30,8 @@ func TestCollectPrStatus_ErrorHandling(t *testing.T) {
 	if prRows[0].PrState != "Error" {
 		t.Errorf("Expected PrState 'Error', got '%s'", prRows[0].PrState)
 	}
-	if prRows[0].PrNumber != "Error" {
-		t.Errorf("Expected PrNumber 'Error', got '%s'", prRows[0].PrNumber)
+	if prRows[0].PrNumber != "N/A" {
+		t.Errorf("Expected PrNumber 'N/A', got '%s'", prRows[0].PrNumber)
 	}
 
 	// Case 2: RunGh Error (gh pr view fails)

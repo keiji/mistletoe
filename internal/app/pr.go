@@ -177,13 +177,13 @@ func CollectPrStatus(statusRows []StatusRow, config *Config, parallel int, ghPat
 						} else {
 							prRow.PrDisplay = fmt.Sprintf("%s [Error]", url)
 							prRow.PrState = "Error"
-							prRow.PrNumber = "Error"
+							prRow.PrNumber = "N/A"
 						}
 					} else {
 						// Fallback if view fails
 						prRow.PrDisplay = fmt.Sprintf("%s [Error]", url)
 						prRow.PrState = "Error"
-						prRow.PrNumber = "Error"
+						prRow.PrNumber = "N/A"
 					}
 				}
 			}
