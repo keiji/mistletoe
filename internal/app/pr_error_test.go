@@ -20,7 +20,7 @@ func TestCollectPrStatus_ErrorHandling(t *testing.T) {
 	repo := Repository{ID: &id, URL: &url}
 	config := &Config{Repositories: &[]Repository{repo}}
 	rows := []StatusRow{{Repo: id, BranchName: "main"}}
-	knownPRs := map[string]string{id: url}
+	knownPRs := map[string][]string{id: {url}}
 
 	prRows := CollectPrStatus(rows, config, 1, "gh", false, knownPRs)
 

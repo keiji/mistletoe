@@ -11,9 +11,9 @@ func TestGenerateMistletoeBody(t *testing.T) {
 	filename := "mistletoe-snapshot-test-id.json"
 
 	currentID := "repo-a"
-	allPRs := map[string]string{
-		"repo-a": "http://example.com/pr/a",
-		"repo-b": "http://example.com/pr/b",
+	allPRs := map[string][]PrInfo{
+		"repo-a": {{URL: "http://example.com/pr/a", State: "OPEN"}},
+		"repo-b": {{URL: "http://example.com/pr/b", State: "OPEN"}},
 	}
 
 	// Test without dependencies (legacy/default behavior)
@@ -99,12 +99,12 @@ func TestGenerateMistletoeBody_WithDependencies(t *testing.T) {
 	filename := "test.json"
 	currentID := "repo-main"
 
-	allPRs := map[string]string{
-		"repo-main":  "url-main",
-		"repo-dep1":  "url-dep1",
-		"repo-dep2":  "url-dep2", // Depended by main
-		"repo-lib":   "url-lib",  // Main depends on lib
-		"repo-other": "url-other",
+	allPRs := map[string][]PrInfo{
+		"repo-main":  {{URL: "url-main", State: "OPEN"}},
+		"repo-dep1":  {{URL: "url-dep1", State: "OPEN"}},
+		"repo-dep2":  {{URL: "url-dep2", State: "OPEN"}}, // Depended by main
+		"repo-lib":   {{URL: "url-lib", State: "OPEN"}},  // Main depends on lib
+		"repo-other": {{URL: "url-other", State: "OPEN"}},
 	}
 
 	deps := &DependencyGraph{
@@ -252,10 +252,10 @@ func TestDependencyCategorization_Verification(t *testing.T) {
 	}
 
 	// 2. Mock PR URLs
-	allPRs := map[string]string{
-		"mstl1": "https://github.com/org/mstl1/pull/1",
-		"mstl2": "https://github.com/org/mstl2/pull/2",
-		"mstl3": "https://github.com/org/mstl3/pull/3",
+	allPRs := map[string][]PrInfo{
+		"mstl1": {{URL: "https://github.com/org/mstl1/pull/1", State: "OPEN"}},
+		"mstl2": {{URL: "https://github.com/org/mstl2/pull/2", State: "OPEN"}},
+		"mstl3": {{URL: "https://github.com/org/mstl3/pull/3", State: "OPEN"}},
 	}
 
 	// 3. Define Expectations

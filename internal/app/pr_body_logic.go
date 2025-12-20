@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"math/rand"
 	"regexp"
-	"sort"
 	"strings"
 	"time"
 )
@@ -18,8 +17,8 @@ type relatedPRsJSON struct {
 }
 
 // GenerateMistletoeBody creates the structured body content.
-// It accepts a map of all related PRs (RepoID -> URL), an optional dependency graph, and the raw dependency content.
-func GenerateMistletoeBody(snapshotData string, snapshotFilename string, currentRepoID string, allPRs map[string]string, deps *DependencyGraph, dependencyContent string) string {
+// It accepts a map of all related PRs (RepoID -> []PrInfo), an optional dependency graph, and the raw dependency content.
+func GenerateMistletoeBody(snapshotData string, snapshotFilename string, currentRepoID string, allPRs map[string][]PrInfo, deps *DependencyGraph, dependencyContent string) string {
 	// Seed random number generator
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 
@@ -48,27 +47,31 @@ func GenerateMistletoeBody(snapshotData string, snapshotFilename string, current
 	sb.WriteString("This content is auto-generated. Manual edits may be lost.\n\n")
 
 	// Filter out self
-	targets := make(map[string]string)
-	for id, url := range allPRs {
+	targets := make(map[string][]PrInfo)
+	for id, items := range allPRs {
 		if id != currentRepoID {
-			targets[id] = url
+			targets[id] = items
 		}
 	}
 
 	var relatedJSON relatedPRsJSON
 
 	// Prepare lists
-	var flatList []string
-	var dependencies []string
-	var dependents []string
-	var others []string
+	var flatList []PrInfo
+	var dependencies []PrInfo
+	var dependents []PrInfo
+	var others []PrInfo
 
 	if deps == nil {
-		for _, u := range targets {
-			flatList = append(flatList, u)
+		for _, items := range targets {
+			flatList = append(flatList, items...)
 		}
-		sort.Strings(flatList)
-		relatedJSON.Others = flatList
+		SortPrs(flatList)
+		var urls []string
+		for _, item := range flatList {
+			urls = append(urls, item.URL)
+		}
+		relatedJSON.Others = urls
 	} else {
 		// Categorize
 		// Prepare sets for fast lookup
@@ -86,28 +89,36 @@ func GenerateMistletoeBody(snapshotData string, snapshotFilename string, current
 			}
 		}
 
-		for id, url := range targets {
+		for id, items := range targets {
 			isDep := forwardDeps[id]
 			isDeper := reverseDeps[id]
 
 			if isDep {
-				dependencies = append(dependencies, url)
+				dependencies = append(dependencies, items...)
 			}
 			if isDeper {
-				dependents = append(dependents, url)
+				dependents = append(dependents, items...)
 			}
 			if !isDep && !isDeper {
-				others = append(others, url)
+				others = append(others, items...)
 			}
 		}
 
-		sort.Strings(dependencies)
-		sort.Strings(dependents)
-		sort.Strings(others)
+		SortPrs(dependencies)
+		SortPrs(dependents)
+		SortPrs(others)
 
-		relatedJSON.Dependencies = dependencies
-		relatedJSON.Dependents = dependents
-		relatedJSON.Others = others
+		extractURLs := func(items []PrInfo) []string {
+			var us []string
+			for _, i := range items {
+				us = append(us, i.URL)
+			}
+			return us
+		}
+
+		relatedJSON.Dependencies = extractURLs(dependencies)
+		relatedJSON.Dependents = extractURLs(dependents)
+		relatedJSON.Others = extractURLs(others)
 	}
 
 	// 1. Related Pull Request(s) Text
@@ -115,31 +126,31 @@ func GenerateMistletoeBody(snapshotData string, snapshotFilename string, current
 
 	if deps == nil {
 		if len(flatList) > 0 {
-			for _, u := range flatList {
-				sb.WriteString(fmt.Sprintf(" * %s\n", u))
+			for _, item := range flatList {
+				sb.WriteString(fmt.Sprintf(" * %s\n", item.URL))
 			}
 		}
 	} else {
 		if len(dependencies) > 0 {
 			sb.WriteString("#### Dependencies\n")
-			for _, u := range dependencies {
-				sb.WriteString(fmt.Sprintf(" * %s\n", u))
+			for _, item := range dependencies {
+				sb.WriteString(fmt.Sprintf(" * %s\n", item.URL))
 			}
 			sb.WriteString("\n")
 		}
 
 		if len(dependents) > 0 {
 			sb.WriteString("#### Dependents\n")
-			for _, u := range dependents {
-				sb.WriteString(fmt.Sprintf(" * %s\n", u))
+			for _, item := range dependents {
+				sb.WriteString(fmt.Sprintf(" * %s\n", item.URL))
 			}
 			sb.WriteString("\n")
 		}
 
 		if len(others) > 0 {
 			sb.WriteString("#### Others\n")
-			for _, u := range others {
-				sb.WriteString(fmt.Sprintf(" * %s\n", u))
+			for _, item := range others {
+				sb.WriteString(fmt.Sprintf(" * %s\n", item.URL))
 			}
 		}
 	}
