@@ -61,6 +61,7 @@ mstl-gh <command> [options] [arguments]
 Global options for most commands:
 *   `-f, --file <path>`: Path to the configuration file (e.g., `repos.json`).
 *   `-p, --parallel <int>`: Number of parallel processes to use (default: 1).
+*   `-v, --verbose`: Enable verbose output (shows executed git/gh commands).
 
 If the `-f` flag is omitted, `mstl` will attempt to read the configuration from **standard input (stdin)**.
 
@@ -87,6 +88,8 @@ mstl init -f <config_file> [options]
 
 **Options:**
 *   `--depth <int>`: Create a shallow clone with a history truncated to the specified number of commits.
+*   `-p, --parallel <int>`: Number of parallel processes to use (default: 1).
+*   `-v, --verbose`: Enable verbose output.
 
 #### `status`
 
@@ -96,6 +99,10 @@ Displays a status table for all configured repositories, showing the current bra
 ```bash
 mstl status -f <config_file> [options]
 ```
+
+**Options:**
+*   `-p, --parallel <int>`: Number of parallel processes to use (default: 1).
+*   `-v, --verbose`: Enable verbose output.
 
 **Status Indicators:**
 *   `>` (Green): Local branch has unpushed commits.
@@ -112,6 +119,10 @@ Checks for unpushed commits in all repositories and pushes them to the remote `o
 mstl push -f <config_file> [options]
 ```
 
+**Options:**
+*   `-p, --parallel <int>`: Number of parallel processes to use (default: 1).
+*   `-v, --verbose`: Enable verbose output.
+
 #### `sync`
 
 Updates repositories by pulling changes from the remote `origin`.
@@ -122,6 +133,10 @@ Updates repositories by pulling changes from the remote `origin`.
 ```bash
 mstl sync -f <config_file> [options]
 ```
+
+**Options:**
+*   `-p, --parallel <int>`: Number of parallel processes to use (default: 1).
+*   `-v, --verbose`: Enable verbose output.
 
 #### `switch`
 
@@ -138,6 +153,8 @@ mstl switch -f <config_file> -c <branch_name>
 
 **Options:**
 *   `-c, --create <branch_name>`: Create a new branch with the specified name and switch to it.
+*   `-p, --parallel <int>`: Number of parallel processes to use (default: 1).
+*   `-v, --verbose`: Enable verbose output.
 
 #### `snapshot`
 
@@ -151,6 +168,8 @@ mstl snapshot [options]
 **Options:**
 *   `-o, --output-file <path>`: Path for the output configuration file. (Default: `mistletoe-snapshot-[id].json`)
 *   `-f, --file <path>`: Optional configuration file path. Used to resolve the `base-branch` field in the generated snapshot.
+*   `-p, --parallel <int>`: Number of parallel processes to use (default: 1).
+*   `-v, --verbose`: Enable verbose output.
 
 #### `version`
 
@@ -191,6 +210,8 @@ mstl-gh pr create -f <config_file> [options]
 *   `-t, --title <string>`: Title of the Pull Request.
 *   `-b, --body <string>`: Body content of the Pull Request.
 *   `-d, --dependencies <path>`: Path to a Markdown file containing a Mermaid dependency graph.
+*   `-p, --parallel <int>`: Number of parallel processes to use (default: 1).
+*   `-v, --verbose`: Enable verbose output.
 *   If title/body are omitted, the default editor is opened.
 
 If `--dependencies` is provided, the graph content is embedded in the PR body (hidden in a details block with a Mermaid preview), and related PRs are categorized based on the graph.
@@ -217,6 +238,24 @@ graph TD
 
 You can define dependencies as a Mermaid graph.
 
+#### `pr update`
+
+Updates existing Pull Requests (Open or Draft) for the configured repositories.
+*   It pushes any unpushed commits if the local branch is ahead of remote.
+*   It updates the Mistletoe block (snapshot and dependency graph) in the PR description.
+*   It does *not* create new Pull Requests.
+*   It aborts if any repository is behind remote or has conflicts.
+
+**Usage:**
+```bash
+mstl-gh pr update -f <config_file> [options]
+```
+
+**Options:**
+*   `-d, --dependencies <path>`: Path to a Markdown file containing a Mermaid dependency graph.
+*   `-p, --parallel <int>`: Number of parallel processes to use (default: 1).
+*   `-v, --verbose`: Enable verbose output.
+
 #### `pr checkout`
 
 Restores the state of repositories based on the snapshot embedded in a Mistletoe-managed Pull Request. It parses the Mistletoe block from the PR body, clones missing repositories, and checks out the recorded branches or revisions.
@@ -229,6 +268,7 @@ mstl-gh pr checkout -u <PR_URL> [options]
 **Options:**
 *   `-u, --url <string>`: The URL of the Pull Request containing the snapshot (Required).
 *   `-p, --parallel <int>`: Number of parallel processes to use (default: 1).
+*   `-v, --verbose`: Enable verbose output.
 
 #### `pr status`
 
@@ -238,6 +278,10 @@ Displays the status of Pull Requests associated with the current branches of the
 ```bash
 mstl-gh pr status -f <config_file> [options]
 ```
+
+**Options:**
+*   `-p, --parallel <int>`: Number of parallel processes to use (default: 1).
+*   `-v, --verbose`: Enable verbose output.
 
 ## License
 
