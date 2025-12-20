@@ -24,9 +24,13 @@ mstl-gh pr checkout -u [PRのURL] [-p parallel] [options]
     *   指定されたPRの本文（Body）を取得します。
     *   本文内のMistletoeブロックを解析し、以下の情報を抽出します。
         *   スナップショット情報（JSON形式）: 各リポジトリのURL、リビジョン、ブランチ情報。
-        *   関連Pull Request情報（JSON形式）: 依存関係や他の関連PRのURL（現状は読み込みのみ）。
-3.  **初期化・同期 (Init)**:
-    *   スナップショット情報を設定ファイル（Config）とみなします。
+        *   関連Pull Request情報（JSON形式）: 依存関係や他の関連PRのURL。
+3.  **関連PRの状態検証**:
+    *   関連Pull Request情報に含まれるすべてのURLについて、現在のステータスを問い合わせます。
+    *   OpenまたはDraft状態のPull Requestのみを有効な依存関係とみなします。
+    *   MergedまたはClosed状態のPull Requestに紐づくリポジトリについては、スナップショット情報から除外（スキップ）し、初期化対象としません。
+4.  **初期化・同期 (Init)**:
+    *   フィルタリング済みのスナップショット情報を設定ファイル（Config）とみなします。
     *   `init` コマンド相当のロジックを実行し、リポジトリのクローンおよび指定されたリビジョン/ブランチへのチェックアウトを行います。
 4.  **ステータス表示**:
     *   同期完了後、`pr status` コマンド相当のロジックを実行し、現在のリポジトリ状態とPRの対応状況を表形式で表示します。
@@ -52,8 +56,9 @@ flowchart TD
     CheckBlock -- No --> ErrorBlock["エラー: Mistletoeブロックなし"]
     CheckBlock -- Yes --> ExtractSnap["スナップショットJSON抽出"]
     ExtractSnap --> ExtractRel["関連PR JSON抽出"]
-    ExtractRel --> CreateConfig["Configオブジェクト生成"]
-    CreateConfig --> ExecInit["Init処理実行 (並列)"]
+    ExtractRel --> CheckRelStatus["関連PRステータス確認"]
+    CheckRelStatus --> FilterConfig["Configオブジェクト生成 (Closed除外)"]
+    FilterConfig --> ExecInit["Init処理実行 (並列)"]
     ExecInit --> CollectStatus["PR Status収集"]
     CollectStatus --> ShowResult["結果表示"]
     ShowResult --> End["終了"]
