@@ -896,6 +896,11 @@ func executePrCreation(repos []Repository, rows []StatusRow, parallel int, gitPa
 						}
 					}
 
+					if strings.Contains(stderr, "No commits between") {
+						fmt.Printf("[%s] No commits between %s and %s. Skipping PR creation.\n", repoName, baseBranch, branchName)
+						return
+					}
+
 					mu.Lock()
 					errs = append(errs, fmt.Sprintf("[%s] PR Create failed: %s", repoName, stderr))
 					mu.Unlock()
