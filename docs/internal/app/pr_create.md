@@ -33,53 +33,73 @@ flowchart TD
     LoadDep --> ValidateAuth["gh CLI認証確認"]
     ValidateAuth --> CollectStatus["ステータス・PR状況収集 (Spinner)"]
     CollectStatus --> RenderTable["pr status テーブル表示"]
-    RenderTable --> CheckBlockers["コンフリクト・Detached HEAD・変更有無確認"]
-    CheckBlockers -- "エラー" --> ErrorState["エラー停止"]
-    CheckBlockers -- "OK" --> FilterRepos[["変更なしリポジトリを除外"]]
-    FilterRepos --> CheckAllPRs{"有効な全リポジトリに\nPRが存在するか？"}
+    RenderTable --> AnalyzeState[["状態解析 (Behind/Ahead/Equal, PR有無)"]]
 
-    CheckAllPRs -- "Yes" --> PromptYes["プロンプト: 説明を更新しますか？"]
-    PromptYes -- "No" --> Stop(["終了"])
-    PromptYes -- "Yes" --> SetSkipEditor["エディタ起動スキップ"]
+    AnalyzeState --> CheckBehind{Pullが必要な\nリポジトリがあるか？\n(Behind)}
+    CheckBehind -- "Yes" --> ErrorAbort["エラー停止: Pullが必要です"]
 
-    CheckAllPRs -- "No" --> PromptNo["プロンプト: 作成しますか？"]
-    PromptNo -- "No" --> Stop
-    PromptNo -- "Yes" --> SetNoSkip["エディタ起動有効"]
+    CheckBehind -- "No" --> Categorize[["アクション分類"]]
+    Categorize --> CatPushNeed["Push必要リスト\n(Ahead or PR更新)"]
+    Categorize --> CatCreateNeed["PR作成必要リスト\n(Ahead & PRなし)"]
+    Categorize --> CatUpdateNeed["PR更新必要リスト\n(PRあり)"]
+    Categorize --> CatSkip["スキップリスト\n(Equal & PRなし)"]
+
+    CatSkip --> CheckWorkable{"処理対象リポジトリがあるか？\n(Create or Update)"}
+    CheckWorkable -- "No" --> Stop(["終了"])
+    CheckWorkable -- "Yes" --> CheckAllPRs{"処理対象全リポジトリに\n既存PRが存在するか？"}
+
+    CheckAllPRs -- "Yes (Updateのみ)" --> PromptUpdate["プロンプト: 説明を更新しますか？"]
+    PromptUpdate -- "No" --> Stop
+    PromptUpdate -- "Yes" --> SetSkipEditor["エディタ起動スキップ"]
+
+    CheckAllPRs -- "No (Create含む)" --> PromptCreate["プロンプト: 作成しますか？"]
+    PromptCreate -- "No" --> Stop
+    PromptCreate -- "Yes" --> SetNoSkip["エディタ起動有効"]
 
     SetSkipEditor --> VerifyBase["GitHub権限・Baseブランチ確認"]
     SetNoSkip --> VerifyBase
 
-    VerifyBase -- "エラー" --> ErrorState
+    VerifyBase -- "エラー" --> ErrorState["エラー停止"]
     VerifyBase -- "OK" --> CheckEditor{"エディタ起動？"}
     CheckEditor -- "Yes" --> InputContent["タイトル・本文入力 (エディタ)\n(解析ルール適用)"]
     CheckEditor -- "No" --> GenSnapshot["スナップショット生成"]
     InputContent --> GenSnapshot
 
-    GenSnapshot --> PushAndCreate["プッシュ & PR作成 (存在時はスキップ)"]
-    PushAndCreate --> UpdateDesc["PR本文更新 (スナップショット埋め込み)"]
-    UpdateDesc --> ShowFinalStatus["最終ステータス表示"]
+    GenSnapshot --> ExecPush["Push実行 (Push必要リスト)"]
+    ExecPush --> ExecCreate["PR作成実行 (PR作成必要リスト)"]
+    ExecCreate --> ExecUpdate["PR本文更新 (作成済み+更新リスト)\n(スナップショット埋め込み)"]
+    ExecUpdate --> ShowFinalStatus["最終ステータス表示"]
     ShowFinalStatus --> Stop
 ```
 
-### 3.2. 変更検知と除外ロジック (Change Detection & Exclusion)
+### 3.2. 状態判定とアクション分類 (State Analysis & Categorization)
 
-各リポジトリについて、以下の条件を満たす場合、そのリポジトリはPushおよびPR作成/更新の対象から除外されます。
+ステータス収集後、各リポジトリの状態に基づいてアクションを以下の優先順位で分類します。
 
-*   **条件**: ローカルブランチのすべてのコミットが、リモートのBaseブランチ（`origin/<base-branch>`）に既に含まれている場合。
-    *   確認方法:
-        1.  `git ls-remote origin <base-branch>` でリモートBaseブランチのコミットハッシュを取得。
-        2.  `git merge-base --is-ancestor <remote-hash> HEAD` で、リモートのコミットがローカル `HEAD` の祖先であるか（＝含まれているか）を確認。
-        3.  祖先である場合、`HEAD` と `<remote-hash>` が同一かどうかを確認。同一であれば「変更なし」と判定。
-    *   ローカル環境への影響（fetchによるリモート追跡ブランチの更新など）を避けるため、`fetch` は行わずに判定します。
-*   **挙動**:
-    *   Pushを行いません。
-    *   新規PRを作成しません。
-    *   既存PRのDescription更新も行いません。
-*   **通知**: 除外されたリポジトリは、処理開始前に一覧表示され、ユーザーに通知されます。
+1.  **Pullが必要 (Behind)**:
+    *   **条件**: ローカルブランチがリモートブランチより遅れている（リモートにありローカルにないコミットがある）。
+    *   **アクション**: **エラー停止**。処理を中断し、対象リポジトリとブランチを表示します。
+
+2.  **Pull Requestの更新 (Update PR)**:
+    *   **条件**: リモートからBaseブランチへの有効な（Open状態の）Pull Requestが既に存在する。
+    *   **アクション**:
+        *   **Push**: ローカルがリモートより進んでいる場合 (`Ahead`) はPushリストに追加します。進んでいない場合 (`Equal`) はPush不要ですが、実装上はPushリストに含めても安全です（No-op）。
+        *   **Update**: 最終工程でPR本文（Mistletoeブロック）を更新します。
+
+3.  **Pull Requestの作成 (Create PR)**:
+    *   **条件**: 有効なPRが存在せず、かつローカルブランチがリモートブランチより進んでいる (`Ahead`)。
+    *   **アクション**:
+        *   **Push**: Pushリストに追加します。
+        *   **Create**: PR作成リストに追加します。
+        *   **Update**: 作成後の最終工程でPR本文を更新します。
+
+4.  **スキップ (No Action)**:
+    *   **条件**: 有効なPRが存在せず、かつローカルブランチとリモートブランチが同期している (`Equal`)。
+    *   **アクション**: PushもPR作成もしません。メモリ上で「PR不要」として保持し、後続の処理から除外します。
 
 ### 3.3. 既存PRの更新スキップ条件 (Skip Update for Closed/Merged PRs)
 
-既存のPull Requestが存在する場合でも、そのステータスが `MERGED` または `CLOSED` である場合、Descriptionの更新（スナップショットの埋め込み）はスキップされます。
+既存のPull Requestが存在する場合でも、そのステータスが `MERGED` または `CLOSED` である場合、Descriptionの更新（スナップショットの埋め込み）はスキップされます（これらのリポジトリは上記分類ロジックにおける「PRなし」として扱われますが、変更がなければ「スキップ」となります）。
 
 ### 3.4. 依存関係の解析 (Dependency Parsing)
 
