@@ -708,7 +708,17 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 	finalRows := CollectStatus(config, parallel, opts.GitPath, verbose, true)
 	finalPrRows := CollectPrStatus(finalRows, config, parallel, opts.GhPath, verbose, finalPrMap)
 	spinner.Stop()
-	RenderPrStatusTable(finalPrRows)
+
+	// Filter for Display (Open or Draft only)
+	var displayRows []PrStatusRow
+	for _, row := range finalPrRows {
+		// GitHub API treats both regular Open PRs and Draft PRs as having the state "OPEN".
+		// Checking for this state correctly includes both [Open] and [Draft] while excluding [Merged] and [Closed].
+		if strings.EqualFold(row.PrState, GitHubPrStateOpen) {
+			displayRows = append(displayRows, row)
+		}
+	}
+	RenderPrStatusTable(displayRows)
 
 	fmt.Println("Done.")
 }
