@@ -63,13 +63,15 @@ Some description...
 <summary>mistletoe-snapshot-1234.json</summary>
 
 ` + "```json" + `
-[
-  {
-    "url": "https://github.com/example/repo1",
-    "revision": "hash1",
-    "branch": "feature/a"
-  }
-]
+{
+  "repositories": [
+    {
+      "url": "https://github.com/example/repo1",
+      "revision": "hash1",
+      "branch": "feature/a"
+    }
+  ]
+}
 ` + "```" + `
 </details>
 
@@ -127,13 +129,15 @@ Some description...
 <summary>mistletoe-snapshot-1234.json</summary>
 
 ` + "```json" + `
-[
-  {
-    "url": "https://github.com/example/repo1",
-    "revision": "hash1",
-    "branch": "feature/a"
-  }
-]
+{
+  "repositories": [
+    {
+      "url": "https://github.com/example/repo1",
+      "revision": "hash1",
+      "branch": "feature/a"
+    }
+  ]
+}
 ` + "```" + `
 </details>
 
@@ -162,13 +166,15 @@ Some description...
 <summary>mistletoe-snapshot-1234.json</summary>
 
 ` + "```json" + `
-[
-  {
-    "url": "https://github.com/example/repo1",
-    "revision": "hash1",
-    "branch": "feature/a"
-  }
-]
+{
+  "repositories": [
+    {
+      "url": "https://github.com/example/repo1",
+      "revision": "hash1",
+      "branch": "feature/a"
+    }
+  ]
+}
 ` + "```" + `
 </details>
 
