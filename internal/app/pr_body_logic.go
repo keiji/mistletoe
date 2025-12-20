@@ -364,7 +364,6 @@ func ParseMistletoeBlock(body string) (*Config, []byte, error) {
 			if len(jsonMatch) > 1 {
 				rawJSON := jsonMatch[1]
 				// Decode
-				// Try parsing as Config object (new format)
 				if cfg, err := ParseConfig([]byte(rawJSON)); err == nil {
 					snapshotConfig = cfg
 				}
