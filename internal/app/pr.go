@@ -125,10 +125,11 @@ type PrInfo struct {
 // PrStatusRow represents a row in the PR status table.
 type PrStatusRow struct {
 	StatusRow
-	PrNumber string
-	PrState  string
-	PrURL    string
-	Base     string
+	PrNumber  string
+	PrState   string
+	PrURL     string
+	PrDisplay string
+	Base      string
 }
 
 // CollectPrStatus collects Pull Request status for the given repositories.
@@ -158,14 +159,32 @@ func CollectPrStatus(statusRows []StatusRow, config *Config, parallel int, ghPat
 				if url, ok := knownPRs[r.Repo]; ok && url != "" {
 					isKnown = true
 					prRow.PrURL = url
-					parts := strings.Split(url, "/")
-					if len(parts) > 0 {
-						prRow.PrNumber = "#" + parts[len(parts)-1]
+
+					// Fetch Status for known URL
+					args := []string{"pr", "view", url, "--json", "number,state,isDraft,baseRefName"}
+					out, err := RunGh(ghPath, verbose, args...)
+					if err == nil {
+						var pr PrInfo
+						if err := json.Unmarshal([]byte(out), &pr); err == nil {
+							pr.URL = url // Ensure URL is set
+							displayState := getPrDisplayState(pr)
+							prRow.PrDisplay = fmt.Sprintf("%s [%s]", pr.URL, displayState)
+							prRow.PrNumber = fmt.Sprintf("#%d", pr.Number)
+							prRow.PrState = pr.State
+							if pr.BaseRefName != "" {
+								prRow.Base = pr.BaseRefName
+							}
+						} else {
+							prRow.PrDisplay = fmt.Sprintf("%s [Error]", url)
+							prRow.PrState = "Error"
+							prRow.PrNumber = "N/A"
+						}
 					} else {
-						prRow.PrNumber = "?"
+						// Fallback if view fails
+						prRow.PrDisplay = fmt.Sprintf("%s [Error]", url)
+						prRow.PrState = "Error"
+						prRow.PrNumber = "N/A"
 					}
-					// Approximation since we don't store state in map
-					prRow.PrState = "Ready"
 				}
 			}
 
@@ -197,33 +216,18 @@ func CollectPrStatus(statusRows []StatusRow, config *Config, parallel int, ghPat
 							// Format PR column
 							var prLines []string
 							for _, pr := range prs {
-								displayState := ""
-								// Determine display state
-								if pr.IsDraft && pr.State == GitHubPrStateOpen {
-									displayState = DisplayPrStateDraft
-								} else {
-									switch pr.State {
-									case GitHubPrStateOpen:
-										displayState = DisplayPrStateOpen
-									case GitHubPrStateMerged:
-										displayState = DisplayPrStateMerged
-									case GitHubPrStateClosed:
-										displayState = DisplayPrStateClosed
-									default:
-										displayState = pr.State // Fallback
-									}
-								}
-
+								displayState := getPrDisplayState(pr)
 								line := fmt.Sprintf("%s [%s]", pr.URL, displayState)
 								if displayState == DisplayPrStateMerged || displayState == DisplayPrStateClosed {
 									line = AnsiFgGray + line + AnsiReset
 								}
 								prLines = append(prLines, line)
 							}
-							prRow.PrURL = strings.Join(prLines, "\n")
+							prRow.PrDisplay = strings.Join(prLines, "\n")
 
 							// Set other fields based on the first (most relevant) PR
 							topPr := prs[0]
+							prRow.PrURL = topPr.URL
 							prRow.PrNumber = fmt.Sprintf("#%d", topPr.Number)
 							prRow.PrState = topPr.State // Raw state
 
@@ -250,6 +254,22 @@ func CollectPrStatus(statusRows []StatusRow, config *Config, parallel int, ghPat
 	wg.Wait()
 
 	return prRows
+}
+
+func getPrDisplayState(pr PrInfo) string {
+	if pr.IsDraft && pr.State == GitHubPrStateOpen {
+		return DisplayPrStateDraft
+	}
+	switch pr.State {
+	case GitHubPrStateOpen:
+		return DisplayPrStateOpen
+	case GitHubPrStateMerged:
+		return DisplayPrStateMerged
+	case GitHubPrStateClosed:
+		return DisplayPrStateClosed
+	default:
+		return pr.State
+	}
 }
 
 func sortPrs(prs []PrInfo) {
@@ -321,7 +341,7 @@ func RenderPrStatusTable(rows []PrStatusRow) {
 			statusStr = "-"
 		}
 
-		prContent := row.PrURL
+		prContent := row.PrDisplay
 		if prContent == "" {
 			prContent = "-"
 		}
@@ -685,7 +705,17 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 	finalRows := CollectStatus(config, parallel, opts.GitPath, verbose, true)
 	finalPrRows := CollectPrStatus(finalRows, config, parallel, opts.GhPath, verbose, finalPrMap)
 	spinner.Stop()
-	RenderPrStatusTable(finalPrRows)
+
+	// Filter for Display (Open or Draft only)
+	var displayRows []PrStatusRow
+	for _, row := range finalPrRows {
+		// GitHub API treats both regular Open PRs and Draft PRs as having the state "OPEN".
+		// Checking for this state correctly includes both [Open] and [Draft] while excluding [Merged] and [Closed].
+		if strings.EqualFold(row.PrState, GitHubPrStateOpen) {
+			displayRows = append(displayRows, row)
+		}
+	}
+	RenderPrStatusTable(displayRows)
 
 	fmt.Println("Done.")
 }

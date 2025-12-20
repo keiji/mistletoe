@@ -100,8 +100,30 @@ func handleGhMock(args []string) {
 		}
 		// pr view
 		if len(args) > 1 && args[1] == "view" {
-			// Output body
-			fmt.Print("Original Body")
+			if os.Getenv("MOCK_GH_VIEW_FAIL") == "1" {
+				os.Exit(1)
+			}
+
+			// Check if json includes number/state (from CollectPrStatus knownPRs)
+			isStateCheck := false
+			for _, arg := range args {
+				if strings.Contains(arg, "number") {
+					isStateCheck = true
+					break
+				}
+			}
+
+			if isStateCheck {
+				if os.Getenv("MOCK_GH_VIEW_INVALID_JSON") == "1" {
+					fmt.Print("INVALID JSON")
+				} else {
+					// Return dummy PR status
+					fmt.Print(`{"number": 99, "state": "OPEN", "isDraft": false, "baseRefName": "main"}`)
+				}
+			} else {
+				// Output body
+				fmt.Print("Original Body")
+			}
 			os.Exit(0)
 		}
 		// pr edit
