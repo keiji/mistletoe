@@ -364,9 +364,9 @@ func ParseMistletoeBlock(body string) (*Config, []byte, error) {
 			if len(jsonMatch) > 1 {
 				rawJSON := jsonMatch[1]
 				// Decode
-				var repos []Repository
-				if err := json.Unmarshal([]byte(rawJSON), &repos); err == nil {
-					snapshotConfig = &Config{Repositories: &repos}
+				// Try parsing as Config object (new format)
+				if cfg, err := ParseConfig([]byte(rawJSON)); err == nil {
+					snapshotConfig = cfg
 				}
 			}
 		}
