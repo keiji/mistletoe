@@ -20,7 +20,7 @@ import (
 func HandlePr(args []string, opts GlobalOptions) {
 	if len(args) == 0 {
 		fmt.Println("Usage: mstl-gh pr <subcommand> [options]")
-		fmt.Println("Available subcommands: create, checkout, status")
+		fmt.Println("Available subcommands: create, update, checkout, status")
 		os.Exit(1)
 	}
 
@@ -34,6 +34,8 @@ func HandlePr(args []string, opts GlobalOptions) {
 		handlePrCheckout(subArgs, opts)
 	case CmdStatus:
 		handlePrStatus(subArgs, opts)
+	case CmdUpdate:
+		handlePrUpdate(subArgs, opts)
 	default:
 		fmt.Printf("Unknown pr subcommand: %s\n", subcmd)
 		os.Exit(1)

@@ -5,6 +5,7 @@ const (
 	CmdPr            = "pr"
 	CmdCreate        = "create"
 	CmdCheckout      = "checkout"
+	CmdUpdate        = "update"
 	PrTitleMaxLength = 256
 )
 
