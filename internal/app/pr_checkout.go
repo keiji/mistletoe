@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strings"
 )
 
 func handlePrCheckout(args []string, opts GlobalOptions) {
@@ -69,16 +70,105 @@ func handlePrCheckout(args []string, opts GlobalOptions) {
 		os.Exit(1)
 	}
 
-	// (Optional) We read relatedJSON as per requirement, but currently don't use it for init logic.
-	// We can display it or validate it if needed.
+	// Filter repositories based on Related PR status (Open/Draft only)
 	if len(relatedJSON) > 0 {
-		var rel map[string]interface{}
-		if err := json.Unmarshal(relatedJSON, &rel); err != nil {
+		var rel RelatedPRsJSON
+		if err := json.Unmarshal(relatedJSON, &rel); err == nil {
+			// Gather all URLs
+			var allURLs []string
+			allURLs = append(allURLs, rel.Dependencies...)
+			allURLs = append(allURLs, rel.Dependents...)
+			allURLs = append(allURLs, rel.Others...)
+
+			if len(allURLs) > 0 {
+				fmt.Println("Verifying related Pull Requests status...")
+
+				// Map URL -> State
+				// We need to check state for these PRs.
+				// Optimization: Check in parallel or sequentially.
+				// Since we might have many, let's use a simple parallel loop.
+
+				type prCheckResult struct {
+					url   string
+					state string
+					err   error
+				}
+
+				ch := make(chan prCheckResult, len(allURLs))
+				for _, u := range allURLs {
+					go func(url string) {
+						out, err := RunGh(opts.GhPath, verbose, "pr", "view", url, "--json", "state", "-q", ".state")
+						ch <- prCheckResult{url: url, state: string(out), err: err}
+					}(u)
+				}
+
+				// Collect
+				closedPRs := make(map[string]bool)
+				for i := 0; i < len(allURLs); i++ {
+					res := <-ch
+					if res.err != nil {
+						fmt.Printf("Warning: Failed to check status for %s: %v\n", res.url, res.err)
+						continue
+					}
+					// Parse state (trim whitespace)
+					st := strings.TrimSpace(res.state)
+
+					// Check if Open
+					if st != "OPEN" {
+						// Note: Draft is also OPEN in GitHub API json state, usually.
+						// If specific field isDraft is needed, we should query it.
+						// But usually "state": "OPEN" covers draft.
+						// If state is MERGED or CLOSED, we filter out.
+						closedPRs[res.url] = true
+					}
+				}
+
+				if len(closedPRs) > 0 {
+					// Filter snapshot repositories
+					var newRepos []Repository
+					for _, r := range *config.Repositories {
+						// We need to match Repo to PR URL.
+						// Heuristic: PR URL starts with Repo URL (minus .git)
+						keep := true
+						repoURL := ""
+						if r.URL != nil {
+							repoURL = *r.URL
+							if len(repoURL) > 4 && repoURL[len(repoURL)-4:] == ".git" {
+								repoURL = repoURL[:len(repoURL)-4]
+							}
+						}
+
+						for closedURL := range closedPRs {
+							// If PR URL belongs to this Repo
+							// e.g. https://github.com/org/repo/pull/1 belongs to https://github.com/org/repo
+							// Check prefix
+							if repoURL != "" && len(closedURL) > len(repoURL) && closedURL[:len(repoURL)] == repoURL {
+								// Confirm separator
+								if closedURL[len(repoURL)] == '/' {
+									fmt.Printf("Skipping repository '%s' because linked PR %s is not Open/Draft.\n", getRepoName(r), closedURL)
+									keep = false
+									break
+								}
+							}
+						}
+						if keep {
+							newRepos = append(newRepos, r)
+						}
+					}
+					config.Repositories = &newRepos
+				}
+			}
+		} else {
 			fmt.Printf("Warning: related PR JSON is invalid: %v\n", err)
 		}
 	}
 
 	// 4. Init / Checkout
+	if len(*config.Repositories) == 0 {
+		fmt.Println("No repositories to initialize (all filtered or empty snapshot).")
+		return
+	}
+
 	fmt.Println("Initializing repositories based on snapshot...")
 	// The snapshot contains the target state. We treat it as the config.
 	// PerformInit handles validation, cloning, and checking out.

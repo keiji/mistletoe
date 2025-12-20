@@ -10,11 +10,14 @@ import (
 	"time"
 )
 
-type relatedPRsJSON struct {
+// Export relatedPRsJSON for pr_checkout.go
+type RelatedPRsJSON struct {
 	Dependencies []string `json:"dependencies,omitempty"`
 	Dependents   []string `json:"dependents,omitempty"`
 	Others       []string `json:"others,omitempty"`
 }
+
+type relatedPRsJSON = RelatedPRsJSON
 
 // GenerateMistletoeBody creates the structured body content.
 // It accepts a map of all related PRs (RepoID -> []PrInfo), an optional dependency graph, and the raw dependency content.
