@@ -1,0 +1,471 @@
+package app
+
+import (
+	"bufio"
+	"errors"
+	"flag"
+	"fmt"
+	"os"
+	"os/exec"
+	"strings"
+	"sync"
+)
+
+// handlePrCreate handles 'pr create'.
+func handlePrCreate(args []string, opts GlobalOptions) {
+	fs := flag.NewFlagSet("pr create", flag.ExitOnError)
+	var (
+		fLong      string
+		fShort     string
+		pVal       int
+		pValShort  int
+		tLong      string
+		tShort     string
+		bLong      string
+		bShort     string
+		dLong      string
+		dShort     string
+		vLong      bool
+		vShort     bool
+	)
+
+	fs.StringVar(&fLong, "file", "", "Configuration file path")
+	fs.StringVar(&fShort, "f", "", "Configuration file path (shorthand)")
+	fs.IntVar(&pVal, "parallel", DefaultParallel, "Number of parallel processes")
+	fs.IntVar(&pValShort, "p", DefaultParallel, "Number of parallel processes (shorthand)")
+	fs.StringVar(&tLong, "title", "", "Pull Request title")
+	fs.StringVar(&tShort, "t", "", "Pull Request title (shorthand)")
+	fs.StringVar(&bLong, "body", "", "Pull Request body")
+	fs.StringVar(&bShort, "b", "", "Pull Request body (shorthand)")
+	fs.StringVar(&dLong, "dependencies", "", "Dependency graph file path")
+	fs.StringVar(&dShort, "d", "", "Dependency graph file path (shorthand)")
+	fs.BoolVar(&vLong, "verbose", false, "Enable verbose output")
+	fs.BoolVar(&vShort, "v", false, "Enable verbose output (shorthand)")
+
+	if err := ParseFlagsFlexible(fs, args); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	// Resolve common values
+	configPath, parallel, configData, err := ResolveCommonValues(fLong, fShort, pVal, pValShort)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	verbose := vLong || vShort
+
+	// Resolve title, body, dependency file
+	prTitle := tLong
+	if prTitle == "" {
+		prTitle = tShort
+	}
+	prBody := bLong
+	if prBody == "" {
+		prBody = bShort
+	}
+	depPath := dLong
+	if depPath == "" {
+		depPath = dShort
+	}
+
+	// 1. Check gh availability
+	if err := checkGhAvailability(opts.GhPath, verbose); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	// 2. Load Config
+	var config *Config
+	if configPath != "" {
+		config, err = loadConfigFile(configPath)
+	} else {
+		config, err = loadConfigData(configData)
+	}
+
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	// 3. Load Dependencies (if specified)
+	var deps *DependencyGraph
+	var depContent string
+	if depPath != "" {
+		contentBytes, errRead := os.ReadFile(depPath)
+		if errRead != nil {
+			fmt.Printf("error reading dependency file: %v\n", errRead)
+			os.Exit(1)
+		}
+		depContent = string(contentBytes)
+
+		var validIDs []string
+		for _, r := range *config.Repositories {
+			validIDs = append(validIDs, getRepoName(r))
+		}
+		var errDep error
+		deps, errDep = ParseDependencies(depContent, validIDs)
+		if errDep != nil {
+			fmt.Printf("error loading dependencies: %v\n", errDep)
+			os.Exit(1)
+		}
+		fmt.Println("Dependency graph loaded successfully.")
+	}
+
+	// 4. Validate Integrity
+	if err := ValidateRepositoriesIntegrity(config, opts.GitPath, verbose); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	// 5. Collect Status & PR Status (Moved Up)
+	fmt.Println("Collecting repository status and checking for existing Pull Requests...")
+	spinner := NewSpinner(verbose)
+	spinner.Start()
+	// Pass noFetch=true to CollectStatus. We rely on subsequent checks.
+	rows := CollectStatus(config, parallel, opts.GitPath, verbose, true)
+	// Initial Check: No known PRs yet
+	prRows := CollectPrStatus(rows, config, parallel, opts.GhPath, verbose, nil)
+	spinner.Stop()
+	RenderPrStatusTable(prRows)
+
+	// 6. Check for Behind/Conflict/Detached
+	// Abort if pull required (behind)
+	ValidateStatusForAction(rows, true)
+
+	// 6.5 Categorize Repositories
+	fmt.Println("Analyzing repository states...")
+
+	var pushList []Repository
+	var createList []Repository
+	var updateList []Repository
+	var skippedRepos []string
+
+	repoMap := make(map[string]Repository)
+	for _, r := range *config.Repositories {
+		repoMap[getRepoName(r)] = r
+	}
+
+	// Map to track PR existence
+	prExistsMap := make(map[string][]PrInfo) // RepoName -> []PrInfo
+	for _, prRow := range prRows {
+		if len(prRow.PrItems) > 0 {
+			prExistsMap[prRow.Repo] = prRow.PrItems
+		}
+	}
+
+	// Helper map for StatusRow
+	statusMap := make(map[string]StatusRow)
+	for _, r := range rows {
+		statusMap[r.Repo] = r
+	}
+
+	// Iterate Repositories
+	for _, repo := range *config.Repositories {
+		repoName := getRepoName(repo)
+		status, hasStatus := statusMap[repoName]
+		if !hasStatus {
+			continue
+		}
+
+		isOpen := false
+		if items, ok := prExistsMap[repoName]; ok {
+			for _, item := range items {
+				if strings.EqualFold(item.State, GitHubPrStateOpen) {
+					isOpen = true
+					break
+				}
+			}
+		}
+
+		if isOpen {
+			pushList = append(pushList, repo)
+			updateList = append(updateList, repo)
+		} else {
+			if status.HasUnpushed {
+				pushList = append(pushList, repo)
+				createList = append(createList, repo)
+			} else {
+				skippedRepos = append(skippedRepos, repoName)
+			}
+		}
+	}
+
+	if len(skippedRepos) > 0 {
+		fmt.Println("The following repositories will be skipped (no changes and no existing PR):")
+		for _, r := range skippedRepos {
+			fmt.Printf(" - %s\n", r)
+		}
+		fmt.Println()
+	}
+
+	// Combine createList + updateList for "Active Repos" processing
+	var activeRepos []Repository
+	activeRepos = append(activeRepos, updateList...)
+	activeRepos = append(activeRepos, createList...)
+
+	if len(activeRepos) == 0 {
+		fmt.Println("No repositories to process.")
+		return
+	}
+
+	// 7. Prompt
+	var skipEditor bool
+
+	// If ALL active repos are in updateList, prompt for description update only
+	allUpdates := len(createList) == 0
+
+	if allUpdates {
+		fmt.Print("No new Pull Requests to create. Update existing Pull Request descriptions? (yes/no): ")
+		reader := bufio.NewReader(os.Stdin)
+		input, _ := reader.ReadString('\n')
+		input = strings.TrimSpace(strings.ToLower(input))
+		if input == "y" || input == "yes" {
+			skipEditor = true
+		} else {
+			fmt.Println("Aborted.")
+			os.Exit(1)
+		}
+	} else {
+		fmt.Print("Proceed with Push and Pull Request creation? (yes/no): ")
+		reader := bufio.NewReader(os.Stdin)
+		input, _ := reader.ReadString('\n')
+		input = strings.TrimSpace(strings.ToLower(input))
+		if input == "y" || input == "yes" {
+			skipEditor = false
+		} else {
+			fmt.Println("Aborted.")
+			os.Exit(1)
+		}
+	}
+
+	// Input Message if needed
+	if !skipEditor {
+		if prTitle == "" && prBody == "" {
+			content, err := RunEditor()
+			if err != nil {
+				fmt.Printf("error getting message: %v\n", err)
+				os.Exit(1)
+			}
+			prTitle, prBody = ParsePrTitleBody(content)
+		}
+	}
+
+	// 8. Check GitHub Management & Permissions & Base Branches (for active repos)
+	fmt.Println("Verifying GitHub permissions and base branches...")
+
+	// Convert prExistsMap (map[string][]PrInfo) to map[string][]string for verifyGithubRequirements
+	prExistsMapURLs := make(map[string][]string)
+	for k, items := range prExistsMap {
+		var urls []string
+		for _, item := range items {
+			urls = append(urls, item.URL)
+		}
+		prExistsMapURLs[k] = urls
+	}
+
+	_, err = verifyGithubRequirements(activeRepos, rows, parallel, opts.GitPath, opts.GhPath, verbose, prExistsMapURLs)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	// 9. Execution Phase 1: Push
+	if len(pushList) > 0 {
+		fmt.Println("Pushing changes...")
+		if err := executePush(pushList, rows, parallel, opts.GitPath, verbose); err != nil {
+			fmt.Printf("error during push: %v\n", err)
+			os.Exit(1)
+		}
+	}
+
+	// 9. Execution Phase 2: Create PRs
+	// We need a map of ALL PR URLs (existing + newly created) for the snapshot/related-pr logic.
+	finalPrMap := make(map[string][]PrInfo)
+	for k, v := range prExistsMap {
+		finalPrMap[k] = v
+	}
+
+	if len(createList) > 0 {
+		fmt.Println("Creating Pull Requests...")
+		// Create placeholder body
+		placeholderBlock := GeneratePlaceholderMistletoeBody()
+		prBodyWithPlaceholder := EmbedMistletoeBody(prBody, placeholderBlock)
+
+		createdMap, err := executePrCreationOnly(createList, rows, parallel, opts.GhPath, verbose, prTitle, prBodyWithPlaceholder)
+		if err != nil {
+			fmt.Printf("error during PR creation: %v\n", err)
+			os.Exit(1)
+		}
+		for k, url := range createdMap {
+			// Created PR is always OPEN
+			finalPrMap[k] = append(finalPrMap[k], PrInfo{URL: url, State: "OPEN"})
+		}
+	}
+
+	// 9. Execution Phase 3: Update Descriptions (All Active PRs)
+	fmt.Println("Generating configuration snapshot...")
+	snapshotData, snapshotID, err := GenerateSnapshotFromStatus(config, rows)
+	if err != nil {
+		fmt.Printf("error generating snapshot: %v\n", err)
+		os.Exit(1)
+	}
+
+	filename := fmt.Sprintf("mistletoe-snapshot-%s.json", snapshotID)
+	if err := os.WriteFile(filename, snapshotData, 0644); err != nil {
+		fmt.Printf("error writing snapshot file: %v\n", err)
+		os.Exit(1)
+	}
+	fmt.Printf("Snapshot saved to %s\n", filename)
+
+	fmt.Println("Updating Pull Request descriptions...")
+	targetPrMap := make(map[string][]PrInfo)
+	for _, r := range activeRepos {
+		rID := getRepoName(r)
+		if items, ok := finalPrMap[rID]; ok {
+			targetPrMap[rID] = items
+		}
+	}
+
+	if err := updatePrDescriptions(targetPrMap, parallel, opts.GhPath, verbose, string(snapshotData), filename, deps, depContent); err != nil {
+		fmt.Printf("error updating descriptions: %v\n", err)
+		os.Exit(1)
+	}
+
+	// 11. Show Status (Final)
+	fmt.Println("Collecting final status...")
+	spinner = NewSpinner(verbose)
+	spinner.Start()
+	finalRows := CollectStatus(config, parallel, opts.GitPath, verbose, true)
+
+	knownPRsForStatus := make(map[string][]string)
+	for k, items := range finalPrMap {
+		var urls []string
+		for _, item := range items {
+			urls = append(urls, item.URL)
+		}
+		knownPRsForStatus[k] = urls
+	}
+
+	finalPrRows := CollectPrStatus(finalRows, config, parallel, opts.GhPath, verbose, knownPRsForStatus)
+	spinner.Stop()
+
+	// Filter for Display (Open or Draft only)
+	var displayRows []PrStatusRow
+	for _, row := range finalPrRows {
+		if !strings.EqualFold(row.PrState, GitHubPrStateOpen) {
+			row.PrDisplay = "-"
+		}
+		displayRows = append(displayRows, row)
+	}
+	RenderPrStatusTable(displayRows)
+
+	fmt.Println("Done.")
+}
+
+// executePrCreationOnly creates PRs for the given repositories.
+// Returns a map of RepoName -> PR URL.
+func executePrCreationOnly(repos []Repository, rows []StatusRow, parallel int, ghPath string, verbose bool, title, body string) (map[string]string, error) {
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, parallel)
+	var errs []string
+	prMap := make(map[string]string)
+
+	statusMap := make(map[string]StatusRow)
+	for _, r := range rows {
+		statusMap[r.Repo] = r
+	}
+
+	for _, repo := range repos {
+		wg.Add(1)
+		go func(r Repository) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+
+			repoName := getRepoName(r)
+			branchName := ""
+			if row, ok := statusMap[repoName]; ok && row.BranchName != "" {
+				branchName = row.BranchName
+			} else {
+				return
+			}
+
+			fmt.Printf("[%s] Creating Pull Request...\n", repoName)
+
+			args := []string{"pr", "create", "--repo", *r.URL, "--head", branchName}
+
+			if title != "" || body != "" {
+				if title != "" {
+					args = append(args, "--title", title)
+				}
+				if body != "" {
+					args = append(args, "--body", body)
+				}
+			} else {
+				args = append(args, "--fill")
+			}
+
+			// Resolve Base Branch
+			baseBranch := ""
+			if r.BaseBranch != nil && *r.BaseBranch != "" {
+				baseBranch = *r.BaseBranch
+			} else if r.Branch != nil && *r.Branch != "" {
+				baseBranch = *r.Branch
+			}
+
+			if baseBranch != "" {
+				args = append(args, "--base", baseBranch)
+			}
+
+			createOut, err := RunGh(ghPath, verbose, args...)
+			if err != nil {
+				var exitErr *exec.ExitError
+				if errors.As(err, &exitErr) {
+					stderr := string(exitErr.Stderr)
+					// Handle cases where PR might have been created externally during race
+					if strings.Contains(stderr, "already exists") {
+						out, _ := RunGh(ghPath, verbose, "pr", "list", "--repo", *r.URL, "--head", branchName, "--json", "url", "-q", ".[0].url")
+						prURL := strings.TrimSpace(out)
+						if prURL != "" {
+							fmt.Printf("[%s] Pull Request already exists: %s\n", repoName, prURL)
+							mu.Lock()
+							prMap[repoName] = prURL
+							mu.Unlock()
+							return
+						}
+					}
+					// No commits between?
+					if strings.Contains(stderr, "No commits between") {
+						fmt.Printf("[%s] No commits between %s and %s. Skipping PR creation.\n", repoName, baseBranch, branchName)
+						return
+					}
+
+					mu.Lock()
+					errs = append(errs, fmt.Sprintf("[%s] PR Create failed: %s", repoName, stderr))
+					mu.Unlock()
+				} else {
+					mu.Lock()
+					errs = append(errs, fmt.Sprintf("[%s] PR Create failed: %v", repoName, err))
+					mu.Unlock()
+				}
+				return
+			}
+			lines := strings.Split(strings.TrimSpace(string(createOut)), "\n")
+			// The last line typically contains the URL
+			prURL := lines[len(lines)-1]
+
+			mu.Lock()
+			prMap[repoName] = prURL
+			mu.Unlock()
+
+		}(repo)
+	}
+	wg.Wait()
+
+	if len(errs) > 0 {
+		return nil, fmt.Errorf("errors occurred during PR creation:\n%s", strings.Join(errs, "\n"))
+	}
+	return prMap, nil
+}

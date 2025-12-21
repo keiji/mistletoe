@@ -1,9 +1,9 @@
 package app
 
 import (
+	"flag"
 	"fmt"
 	"os"
-	"flag"
 	"strings"
 )
 
@@ -11,14 +11,14 @@ import (
 func handlePrUpdate(args []string, opts GlobalOptions) {
 	fs := flag.NewFlagSet("pr update", flag.ExitOnError)
 	var (
-		fLong      string
-		fShort     string
-		pVal       int
-		pValShort  int
-		dLong      string
-		dShort     string
-		vLong      bool
-		vShort     bool
+		fLong     string
+		fShort    string
+		pVal      int
+		pValShort int
+		dLong     string
+		dShort    string
+		vLong     bool
+		vShort    bool
 	)
 
 	fs.StringVar(&fLong, "file", "", "Configuration file path")
@@ -72,7 +72,7 @@ func handlePrUpdate(args []string, opts GlobalOptions) {
 	if depPath != "" {
 		contentBytes, errRead := os.ReadFile(depPath)
 		if errRead != nil {
-			fmt.Printf("Error reading dependency file: %v\n", errRead)
+			fmt.Printf("error reading dependency file: %v\n", errRead)
 			os.Exit(1)
 		}
 		depContent = string(contentBytes)
@@ -84,7 +84,7 @@ func handlePrUpdate(args []string, opts GlobalOptions) {
 		var errDep error
 		deps, errDep = ParseDependencies(depContent, validIDs)
 		if errDep != nil {
-			fmt.Printf("Error loading dependencies: %v\n", errDep)
+			fmt.Printf("error loading dependencies: %v\n", errDep)
 			os.Exit(1)
 		}
 		fmt.Println("Dependency graph loaded successfully.")
@@ -101,9 +101,6 @@ func handlePrUpdate(args []string, opts GlobalOptions) {
 	spinner := NewSpinner(verbose)
 	spinner.Start()
 
-	// CollectStatus with noFetch=false (we want accurate status check, similar to pr create but strictly verifying)
-	// 'pr create' uses noFetch=true for optimization, but since 'pr update' is about updating metadata,
-	// checking if we are behind (and thus our snapshot is old) is valuable.
 	rows := CollectStatus(config, parallel, opts.GitPath, verbose, false)
 
 	// Collect PR Status
@@ -112,32 +109,9 @@ func handlePrUpdate(args []string, opts GlobalOptions) {
 	RenderPrStatusTable(prRows)
 
 	// 6. Check for Behind/Conflict/Detached
-	var behindRepos []string
-	for _, row := range rows {
-		if row.IsPullable {
-			behindRepos = append(behindRepos, row.Repo)
-		}
-		if row.HasConflict {
-			fmt.Printf("Error: Repository '%s' has conflicts. Cannot proceed.\n", row.Repo)
-			os.Exit(1)
-		}
-		if row.BranchName == "HEAD" {
-			fmt.Printf("Error: Repository '%s' is in a detached HEAD state. Cannot proceed.\n", row.Repo)
-			os.Exit(1)
-		}
-	}
-
-	if len(behindRepos) > 0 {
-		fmt.Printf("Error: The following repositories are behind remote and require a pull:\n")
-		for _, r := range behindRepos {
-			fmt.Printf(" - %s\n", r)
-		}
-		fmt.Println("Please pull changes before updating Pull Requests.")
-		os.Exit(1)
-	}
+	ValidateStatusForAction(rows, true)
 
 	// 7. Identify Active PRs to Update
-	// We only update if a PR exists (Open/Draft).
 	targetPrMap := make(map[string][]PrInfo)
 	var activeRepos []Repository
 	repoMap := make(map[string]Repository)
@@ -171,7 +145,6 @@ func handlePrUpdate(args []string, opts GlobalOptions) {
 	}
 
 	// 7.5 Check for Push (Ahead)
-	// If any active repo is ahead, we push it before updating description.
 	var pushList []Repository
 	statusMap := make(map[string]StatusRow)
 	for _, r := range rows {
@@ -190,33 +163,22 @@ func handlePrUpdate(args []string, opts GlobalOptions) {
 	if len(pushList) > 0 {
 		fmt.Println("Pushing changes for repositories with active Pull Requests...")
 		if err := executePush(pushList, rows, parallel, opts.GitPath, verbose); err != nil {
-			fmt.Printf("Error during push: %v\n", err)
+			fmt.Printf("error during push: %v\n", err)
 			os.Exit(1)
 		}
-		// Re-collect status after push?
-		// We need updated commit hashes for snapshot!
-		// But CollectStatus uses 'rows' for snapshot generation logic (GenerateSnapshotFromStatus uses 'rows').
-		// The rows contain the commit hash (LocalBranchRev) which is what matters for snapshot.
-		// If we push, the commit hash doesn't change, only the remote ref status changes.
-		// The snapshot records the *local* (which is now pushed) state.
-		// So we don't strictly need to re-collect status for the snapshot's sake.
-		// However, GenerateSnapshotFromStatus uses 'rows' which has 'LocalBranchRev'.
-		// 'LocalBranchRev' is derived from local commit.
-		// So it remains valid.
 	}
 
 	// 8. Generate Snapshot
 	fmt.Println("Generating configuration snapshot...")
 	snapshotData, snapshotID, err := GenerateSnapshotFromStatus(config, rows)
 	if err != nil {
-		fmt.Printf("Error generating snapshot: %v\n", err)
+		fmt.Printf("error generating snapshot: %v\n", err)
 		os.Exit(1)
 	}
 
 	filename := fmt.Sprintf("mistletoe-snapshot-%s.json", snapshotID)
-	// We write the file because UpdatePrDescriptions needs the file name/content logic
 	if err := os.WriteFile(filename, snapshotData, 0644); err != nil {
-		fmt.Printf("Error writing snapshot file: %v\n", err)
+		fmt.Printf("error writing snapshot file: %v\n", err)
 		os.Exit(1)
 	}
 	fmt.Printf("Snapshot saved to %s\n", filename)
@@ -224,18 +186,12 @@ func handlePrUpdate(args []string, opts GlobalOptions) {
 	// 9. Update Descriptions
 	fmt.Println("Updating Pull Request descriptions...")
 
-	// Convert activeRepos to list of keys for verification if needed,
-	// but targetPrMap already contains the filtered list.
-
 	if err := updatePrDescriptions(targetPrMap, parallel, opts.GhPath, verbose, string(snapshotData), filename, deps, depContent); err != nil {
-		fmt.Printf("Error updating descriptions: %v\n", err)
+		fmt.Printf("error updating descriptions: %v\n", err)
 		os.Exit(1)
 	}
 
 	// 10. Final Status
-	// Re-render table to show we are done (PR status hasn't changed, but good for confirmation)
-	// Since we didn't create new PRs, 'prRows' is still valid, but let's re-render it.
-	// Filter for Display (Open or Draft only)
 	var displayRows []PrStatusRow
 	for _, row := range prRows {
 		if !strings.EqualFold(row.PrState, GitHubPrStateOpen) {

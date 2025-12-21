@@ -22,13 +22,13 @@ func handlePush(args []string, opts GlobalOptions) {
 	fs.BoolVar(&vShort, "v", false, "Enable verbose output (shorthand)")
 
 	if err := ParseFlagsFlexible(fs, args); err != nil {
-		fmt.Println("Error parsing flags:", err)
+		fmt.Println("error parsing flags:", err)
 		os.Exit(1)
 	}
 
 	configFile, parallel, configData, err := ResolveCommonValues(fLong, fShort, pVal, pValShort)
 	if err != nil {
-		fmt.Printf("Error: %v\n", err)
+		fmt.Printf("error: %v\n", err)
 		os.Exit(1)
 	}
 	verbose := vLong || vShort
@@ -67,17 +67,7 @@ func handlePush(args []string, opts GlobalOptions) {
 
 	RenderStatusTable(rows)
 
-	for _, row := range rows {
-		if row.HasConflict {
-			fail("Conflicts detected. Cannot push.\n")
-		}
-	}
-
-	for _, row := range rows {
-		if row.IsPullable {
-			fail("Sync required.\n")
-		}
-	}
+	ValidateStatusForAction(rows, true)
 
 	// Identify repositories to push
 	var pushable []StatusRow
