@@ -236,11 +236,14 @@ func TestRunGit_VerboseLog(t *testing.T) {
 	out, _ := io.ReadAll(r)
 	output := string(out)
 
-	// Check format: [CMD] echo hello (0ms)
-	if !strings.Contains(output, "[CMD] echo hello (") {
-		t.Errorf("Log output format incorrect or missing: %q", output)
+	// Check format: [CMD] echo hello\n -> (done in ...ms)\n
+	if !strings.Contains(output, "[CMD] echo hello\n") {
+		t.Errorf("Start log missing or incorrect: %q", output)
+	}
+	if !strings.Contains(output, "-> (done in ") {
+		t.Errorf("End log duration missing: %q", output)
 	}
 	if !strings.HasSuffix(strings.TrimSpace(output), "ms)") {
-		t.Errorf("Log output should end with ms): %q", output)
+		t.Errorf("End log should end with ms): %q", output)
 	}
 }
