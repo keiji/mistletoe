@@ -30,11 +30,11 @@ func RunGit(dir string, gitPath string, verbose bool, args ...string) (string, e
 	start := time.Now()
 	cmdStr := fmt.Sprintf("%s %s", gitPath, strings.Join(args, " "))
 	if verbose {
-		fmt.Fprintf(os.Stderr, "[CMD] %s\n", cmdStr)
+		fmt.Fprintf(os.Stderr, "[CMD] %s ", cmdStr)
 	}
 	defer func() {
 		if verbose {
-			fmt.Fprintf(os.Stderr, "-> (done in %s)\n", formatDuration(time.Since(start)))
+			fmt.Fprintf(os.Stderr, "(%s)\n", formatDuration(time.Since(start)))
 		}
 	}()
 
@@ -54,11 +54,11 @@ func RunGitInteractive(dir string, gitPath string, verbose bool, args ...string)
 	start := time.Now()
 	cmdStr := fmt.Sprintf("%s %s", gitPath, strings.Join(args, " "))
 	if verbose {
-		fmt.Fprintf(os.Stderr, "[CMD] %s\n", cmdStr)
+		fmt.Fprintf(os.Stderr, "[CMD] %s ", cmdStr)
 	}
 	defer func() {
 		if verbose {
-			fmt.Fprintf(os.Stderr, "-> (done in %s)\n", formatDuration(time.Since(start)))
+			fmt.Fprintf(os.Stderr, "(%s)\n", formatDuration(time.Since(start)))
 		}
 	}()
 
@@ -78,11 +78,11 @@ func RunGh(ghPath string, verbose bool, args ...string) (string, error) {
 	start := time.Now()
 	cmdStr := fmt.Sprintf("%s %s", ghPath, strings.Join(args, " "))
 	if verbose {
-		fmt.Fprintf(os.Stderr, "[CMD] %s\n", cmdStr)
+		fmt.Fprintf(os.Stderr, "[CMD] %s ", cmdStr)
 	}
 	defer func() {
 		if verbose {
-			fmt.Fprintf(os.Stderr, "-> (done in %s)\n", formatDuration(time.Since(start)))
+			fmt.Fprintf(os.Stderr, "(%s)\n", formatDuration(time.Since(start)))
 		}
 	}()
 
