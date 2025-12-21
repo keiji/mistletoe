@@ -28,12 +28,13 @@ func formatDuration(d time.Duration) string {
 // Leading/trailing whitespace is trimmed.
 func RunGit(dir string, gitPath string, verbose bool, args ...string) (string, error) {
 	start := time.Now()
+	cmdStr := fmt.Sprintf("%s %s", gitPath, strings.Join(args, " "))
 	if verbose {
-		fmt.Fprintf(os.Stderr, "[CMD] %s %s ", gitPath, strings.Join(args, " "))
+		fmt.Fprintf(os.Stderr, "[CMD] %s\n", cmdStr)
 	}
 	defer func() {
 		if verbose {
-			fmt.Fprintf(os.Stderr, "(%s)\n", formatDuration(time.Since(start)))
+			fmt.Fprintf(os.Stderr, "[CMD] %s (done in %s)\n", cmdStr, formatDuration(time.Since(start)))
 		}
 	}()
 
@@ -51,12 +52,13 @@ func RunGit(dir string, gitPath string, verbose bool, args ...string) (string, e
 // RunGitInteractive runs a git command connected to os.Stdout/Stderr.
 func RunGitInteractive(dir string, gitPath string, verbose bool, args ...string) error {
 	start := time.Now()
+	cmdStr := fmt.Sprintf("%s %s", gitPath, strings.Join(args, " "))
 	if verbose {
-		fmt.Fprintf(os.Stderr, "[CMD] %s %s ", gitPath, strings.Join(args, " "))
+		fmt.Fprintf(os.Stderr, "[CMD] %s\n", cmdStr)
 	}
 	defer func() {
 		if verbose {
-			fmt.Fprintf(os.Stderr, "(%s)\n", formatDuration(time.Since(start)))
+			fmt.Fprintf(os.Stderr, "[CMD] %s (done in %s)\n", cmdStr, formatDuration(time.Since(start)))
 		}
 	}()
 
@@ -74,12 +76,13 @@ func RunGitInteractive(dir string, gitPath string, verbose bool, args ...string)
 // RunGh runs a gh command and returns its output (stdout).
 func RunGh(ghPath string, verbose bool, args ...string) (string, error) {
 	start := time.Now()
+	cmdStr := fmt.Sprintf("%s %s", ghPath, strings.Join(args, " "))
 	if verbose {
-		fmt.Fprintf(os.Stderr, "[CMD] %s %s ", ghPath, strings.Join(args, " "))
+		fmt.Fprintf(os.Stderr, "[CMD] %s\n", cmdStr)
 	}
 	defer func() {
 		if verbose {
-			fmt.Fprintf(os.Stderr, "(%s)\n", formatDuration(time.Since(start)))
+			fmt.Fprintf(os.Stderr, "[CMD] %s (done in %s)\n", cmdStr, formatDuration(time.Since(start)))
 		}
 	}()
 
