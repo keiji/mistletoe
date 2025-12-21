@@ -38,6 +38,10 @@ func handlePrStatus(args []string, opts GlobalOptions) {
 	}
 	verbose := vLong || vShort
 
+	if verbose {
+		parallel = 1
+	}
+
 	// 1. Check gh availability
 	if err := checkGhAvailability(opts.GhPath, verbose); err != nil {
 		fmt.Println(err)

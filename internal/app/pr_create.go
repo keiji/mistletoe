@@ -55,6 +55,11 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 	}
 	verbose := vLong || vShort
 
+	// User requirement: When verbose is enabled, force parallel=1 to ensure clean log output.
+	if verbose {
+		parallel = 1
+	}
+
 	// Resolve title, body, dependency file
 	prTitle := tLong
 	if prTitle == "" {
