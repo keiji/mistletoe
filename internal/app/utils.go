@@ -32,6 +32,9 @@ func formatDuration(d time.Duration) string {
 // Leading/trailing whitespace is trimmed.
 func RunGit(dir string, gitPath string, verbose bool, args ...string) (string, error) {
 	if verbose {
+		// Lock execution to ensure logs (start command + end duration) are printed sequentially
+		// without interleaving from other goroutines.
+		// defer Unlock() unlocks at the end of the function, holding the lock during execution.
 		verboseLogMu.Lock()
 		defer verboseLogMu.Unlock()
 	}
@@ -61,6 +64,7 @@ func RunGit(dir string, gitPath string, verbose bool, args ...string) (string, e
 // RunGitInteractive runs a git command connected to os.Stdout/Stderr.
 func RunGitInteractive(dir string, gitPath string, verbose bool, args ...string) error {
 	if verbose {
+		// Lock execution to ensure logs are printed sequentially.
 		verboseLogMu.Lock()
 		defer verboseLogMu.Unlock()
 	}
@@ -90,6 +94,7 @@ func RunGitInteractive(dir string, gitPath string, verbose bool, args ...string)
 // RunGh runs a gh command and returns its output (stdout).
 func RunGh(ghPath string, verbose bool, args ...string) (string, error) {
 	if verbose {
+		// Lock execution to ensure logs are printed sequentially.
 		verboseLogMu.Lock()
 		defer verboseLogMu.Unlock()
 	}
