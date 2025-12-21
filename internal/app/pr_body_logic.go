@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-// Export relatedPRsJSON for pr_checkout.go
+// RelatedPRsJSON is the struct for related PRs JSON.
 type RelatedPRsJSON struct {
 	Dependencies []string `json:"dependencies,omitempty"`
 	Dependents   []string `json:"dependents,omitempty"`

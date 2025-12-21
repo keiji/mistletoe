@@ -350,7 +350,7 @@ func getPrDisplayState(pr PrInfo) string {
 	}
 }
 
-// Export SortPrs for use in pr_body_logic.go
+// SortPrs sorts a list of PrInfo objects.
 func SortPrs(prs []PrInfo) {
 	stateRank := func(pr PrInfo) int {
 		// Handle Draft explicitly

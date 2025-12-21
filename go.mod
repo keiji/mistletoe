@@ -1,6 +1,6 @@
 module mistletoe
 
-go 1.24.3
+go 1.25.5
 
 require github.com/olekukonko/tablewriter v1.1.2
 
