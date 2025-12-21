@@ -12,6 +12,8 @@ import (
 	"github.com/olekukonko/tablewriter/tw"
 )
 
+var osExit = os.Exit
+
 // StatusRow represents the status of a single repository.
 type StatusRow struct {
 	Repo           string
@@ -36,25 +38,25 @@ func ValidateRepositoriesIntegrity(config *Config, gitPath string, verbose bool)
 			continue
 		}
 		if err != nil {
-			return fmt.Errorf("Error checking directory %s: %v", targetDir, err)
+			return fmt.Errorf("error checking directory %s: %v", targetDir, err)
 		}
 		if !info.IsDir() {
-			return fmt.Errorf("Error: target %s exists and is not a directory", targetDir)
+			return fmt.Errorf("error: target %s exists and is not a directory", targetDir)
 		}
 
 		// Check if Git repository
 		gitDir := filepath.Join(targetDir, ".git")
 		if _, err := os.Stat(gitDir); err != nil {
-			return fmt.Errorf("Error: directory %s exists but is not a git repository", targetDir)
+			return fmt.Errorf("error: directory %s exists but is not a git repository", targetDir)
 		}
 
 		// Check remote origin
 		currentURL, err := RunGit(targetDir, gitPath, verbose, "config", "--get", "remote.origin.url")
 		if err != nil {
-			return fmt.Errorf("Error: directory %s is a git repo but failed to get remote origin: %v", targetDir, err)
+			return fmt.Errorf("error: directory %s is a git repo but failed to get remote origin: %v", targetDir, err)
 		}
 		if currentURL != *repo.URL {
-			return fmt.Errorf("Error: directory %s exists with different remote origin: %s (expected %s)", targetDir, currentURL, *repo.URL)
+			return fmt.Errorf("error: directory %s exists with different remote origin: %s (expected %s)", targetDir, currentURL, *repo.URL)
 		}
 	}
 	return nil
@@ -103,8 +105,6 @@ func getRepoStatus(repo Repository, gitPath string, verbose bool, noFetch bool) 
 	}
 
 	// 1. Get Local Status (Short SHA, Full SHA, Branch Status)
-	// We use git log -1 --format="%h%n%H%n%D" to get all info in one go.
-	// %h: Short Hash, %H: Full Hash, %D: Ref names
 	output, err := RunGit(targetDir, gitPath, verbose, "log", "-1", "--format=%h%n%H%n%D")
 
 	branchName := ""
@@ -139,7 +139,6 @@ func getRepoStatus(repo Repository, gitPath string, verbose bool, noFetch bool) 
 			branchName = "HEAD"
 		}
 	} else {
-		// Fallback for unborn branches (empty repo) where git log fails
 		branchName, err = RunGit(targetDir, gitPath, verbose, "rev-parse", "--abbrev-ref", "HEAD")
 		if err != nil {
 			branchName = ""
@@ -178,21 +177,14 @@ func getRepoStatus(repo Repository, gitPath string, verbose bool, noFetch bool) 
 	remoteColor := ColorNone
 
 	if !isDetached {
-		// Check if remote branch exists
-		// If noFetch is true, skip explicit fetch and rely on existing refs/remotes/origin
 		if !noFetch {
-			// git fetch origin <branchName>
-			// This replaces ls-remote + (maybe) fetch with a single fetch.
-			// It ensures we have the latest remote state and objects.
 			_, _ = RunGit(targetDir, gitPath, verbose, "fetch", "origin", branchName)
 		}
 
-		// Resolve the remote branch tip from refs/remotes/origin/<branchName>
 		output, err := RunGit(targetDir, gitPath, verbose, "rev-parse", "refs/remotes/origin/"+branchName)
 		if err == nil && output != "" {
 			remoteHeadFull = strings.TrimSpace(output)
 
-			// Construct display: branchName/shortSHA
 			shortRemote := remoteHeadFull
 			if len(shortRemote) >= 7 {
 				shortRemote = shortRemote[:7]
@@ -201,9 +193,6 @@ func getRepoStatus(repo Repository, gitPath string, verbose bool, noFetch bool) 
 			}
 			remoteDisplay = fmt.Sprintf("%s:%s", branchName, shortRemote)
 
-			// Check Pushability (Coloring for Remote Column)
-			// If local..remote is not 0, it implies remote has commits local doesn't (pull needed or diverged)
-			// -> "push impossible" -> Yellow
 			if localHeadFull != "" {
 				count, err := RunGit(targetDir, gitPath, verbose, "rev-list", "--count", localHeadFull+".."+remoteHeadFull)
 				if err == nil && count != "0" {
@@ -219,37 +208,24 @@ func getRepoStatus(repo Repository, gitPath string, verbose bool, noFetch bool) 
 	hasConflict := false
 
 	if remoteHeadFull != "" && localHeadFull != "" {
-		// Since we fetched above, we assume we have the objects.
-		// Proceed directly to ancestry checks.
-
-		// Check Unpushed (Ahead)
-		// git rev-list --count remote..local
 		if remoteHeadFull != localHeadFull {
-			// If object is still missing, this will fail and return err, hasUnpushed remains false.
 			count, err := RunGit(targetDir, gitPath, verbose, "rev-list", "--count", remoteHeadFull+".."+localHeadFull)
 			if err == nil && count != "0" {
 				hasUnpushed = true
 			}
 		}
 
-		// Check Pullable (Behind)
-		// Only if current branch matches config branch (Existing logic preserved for Status Symbol)
 		if repo.Branch != nil && *repo.Branch != "" && *repo.Branch == branchName {
 			if remoteHeadFull != localHeadFull {
-				// Object exists locally, check ancestry
-				// git rev-list --count local..remote
 				count, err := RunGit(targetDir, gitPath, verbose, "rev-list", "--count", localHeadFull+".."+remoteHeadFull)
 				if err == nil && count != "0" {
 					isPullable = true
 				}
 
 				if isPullable {
-					// Check for conflicts
-					// 2. Merge Base
 					base, err := RunGit(targetDir, gitPath, verbose, "merge-base", localHeadFull, remoteHeadFull)
 					if err == nil && base != "" {
 						base = strings.TrimSpace(base)
-						// 3. Merge Tree
 						output, err := RunGit(targetDir, gitPath, verbose, "merge-tree", base, localHeadFull, remoteHeadFull)
 						if err == nil {
 							if strings.Contains(output, "<<<<<<<") {
@@ -262,7 +238,6 @@ func getRepoStatus(repo Repository, gitPath string, verbose bool, noFetch bool) 
 		}
 
 	} else if !isDetached && remoteHeadFull == "" {
-		// Remote branch doesn't exist? Means all local commits are unpushed
 		hasUnpushed = true
 	}
 
@@ -310,7 +285,6 @@ func RenderStatusTable(rows []StatusRow) {
 	)
 
 	for _, row := range rows {
-		// Status Column
 		statusStr := ""
 		if row.HasUnpushed {
 			statusStr += FgGreen + StatusSymbolUnpushed + Reset
@@ -326,7 +300,6 @@ func RenderStatusTable(rows []StatusRow) {
 			statusStr = "-"
 		}
 
-		// Remote Column
 		remoteStr := row.RemoteRev
 		if row.RemoteColor == ColorYellow {
 			remoteStr = FgYellow + remoteStr + Reset
@@ -338,4 +311,31 @@ func RenderStatusTable(rows []StatusRow) {
 		fmt.Printf("Error rendering table: %v\n", err)
 	}
 	fmt.Printf("Status Legend: %s Pullable, %s Unpushed, %s Conflict\n", StatusSymbolPullable, StatusSymbolUnpushed, StatusSymbolConflict)
+}
+
+// ValidateStatusForAction checks if repositories are in a safe state for operations.
+func ValidateStatusForAction(rows []StatusRow, checkPullable bool) {
+	var behindRepos []string
+	for _, row := range rows {
+		if checkPullable && row.IsPullable {
+			behindRepos = append(behindRepos, row.Repo)
+		}
+		if row.HasConflict {
+			fmt.Printf("error: repository '%s' has conflicts. Cannot proceed.\n", row.Repo)
+			osExit(1)
+		}
+		if row.BranchName == "HEAD" {
+			fmt.Printf("error: repository '%s' is in a detached HEAD state. Cannot proceed.\n", row.Repo)
+			osExit(1)
+		}
+	}
+
+	if len(behindRepos) > 0 {
+		fmt.Printf("error: the following repositories are behind remote and require a pull:\n")
+		for _, r := range behindRepos {
+			fmt.Printf(" - %s\n", r)
+		}
+		fmt.Println("Please pull changes before proceeding.")
+		osExit(1)
+	}
 }

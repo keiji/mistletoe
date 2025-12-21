@@ -236,11 +236,17 @@ func TestRunGit_VerboseLog(t *testing.T) {
 	out, _ := io.ReadAll(r)
 	output := string(out)
 
-	// Check format: [CMD] echo hello (0ms) or similar
+	// Check format: [CMD] echo hello (0ms)\n
 	if !strings.Contains(output, "[CMD] echo hello (") {
 		t.Errorf("Log output format incorrect or missing: %q", output)
 	}
 	if !strings.HasSuffix(strings.TrimSpace(output), "ms)") {
 		t.Errorf("Log output should end with ms): %q", output)
+	}
+	// Check that there is NO newline between command and time (approximate check)
+	// We expect "[CMD] echo hello (" to be on one line.
+	// If it was two lines, it would be "[CMD] echo hello\n... ("
+	if strings.Contains(output, "echo hello\n") {
+		t.Errorf("Log output should not have newline after command: %q", output)
 	}
 }

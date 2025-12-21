@@ -173,3 +173,65 @@ func TestCollectStatus(t *testing.T) {
 		t.Error("Expected IsPullable=true (Diverged)")
 	}
 }
+
+func TestValidateStatusForAction(t *testing.T) {
+	// Mock osExit
+	oldOsExit := osExit
+	defer func() { osExit = oldOsExit }()
+
+	var exitCode int
+	osExit = func(code int) {
+		exitCode = code
+	}
+
+	tests := []struct {
+		name          string
+		rows          []StatusRow
+		checkPullable bool
+		wantExit      bool
+	}{
+		{
+			name:          "Clean",
+			rows:          []StatusRow{{Repo: "r1", HasConflict: false, BranchName: "main"}},
+			checkPullable: true,
+			wantExit:      false,
+		},
+		{
+			name:          "Conflict",
+			rows:          []StatusRow{{Repo: "r1", HasConflict: true, BranchName: "main"}},
+			checkPullable: false,
+			wantExit:      true,
+		},
+		{
+			name:          "Detached HEAD",
+			rows:          []StatusRow{{Repo: "r1", HasConflict: false, BranchName: "HEAD"}},
+			checkPullable: false,
+			wantExit:      true,
+		},
+		{
+			name:          "Behind (Check=True)",
+			rows:          []StatusRow{{Repo: "r1", IsPullable: true, BranchName: "main"}},
+			checkPullable: true,
+			wantExit:      true,
+		},
+		{
+			name:          "Behind (Check=False)",
+			rows:          []StatusRow{{Repo: "r1", IsPullable: true, BranchName: "main"}},
+			checkPullable: false,
+			wantExit:      false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			exitCode = 0 // reset
+			ValidateStatusForAction(tt.rows, tt.checkPullable)
+			if tt.wantExit && exitCode == 0 {
+				t.Error("Expected exit(1), got 0")
+			}
+			if !tt.wantExit && exitCode != 0 {
+				t.Errorf("Expected exit(0), got %d", exitCode)
+			}
+		})
+	}
+}

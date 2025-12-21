@@ -39,6 +39,9 @@ func handleSwitch(args []string, opts GlobalOptions) {
 		os.Exit(1)
 	}
 	verbose := vLong || vShort
+	if verbose {
+		parallel = 1
+	}
 
 	createBranchName := createLong
 	if createShort != "" {
