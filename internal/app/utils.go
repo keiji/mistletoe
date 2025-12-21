@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 	"time"
 
 	"golang.org/x/text/language"
@@ -14,6 +15,9 @@ import (
 
 // ExecCommand is a variable that holds exec.Command to allow mocking in tests.
 var ExecCommand = exec.Command
+
+// verboseLogMu ensures atomic execution and logging when verbose mode is enabled.
+var verboseLogMu sync.Mutex
 
 // formatDuration formats a duration in milliseconds with comma separators (e.g., "1,234ms").
 func formatDuration(d time.Duration) string {
@@ -27,6 +31,11 @@ func formatDuration(d time.Duration) string {
 // RunGit runs a git command in the specified directory and returns its output (stdout).
 // Leading/trailing whitespace is trimmed.
 func RunGit(dir string, gitPath string, verbose bool, args ...string) (string, error) {
+	if verbose {
+		verboseLogMu.Lock()
+		defer verboseLogMu.Unlock()
+	}
+
 	start := time.Now()
 	cmdStr := fmt.Sprintf("%s %s", gitPath, strings.Join(args, " "))
 	if verbose {
@@ -51,6 +60,11 @@ func RunGit(dir string, gitPath string, verbose bool, args ...string) (string, e
 
 // RunGitInteractive runs a git command connected to os.Stdout/Stderr.
 func RunGitInteractive(dir string, gitPath string, verbose bool, args ...string) error {
+	if verbose {
+		verboseLogMu.Lock()
+		defer verboseLogMu.Unlock()
+	}
+
 	start := time.Now()
 	cmdStr := fmt.Sprintf("%s %s", gitPath, strings.Join(args, " "))
 	if verbose {
@@ -75,6 +89,11 @@ func RunGitInteractive(dir string, gitPath string, verbose bool, args ...string)
 
 // RunGh runs a gh command and returns its output (stdout).
 func RunGh(ghPath string, verbose bool, args ...string) (string, error) {
+	if verbose {
+		verboseLogMu.Lock()
+		defer verboseLogMu.Unlock()
+	}
+
 	start := time.Now()
 	cmdStr := fmt.Sprintf("%s %s", ghPath, strings.Join(args, " "))
 	if verbose {
