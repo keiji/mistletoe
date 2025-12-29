@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import subprocess
 import uuid
 import json
@@ -8,10 +9,12 @@ import time
 
 class MstlGhTest:
     def __init__(self):
-        self.uuid = str(uuid.uuid4())[:8]
         self.user = self.get_gh_user()
-        self.repo_a_name = f"mistletoe-test-{self.uuid}-A"
-        self.repo_b_name = f"mistletoe-test-{self.uuid}-B"
+        self.uuid = str(uuid.uuid4())[:8]
+
+        # Ensure unique repository names
+        self.repo_a_name, self.repo_b_name = self.ensure_unique_names()
+
         self.repo_a_url = f"https://github.com/{self.user}/{self.repo_a_name}.git"
         self.repo_b_url = f"https://github.com/{self.user}/{self.repo_b_name}.git"
         self.cwd = os.getcwd()
@@ -20,6 +23,32 @@ class MstlGhTest:
         self.mstl_bin = os.path.abspath(os.path.join(self.cwd, "mstl-gh"))
         if sys.platform == "win32":
             self.mstl_bin += ".exe"
+
+    def ensure_unique_names(self):
+        while True:
+            name_a = f"mistletoe-test-{self.uuid}-A"
+            name_b = f"mistletoe-test-{self.uuid}-B"
+
+            if not self.repo_exists(name_a) and not self.repo_exists(name_b):
+                return name_a, name_b
+
+            # Regenerate UUID if collision found
+            self.uuid = str(uuid.uuid4())[:8]
+
+    def repo_exists(self, repo_name):
+        # Check if repo exists using gh repo view
+        # We expect exit code 1 if it doesn't exist
+        print(f"[-] Checking if repository {repo_name} exists...")
+        try:
+            subprocess.run(
+                ["gh", "repo", "view", f"{self.user}/{repo_name}"],
+                check=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
+            )
+            return True
+        except subprocess.CalledProcessError:
+            return False
 
     def run_cmd(self, args, cwd=None, input_str=None, check=True, capture_output=False):
         if cwd is None:
@@ -220,10 +249,16 @@ class MstlGhTest:
         print(f"[-] Deleting remote repositories...")
         for repo in [self.repo_a_name, self.repo_b_name]:
             try:
-                # gh repo delete requires confirmation
-                self.run_cmd(["gh", "repo", "delete", repo, "--yes"])
+                # Rename before deletion to indicate it's being deleted
+                new_name = f"{repo}-deleting"
+                print(f"[-] Renaming {repo} to {new_name}...")
+                self.run_cmd(["gh", "repo", "rename", new_name, "--repo", f"{self.user}/{repo}", "--yes"])
+
+                # Delete the renamed repository
+                print(f"[-] Deleting {new_name}...")
+                self.run_cmd(["gh", "repo", "delete", f"{self.user}/{new_name}", "--yes"])
             except Exception as e:
-                print(f"Failed to delete {repo}: {e}")
+                print(f"Failed to delete {repo} (or renamed version): {e}")
 
     def run(self):
         try:
