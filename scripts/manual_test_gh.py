@@ -130,11 +130,16 @@ class MstlGhTest:
                 print("Consent not given. Aborting.")
                 sys.exit(1)
 
-    def checkpoint(self, name, description):
+    def checkpoint(self, name, description, urls=None):
         print("\n" + "="*60)
         print(f"CHECKPOINT: {name}")
         print("="*60)
         print(f"Expected State: {description}")
+        if urls:
+            print("-" * 60)
+            print("Relevant URLs:")
+            for k, v in urls.items():
+                print(f"  {k}: {v}")
         print("-" * 60)
         print("Please verify the state manually.")
         print("Press Enter to continue (or Ctrl+C to abort)...")
@@ -193,13 +198,25 @@ class MstlGhTest:
         print("[TEST] Running init...")
         self.run_cmd([self.mstl_bin, "init", "-f", "mistletoe.json"], cwd=self.test_dir)
 
-        self.checkpoint("Init Complete", f"Directories for {self.repo_a_name}, {self.repo_b_name}, {self.repo_c_name} should exist.")
+        self.checkpoint("Init Complete",
+                        f"Directories for {self.repo_a_name}, {self.repo_b_name}, {self.repo_c_name} should exist.",
+                        urls={
+                            "Repo A": self.repo_a_url,
+                            "Repo B": self.repo_b_url,
+                            "Repo C": self.repo_c_url
+                        })
 
     def test_switch(self):
         print("[TEST] Running switch...")
         self.run_cmd([self.mstl_bin, "switch", "-c", "feature/complex-dep"], cwd=self.test_dir)
 
-        self.checkpoint("Switch Complete", "All repositories should be on branch 'feature/complex-dep'.")
+        self.checkpoint("Switch Complete",
+                        "All repositories should be on branch 'feature/complex-dep'.",
+                         urls={
+                            "Repo A": f"{self.repo_a_url}/tree/feature/complex-dep",
+                            "Repo B": f"{self.repo_b_url}/tree/feature/complex-dep",
+                            "Repo C": f"{self.repo_c_url}/tree/feature/complex-dep"
+                        })
 
     def test_status_clean(self):
         print("[TEST] Running status (clean)...")
@@ -218,11 +235,23 @@ class MstlGhTest:
 
         self.run_cmd([self.mstl_bin, "pr", "create", "-t", "Complex Dependency PR", "-b", "Testing complex dependencies", "-d", "dependencies.mmd"], cwd=self.test_dir)
 
+        # Get PR URLs
+        pr_urls = {}
+        for name, url in [("Repo A", self.repo_a_url), ("Repo B", self.repo_b_url), ("Repo C", self.repo_c_url)]:
+            res = self.run_cmd(["gh", "pr", "list", "--repo", url, "--head", "feature/complex-dep", "--json", "url"], capture_output=True)
+            try:
+                prs = json.loads(res.stdout)
+                if prs:
+                    pr_urls[f"{name} PR"] = prs[0]['url']
+            except:
+                pass
+
         self.checkpoint("PR Created",
                         f"PRs created for A, B, C.\n"
                         f"Repo A PR should list B as dependency.\n"
                         f"Repo B PR should list C as dependency and A as dependent.\n"
-                        f"Repo C PR should list B as dependent.")
+                        f"Repo C PR should list B as dependent.",
+                        urls=pr_urls)
 
     def test_pr_status(self):
         print("[TEST] Running pr status...")
@@ -240,7 +269,17 @@ class MstlGhTest:
 
         self.run_cmd([self.mstl_bin, "pr", "update"], cwd=self.test_dir, input_str="yes\n")
 
-        self.checkpoint("PR Updated", "Repo C PR updated. Check body for new commit hash in snapshot.")
+        # Get Repo C PR URL
+        pr_urls = {}
+        res = self.run_cmd(["gh", "pr", "list", "--repo", self.repo_c_url, "--head", "feature/complex-dep", "--json", "url"], capture_output=True)
+        try:
+             prs = json.loads(res.stdout)
+             if prs:
+                 pr_urls["Repo C PR"] = prs[0]['url']
+        except:
+            pass
+
+        self.checkpoint("PR Updated", "Repo C PR updated. Check body for new commit hash in snapshot.", urls=pr_urls)
 
     def test_pr_checkout(self):
         print("[TEST] Running pr checkout...")
