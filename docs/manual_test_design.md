@@ -1,81 +1,82 @@
-# mstl Manual Test Design
+# mstl 手動テスト設計書
 
-This document outlines the design for a shell script to verify the core functionality of the `mstl` command-line tool. The test script is intended to be run in a Unix-like environment (Linux/macOS) with `git` installed.
+本書は、`mstl` コマンドラインツールの主要機能を検証するためのシェルスクリプトの設計概要を記述します。テストスクリプトは、`git` がインストールされた Unix 系環境 (Linux/macOS) での実行を想定しています。
 
-## 1. Overview
+## 1. 概要 (Overview)
 
-The test script will:
-1.  Build the `mstl` binary from source.
-2.  Create a temporary testing directory.
-3.  Set up "remote" bare Git repositories to simulate a server environment.
-4.  Generate a `mstl` configuration file pointing to these remotes.
-5.  Execute `mstl` subcommands in a logical sequence.
-6.  Verify the outcome of each command (exit codes, file existence, git state).
+テストスクリプトは以下の処理を実行します。
 
-## 2. Prerequisites
+1.  ソースコードから `mstl` バイナリをビルドします。
+2.  一時的なテスト用ディレクトリを作成します。
+3.  サーバー環境をシミュレートするための「リモート」ベア Git リポジトリをセットアップします。
+4.  これらのリモートリポジトリを指す `mstl` 設定ファイルを生成します。
+5.  `mstl` の各サブコマンドを論理的な順序で実行します。
+6.  各コマンドの結果（終了コード、ファイルの存在、Git の状態）を検証します。
 
-*   Go (to build `mstl`)
+## 2. 前提条件 (Prerequisites)
+
+*   Go (`mstl` のビルド用)
 *   Git
 *   Bash
 
-## 3. Test Scenarios
+## 3. テストシナリオ (Test Scenarios)
 
-### 3.1. Basic Information
-*   **Command:** `mstl version`
-*   **Expected Result:** output contains "mstl version".
-*   **Command:** `mstl help`
-*   **Expected Result:** output contains usage information and list of commands.
+### 3.1. 基本情報
+*   **コマンド:** `mstl version`
+*   **期待される結果:** 出力に "mstl version" が含まれていること。
+*   **コマンド:** `mstl help`
+*   **期待される結果:** 出力に使用方法とコマンド一覧が含まれていること。
 
-### 3.2. Initialization (`init`)
-*   **Setup:** Create a config file `mstl_config.json` defining two repositories (`repo1`, `repo2`).
-*   **Command:** `mstl init -f mstl_config.json`
-*   **Expected Result:**
-    *   Directories `repo1` and `repo2` are created.
-    *   Both are valid git repositories.
-    *   Both are checked out to the default branch (e.g., `main`).
+### 3.2. 初期化 (`init`)
+*   **セットアップ:** 2つのリポジトリ (`repo1`, `repo2`) を定義した設定ファイル `mstl_config.json` を作成します。
+*   **コマンド:** `mstl init -f mstl_config.json`
+*   **期待される結果:**
+    *   `repo1` および `repo2` ディレクトリが作成されていること。
+    *   両方が有効な Git リポジトリであること。
+    *   両方がデフォルトブランチ (例: `main`) をチェックアウトしていること。
 
-### 3.3. Status (`status`) - Clean
-*   **Command:** `mstl status -f mstl_config.json`
-*   **Expected Result:**
-    *   Output table shows both repositories.
-    *   Status column implies "clean" (no symbols like `!`, `<`, `>`).
+### 3.3. ステータス確認 (`status`) - クリーンな状態
+*   **コマンド:** `mstl status -f mstl_config.json`
+*   **期待される結果:**
+    *   出力テーブルに両方のリポジトリが表示されていること。
+    *   ステータス列が「クリーン」であること（`!`, `<`, `>` などの記号がないこと）。
 
-### 3.4. Branch Switching (`switch`)
-*   **Command:** `mstl switch -f mstl_config.json -c feature/test-branch`
-*   **Expected Result:**
-    *   Both local repositories are switched to `feature/test-branch`.
-    *   `git symbolic-ref HEAD` in each repo returns `refs/heads/feature/test-branch`.
+### 3.4. ブランチ切り替え (`switch`)
+*   **コマンド:** `mstl switch -f mstl_config.json -c feature/test-branch`
+*   **期待される結果:**
+    *   両方のローカルリポジトリが `feature/test-branch` に切り替わっていること。
+    *   各リポジトリで `git symbolic-ref HEAD` が `refs/heads/feature/test-branch` を返すこと。
 
-### 3.5. Modifications & Push (`push`)
-*   **Setup:** Make a commit in `repo1`.
-*   **Command:** `mstl status -f mstl_config.json`
-*   **Expected Result:** `repo1` shows unpushed status (`>`).
-*   **Command:** `mstl push -f mstl_config.json` (may require `yes` input or flags if interactive).
-    *   *Note:* Since `push` might prompt, the script needs to handle this (e.g., `echo "yes" | ...`).
-*   **Expected Result:**
-    *   Push succeeds.
-    *   `mstl status` shows clean again.
-    *   Remote `repo1` has the new commit.
+### 3.5. 変更とプッシュ (`push`)
+*   **セットアップ:** `repo1` でコミットを作成します。
+*   **コマンド:** `mstl status -f mstl_config.json`
+*   **期待される結果:** `repo1` が未プッシュ状態 (`>`) を示していること。
+*   **コマンド:** `mstl push -f mstl_config.json` (対話モードの場合は `yes` 入力やフラグが必要になる場合があります)。
+    *   *注記:* `push` はプロンプトを表示する場合があるため、スクリプトでこれを処理する必要があります（例: `echo "yes" | ...`）。
+*   **期待される結果:**
+    *   プッシュが成功すること。
+    *   `mstl status` が再度クリーンな状態を示すこと。
+    *   リモートの `repo1` に新しいコミットが存在すること。
 
-### 3.6. Remote Updates & Sync (`sync`)
-*   **Setup:** Create a commit in `repo2`'s remote (simulate another user).
-*   **Command:** `mstl status -f mstl_config.json`
-*   **Expected Result:** `repo2` shows pullable status (`<`).
-*   **Command:** `mstl sync -f mstl_config.json` (may require interactive handling for rebase/merge strategy, defaulting to pull).
-*   **Expected Result:**
-    *   Sync succeeds.
-    *   Local `repo2` has the remote commit.
-    *   `mstl status` shows clean.
+### 3.6. リモート更新と同期 (`sync`)
+*   **セットアップ:** `repo2` のリモートでコミットを作成します（別のユーザーをシミュレート）。
+*   **コマンド:** `mstl status -f mstl_config.json`
+*   **期待される結果:** `repo2` がプル可能状態 (`<`) を示していること。
+*   **コマンド:** `mstl sync -f mstl_config.json` (リベース/マージ戦略の対話的処理が必要になる場合があり、デフォルトはプルとします)。
+*   **期待される結果:**
+    *   同期が成功すること。
+    *   ローカルの `repo2` にリモートのコミットが反映されていること。
+    *   `mstl status` がクリーンな状態を示すこと。
 
-### 3.7. Snapshot (`snapshot`)
-*   **Command:** `mstl snapshot` (run inside the parent directory of repos).
-*   **Expected Result:**
-    *   A JSON file (e.g., `mistletoe-snapshot-*.json`) is created.
-    *   Content includes `repo1` and `repo2` with their current branch/revision.
+### 3.7. スナップショット (`snapshot`)
+*   **コマンド:** `mstl snapshot` (リポジトリの親ディレクトリ内で実行)。
+*   **期待される結果:**
+    *   JSON ファイル (例: `mistletoe-snapshot-*.json`) が作成されること。
+    *   内容に `repo1` と `repo2` が含まれ、それぞれの現在のブランチ/リビジョンが記録されていること。
 
-## 4. Implementation Details
+## 4. 実装の詳細 (Internal Logic)
 
-*   The script should use `set -e` to fail fast on errors.
-*   Use a `trap` to clean up the temporary directory on exit.
-*   Functions should be used to encapsulate common verification steps (e.g., `assert_git_branch`).
-*   Output should be colored (Green for pass, Red for fail) for readability.
+*   スクリプトは `set -e` を使用して、エラー発生時に即座に終了するようにします。
+*   終了時に一時ディレクトリをクリーンアップするために `trap` を使用します。
+*   一般的な検証手順（例: `assert_git_branch`）をカプセル化するために関数を使用します。
+*   可読性を高めるため、出力には色付け（成功時は緑、失敗時は赤）を行います。
