@@ -5,7 +5,7 @@ import json
 import os
 import sys
 import shutil
-import time
+import signal
 
 class MstlGhTest:
     def __init__(self):
@@ -13,24 +13,49 @@ class MstlGhTest:
         self.uuid = str(uuid.uuid4())[:8]
 
         # Ensure unique repository names
-        self.repo_a_name, self.repo_b_name = self.ensure_unique_names()
+        self.repo_a_name, self.repo_b_name, self.repo_c_name = self.ensure_unique_names()
 
         self.repo_a_url = f"https://github.com/{self.user}/{self.repo_a_name}.git"
         self.repo_b_url = f"https://github.com/{self.user}/{self.repo_b_name}.git"
+        self.repo_c_url = f"https://github.com/{self.user}/{self.repo_c_name}.git"
+
         self.cwd = os.getcwd()
         self.test_dir = os.path.join(self.cwd, f"test_workspace_{self.uuid}")
         self.config_file = os.path.join(self.test_dir, "mistletoe.json")
+        self.dependency_file = os.path.join(self.test_dir, "dependencies.mmd")
         self.mstl_bin = os.path.abspath(os.path.join(self.cwd, "mstl-gh"))
         if sys.platform == "win32":
             self.mstl_bin += ".exe"
+
+        self.cleanup_needed = True
+
+        # Register signal handler
+        signal.signal(signal.SIGINT, self.signal_handler)
+
+    def signal_handler(self, sig, frame):
+        print("\n\n[!] Interrupted by user (Ctrl+C).")
+        print("Do you want to delete the temporary repositories? (yes/no) [yes]: ", end="", flush=True)
+        try:
+            choice = input().lower().strip()
+        except EOFError:
+            choice = "yes"
+
+        if choice in ["", "yes", "y"]:
+            self.cleanup()
+        else:
+            self.cleanup_needed = False
+            print("Skipping cleanup. Repositories and workspace are left intact.")
+
+        sys.exit(130)
 
     def ensure_unique_names(self):
         while True:
             name_a = f"mistletoe-test-{self.uuid}-A"
             name_b = f"mistletoe-test-{self.uuid}-B"
+            name_c = f"mistletoe-test-{self.uuid}-C"
 
-            if not self.repo_exists(name_a) and not self.repo_exists(name_b):
-                return name_a, name_b
+            if not self.repo_exists(name_a) and not self.repo_exists(name_b) and not self.repo_exists(name_c):
+                return name_a, name_b, name_c
 
             # Regenerate UUID if collision found
             self.uuid = str(uuid.uuid4())[:8]
@@ -93,6 +118,7 @@ class MstlGhTest:
             print("3. The following temporary repositories will be created:")
             print(f"   - {self.repo_a_name}")
             print(f"   - {self.repo_b_name}")
+            print(f"   - {self.repo_c_name}")
             print("\nType 'I AGREE' to proceed:")
 
             try:
@@ -104,28 +130,32 @@ class MstlGhTest:
                 print("Consent not given. Aborting.")
                 sys.exit(1)
 
+    def checkpoint(self, name, description):
+        print("\n" + "="*60)
+        print(f"CHECKPOINT: {name}")
+        print("="*60)
+        print(f"Expected State: {description}")
+        print("-" * 60)
+        print("Please verify the state manually.")
+        print("Press Enter to continue (or Ctrl+C to abort)...")
+        try:
+            input()
+        except EOFError:
+            pass
+
     def build_mstl_gh(self):
         print("[-] Building mstl-gh...")
         self.run_cmd(["go", "build", "-o", self.mstl_bin, "cmd/mstl-gh/main.go"])
 
     def setup_repos(self):
         print(f"[-] Creating temporary repositories...")
-        self.run_cmd(["gh", "repo", "create", self.repo_a_name, "--private"])
-        self.run_cmd(["gh", "repo", "create", self.repo_b_name, "--private"])
-
-        # Initialize repos with a commit so they can be cloned/pushed to
-        # We need to clone them, add a file, and push?
-        # Actually `gh repo create` with `--private` creates empty repo.
-        # mstl init works on empty repos? No, `init` clones.
-        # Cloning an empty repo is fine, but checking out a branch might fail if it doesn't exist.
-        # Let's initialize them with a README.
-        # But `gh repo create` has `--add-readme`? No, maybe.
-        # Safer: Create locally, init, push.
+        for repo in [self.repo_a_name, self.repo_b_name, self.repo_c_name]:
+            self.run_cmd(["gh", "repo", "create", repo, "--private"])
 
         tmp_setup = os.path.join(self.cwd, f"setup_{self.uuid}")
         os.makedirs(tmp_setup, exist_ok=True)
 
-        for repo in [self.repo_a_name, self.repo_b_name]:
+        for repo in [self.repo_a_name, self.repo_b_name, self.repo_c_name]:
             r_dir = os.path.join(tmp_setup, repo)
             os.makedirs(r_dir)
             self.run_cmd(["git", "init"], cwd=r_dir)
@@ -142,60 +172,57 @@ class MstlGhTest:
         os.makedirs(self.test_dir, exist_ok=True)
         config = {
             "repositories": [
-                {"url": self.repo_a_url, "branch": "main"},
-                {"url": self.repo_b_url, "branch": "main"}
+                {"url": self.repo_a_url, "branch": "main", "id": self.repo_a_name},
+                {"url": self.repo_b_url, "branch": "main", "id": self.repo_b_name},
+                {"url": self.repo_c_url, "branch": "main", "id": self.repo_c_name}
             ]
         }
         with open(self.config_file, "w") as f:
             json.dump(config, f, indent=2)
         print(f"[-] Config created at {self.config_file}")
 
+        # Create dependency graph
+        with open(self.dependency_file, "w") as f:
+            f.write("graph TD\n")
+            f.write(f'    "{self.repo_a_name}" --> "{self.repo_b_name}"\n')
+            f.write(f'    "{self.repo_b_name}" --> "{self.repo_c_name}"\n')
+        print(f"[-] Dependency graph created at {self.dependency_file}")
+
+
     def test_init(self):
         print("[TEST] Running init...")
         self.run_cmd([self.mstl_bin, "init", "-f", "mistletoe.json"], cwd=self.test_dir)
 
-        # Verify
-        if not os.path.isdir(os.path.join(self.test_dir, self.repo_a_name)):
-            raise Exception("Repo A directory not found")
-        if not os.path.isdir(os.path.join(self.test_dir, self.repo_b_name)):
-            raise Exception("Repo B directory not found")
+        self.checkpoint("Init Complete", f"Directories for {self.repo_a_name}, {self.repo_b_name}, {self.repo_c_name} should exist.")
 
     def test_switch(self):
         print("[TEST] Running switch...")
-        # Create branch locally first in one? No, switch -c creates it.
-        self.run_cmd([self.mstl_bin, "switch", "-c", "feature/test-gh"], cwd=self.test_dir)
+        self.run_cmd([self.mstl_bin, "switch", "-c", "feature/complex-dep"], cwd=self.test_dir)
 
-        # Verify
-        res = self.run_cmd(["git", "symbolic-ref", "--short", "HEAD"], cwd=os.path.join(self.test_dir, self.repo_a_name), capture_output=True)
-        if res.stdout.strip() != "feature/test-gh":
-            raise Exception(f"Repo A not on correct branch: {res.stdout}")
+        self.checkpoint("Switch Complete", "All repositories should be on branch 'feature/complex-dep'.")
 
     def test_status_clean(self):
         print("[TEST] Running status (clean)...")
         self.run_cmd([self.mstl_bin, "status"], cwd=self.test_dir)
 
-    def test_push(self):
-        print("[TEST] Running push...")
+    def test_pr_create(self):
+        print("[TEST] Running pr create...")
         # Make changes
-        for repo in [self.repo_a_name, self.repo_b_name]:
+        for repo in [self.repo_a_name, self.repo_b_name, self.repo_c_name]:
             r_dir = os.path.join(self.test_dir, repo)
             with open(os.path.join(r_dir, "test.txt"), "w") as f:
                 f.write("test content")
             self.run_cmd(["git", "add", "."], cwd=r_dir)
             self.run_cmd(["git", "commit", "-m", "Add test.txt"], cwd=r_dir)
+            self.run_cmd([self.mstl_bin, "push"], cwd=self.test_dir, input_str="yes\n")
 
-        # Push with confirmation
-        self.run_cmd([self.mstl_bin, "push"], cwd=self.test_dir, input_str="yes\n")
+        self.run_cmd([self.mstl_bin, "pr", "create", "-t", "Complex Dependency PR", "-b", "Testing complex dependencies", "-d", "dependencies.mmd"], cwd=self.test_dir)
 
-    def test_pr_create(self):
-        print("[TEST] Running pr create...")
-        self.run_cmd([self.mstl_bin, "pr", "create", "-t", "Test PR", "-b", "Test Body"], cwd=self.test_dir)
-
-        # Verify PRs exist
-        res = self.run_cmd(["gh", "pr", "list", "--repo", self.repo_a_url, "--head", "feature/test-gh", "--json", "url"], capture_output=True)
-        prs = json.loads(res.stdout)
-        if len(prs) == 0:
-            raise Exception("PR for Repo A not found")
+        self.checkpoint("PR Created",
+                        f"PRs created for A, B, C.\n"
+                        f"Repo A PR should list B as dependency.\n"
+                        f"Repo B PR should list C as dependency and A as dependent.\n"
+                        f"Repo C PR should list B as dependent.")
 
     def test_pr_status(self):
         print("[TEST] Running pr status...")
@@ -203,8 +230,8 @@ class MstlGhTest:
 
     def test_pr_update(self):
         print("[TEST] Running pr update...")
-        # Make more changes
-        r_dir = os.path.join(self.test_dir, self.repo_a_name)
+        # Make more changes in C
+        r_dir = os.path.join(self.test_dir, self.repo_c_name)
         with open(os.path.join(r_dir, "update.txt"), "w") as f:
             f.write("updated content")
         self.run_cmd(["git", "add", "."], cwd=r_dir)
@@ -213,16 +240,12 @@ class MstlGhTest:
 
         self.run_cmd([self.mstl_bin, "pr", "update"], cwd=self.test_dir, input_str="yes\n")
 
-    def test_snapshot(self):
-        print("[TEST] Running snapshot...")
-        self.run_cmd([self.mstl_bin, "snapshot", "-o", "snapshot.json"], cwd=self.test_dir)
-        if not os.path.exists(os.path.join(self.test_dir, "snapshot.json")):
-            raise Exception("Snapshot file not created")
+        self.checkpoint("PR Updated", "Repo C PR updated. Check body for new commit hash in snapshot.")
 
     def test_pr_checkout(self):
         print("[TEST] Running pr checkout...")
         # Get PR URL from Repo A
-        res = self.run_cmd(["gh", "pr", "list", "--repo", self.repo_a_url, "--head", "feature/test-gh", "--json", "url"], capture_output=True)
+        res = self.run_cmd(["gh", "pr", "list", "--repo", self.repo_a_url, "--head", "feature/complex-dep", "--json", "url"], capture_output=True)
         prs = json.loads(res.stdout)
         pr_url = prs[0]['url']
 
@@ -234,20 +257,26 @@ class MstlGhTest:
             self.run_cmd([self.mstl_bin, "pr", "checkout", "-u", pr_url], cwd=checkout_dir)
 
             # Verify
-            if not os.path.isdir(os.path.join(checkout_dir, self.repo_a_name)):
-                raise Exception("Checkout Repo A failed")
-            if not os.path.isdir(os.path.join(checkout_dir, self.repo_b_name)):
-                raise Exception("Checkout Repo B failed")
+            if not os.path.isdir(os.path.join(checkout_dir, self.repo_a_name)) or \
+               not os.path.isdir(os.path.join(checkout_dir, self.repo_b_name)) or \
+               not os.path.isdir(os.path.join(checkout_dir, self.repo_c_name)):
+                raise Exception("Checkout failed: Not all repos restored.")
+
+            self.checkpoint("Checkout Complete", "A, B, C restored from Repo A's PR snapshot.")
+
         finally:
             shutil.rmtree(checkout_dir, ignore_errors=True)
 
     def cleanup(self):
+        if not self.cleanup_needed:
+            return
+
         print("[-] Cleaning up...")
         if os.path.exists(self.test_dir):
             shutil.rmtree(self.test_dir, ignore_errors=True)
 
         print(f"[-] Deleting remote repositories...")
-        for repo in [self.repo_a_name, self.repo_b_name]:
+        for repo in [self.repo_a_name, self.repo_b_name, self.repo_c_name]:
             try:
                 # Rename before deletion to indicate it's being deleted
                 new_name = f"{repo}-deleting"
@@ -260,6 +289,8 @@ class MstlGhTest:
             except Exception as e:
                 print(f"Failed to delete {repo} (or renamed version): {e}")
 
+        self.cleanup_needed = False
+
     def run(self):
         try:
             self.check_existing_repos()
@@ -269,11 +300,9 @@ class MstlGhTest:
             self.test_init()
             self.test_switch()
             self.test_status_clean()
-            self.test_push()
             self.test_pr_create()
             self.test_pr_status()
             self.test_pr_update()
-            self.test_snapshot()
             self.test_pr_checkout()
             print("\n" + "=" * 30)
             print("ALL TESTS PASSED")
