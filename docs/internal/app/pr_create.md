@@ -20,6 +20,7 @@ mstl-gh pr create [options]
 | `--file` | `-f` | 設定ファイル (JSON) のパス。 | `mistletoe.json` |
 | `--dependencies` | `-d` | 依存関係グラフ（Mermaid形式）のMarkdownファイルパス。 | (なし) |
 | `--parallel` | `-p` | 並列実行数。 | 1 |
+| `--overwrite` | `-w` | 既存PRの作成者が自分以外で、Mistletoeブロックがない場合でも上書きを許可する。 | false |
 | `--verbose` | `-v` | デバッグ用の詳細ログを出力（実行された git/gh コマンドを表示） | false |
 
 ## 3. ロジックフロー (Logic Flow)
@@ -46,7 +47,10 @@ flowchart TD
 
     CatSkip --> CheckWorkable{"処理対象リポジトリがあるか？\n(Create or Update)"}
     CheckWorkable -- "No" --> Stop(["終了"])
-    CheckWorkable -- "Yes" --> CheckAllPRs{"処理対象全リポジトリに\n既存PRが存在するか？"}
+    CheckWorkable -- "Yes" --> CheckPermissions{"既存PR更新権限確認\n(後述詳細)"}
+
+    CheckPermissions -- "NG" --> ErrorPermission["エラー停止: 権限なし/上書き不可"]
+    CheckPermissions -- "OK" --> CheckAllPRs{"処理対象全リポジトリに\n既存PRが存在するか？"}
 
     CheckAllPRs -- "Yes (Updateのみ)" --> PromptUpdate["プロンプト: 説明を更新しますか？"]
     PromptUpdate -- "No" --> Stop
@@ -97,11 +101,27 @@ flowchart TD
     *   **条件**: 有効なPRが存在せず、かつローカルブランチとリモートブランチが同期している (`Equal`)。
     *   **アクション**: PushもPR作成もしません。メモリ上で「PR不要」として保持し、後続の処理から除外します。
 
-### 3.3. 既存PRの更新スキップ条件 (Skip Update for Closed/Merged PRs)
+### 3.3. 既存PRの権限確認と上書きルール (Permission Check & Overwrite Rules)
+
+既存の Pull Request が存在する場合、処理を開始する前に以下の権限確認と上書き判定を行います。
+
+1.  **編集権限の確認**:
+    *   現在のユーザーがその Pull Request に対して編集権限 (`viewerCanEditFiles`) を持っているか確認します。
+    *   権限がない場合、エラーメッセージを表示して処理を中止します。
+
+2.  **上書き判定**:
+    *   編集権限がある場合、以下の条件で上書き（Mistletoeブロックの追記・更新）可否を判定します。
+        *   **Mistletoeブロックあり**: 既存PRに既に Mistletoe ブロックが存在する場合、**上書き可能**と判断します。
+        *   **Mistletoeブロックなし & 作成者が自分**: Mistletoe ブロックがなく、PR作成者が現在のユーザーである場合、**上書き可能**と判断します。
+        *   **Mistletoeブロックなし & 作成者が他人**: Mistletoe ブロックがなく、PR作成者が現在のユーザーでない場合：
+            *   `--overwrite` (`-w`) オプションが指定されていれば、**上書き可能**と判断します。
+            *   指定されていない場合、**エラー**として処理を中止し、`--overwrite` オプションの使用を促します。
+
+### 3.4. 既存PRの更新スキップ条件 (Skip Update for Closed/Merged PRs)
 
 既存のPull Requestが存在する場合でも、そのステータスが `MERGED` または `CLOSED` である場合、Descriptionの更新（スナップショットの埋め込み）はスキップされます（これらのリポジトリは上記分類ロジックにおける「PRなし」として扱われますが、変更がなければ「スキップ」となります）。
 
-### 3.4. 依存関係の解析 (Dependency Parsing)
+### 3.5. 依存関係の解析 (Dependency Parsing)
 
 `--dependencies` オプションで指定されたファイルは以下のルールで解析されます：
 *   **形式**: Markdownファイル内のMermaidグラフ（`graph` または `flowchart`）。
@@ -116,7 +136,7 @@ flowchart TD
     *   `ID["Label"]` や `ID{Label}` の形式であっても、先頭のID部分のみを使用して照合します。
 *   **検証**: グラフ内の抽出されたノードIDは、設定ファイル (`repositories` 内の `id`) と一致する必要があります。一致しないIDが含まれる場合はエラーとして終了します。
 
-### 3.5. Mistletoe ブロック (Mistletoe Block)
+### 3.6. Mistletoe ブロック (Mistletoe Block)
 
 PR 本文の末尾に、自動生成された不可視（または折りたたみ）ブロックを追加します。
 
@@ -184,18 +204,18 @@ PR 本文の末尾に、自動生成された不可視（または折りたた�
 
 これにより、レビュー担当者はスナップショット情報を参照でき、将来的な自動検証やリンク連携が可能になります。
 
-### 3.6. 制約事項 (Constraints)
+### 3.7. 制約事項 (Constraints)
 
 *   **GitHub のみ**: URL が GitHub を指していないリポジトリはスキップまたはエラー。
 *   **クリーンな状態**: 全てのリポジトリが最新（Up-to-date）であり、ローカルの変更がないことが推奨されますが、実装上は「プッシュ可能であること」の確認。
 *   **Detached HEAD 禁止**: ブランチ上にいない（Detached HEAD）リポジトリがある場合、PR 作成先が不明確なためエラー。
 *   **Baseブランチの存在**: PRの作成先となるBaseブランチが設定ファイルに指定（`base-branch` 優先、なければ `branch`）されており、かつリモートに存在しない場合、エラーとして終了します。
 
-### 3.7. デバッグ (Debugging)
+### 3.8. デバッグ (Debugging)
 
 `--verbose` オプションが指定された場合、実行される `git` および `gh` コマンドが標準エラー出力に出力されます。また、スピナー（進行状況インジケータ）は無効化されます。
 
-### 3.8. エディタ入力の解析ルール (Editor Input Parsing Rules)
+### 3.9. エディタ入力の解析ルール (Editor Input Parsing Rules)
 
 エディタから入力されたテキストは、以下のルールに従って「タイトル」と「本文」に分割されます。
 PRタイトルの最大文字数 (`PrTitleMaxLength`) は 256 文字です。

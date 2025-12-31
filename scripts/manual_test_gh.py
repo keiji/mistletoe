@@ -9,6 +9,7 @@ import signal
 
 class MstlGhTest:
     def __init__(self):
+        self.cwd = os.getcwd()
         self.user = self.get_gh_user()
         self.uuid = str(uuid.uuid4())[:8]
 
@@ -19,7 +20,6 @@ class MstlGhTest:
         self.repo_b_url = f"https://github.com/{self.user}/{self.repo_b_name}.git"
         self.repo_c_url = f"https://github.com/{self.user}/{self.repo_c_name}.git"
 
-        self.cwd = os.getcwd()
         self.test_dir = os.path.join(self.cwd, f"test_workspace_{self.uuid}")
         self.config_file = os.path.join(self.test_dir, "mistletoe.json")
         self.dependency_file = os.path.join(self.test_dir, "dependencies.mmd")
@@ -281,6 +281,27 @@ class MstlGhTest:
 
         self.checkpoint("PR Updated", "Repo C PR updated. Check body for new commit hash in snapshot.", urls=pr_urls)
 
+    def test_pr_update_permissions(self):
+        print("[TEST] Running pr update (Permission Check - Creator == Me, No Block)...")
+        # 1. Modify Repo C PR body to remove Mistletoe block
+        print("[-] Removing Mistletoe block from Repo C PR...")
+        self.run_cmd(["gh", "pr", "edit", "--body", "Manual edit without Mistletoe block"], cwd=os.path.join(self.test_dir, self.repo_c_name))
+
+        # 2. Update Repo C content to force a change
+        r_dir = os.path.join(self.test_dir, self.repo_c_name)
+        with open(os.path.join(r_dir, "update_perm.txt"), "w") as f:
+            f.write("permission test")
+        self.run_cmd(["git", "add", "."], cwd=r_dir)
+        self.run_cmd(["git", "commit", "-m", "Update for permission test"], cwd=r_dir)
+        self.run_cmd([self.mstl_bin, "push"], cwd=self.test_dir, input_str="yes\n")
+
+        # 3. Run pr update - should succeed because Creator is Me
+        self.run_cmd([self.mstl_bin, "pr", "update"], cwd=self.test_dir, input_str="yes\n")
+
+        self.checkpoint("PR Updated (Permission Test)",
+                        "Repo C PR should be updated with a new Mistletoe block appended, even though it was missing.",
+                        urls={})
+
     def test_pr_checkout(self):
         print("[TEST] Running pr checkout...")
         # Get PR URL from Repo A
@@ -342,6 +363,7 @@ class MstlGhTest:
             self.test_pr_create()
             self.test_pr_status()
             self.test_pr_update()
+            self.test_pr_update_permissions()
             self.test_pr_checkout()
             print("\n" + "=" * 30)
             print("ALL TESTS PASSED")

@@ -306,8 +306,10 @@ func EmbedMistletoeBody(originalBody, newBlock string) string {
 }
 
 // ParseMistletoeBlock extracts the JSON blocks from a Mistletoe-formatted body.
-// It returns the decoded snapshot (as a Config struct), raw Related PRs JSON, or error if not found.
-func ParseMistletoeBlock(body string) (*Config, []byte, error) {
+// It returns the decoded snapshot (as a Config struct), raw Related PRs JSON, and true if Mistletoe block was found.
+// If not found, returns nil, nil, false.
+// If found but data missing/invalid, returns error.
+func ParseMistletoeBlock(body string) (*Config, []byte, bool) {
 	lines := strings.Split(body, "\n")
 	startIdx := -1
 	endIdx := -1
@@ -339,7 +341,7 @@ func ParseMistletoeBlock(body string) (*Config, []byte, error) {
 	}
 
 	if startIdx == -1 || endIdx == -1 {
-		return nil, nil, fmt.Errorf("Mistletoe block not found in PR body")
+		return nil, nil, false
 	}
 
 	blockContent := strings.Join(lines[startIdx:endIdx+1], "\n")
@@ -347,10 +349,6 @@ func ParseMistletoeBlock(body string) (*Config, []byte, error) {
 	// 2. Extract Snapshot (Config)
 	// Look for snapshot filename (mistletoe-snapshot-...) in <summary>
 	// Then parse the JSON code block inside that details block.
-
-	// Regex to find snapshot block:
-	// <details>\s*<summary>.*mistletoe-snapshot-.*\.json</summary>\s*```json\s*(\{.*?\})\s*```
-	// This might be tricky with multiline regex in Go. We'll step through details blocks.
 
 	detailsRe := regexp.MustCompile(`(?s)<details>(.*?)</details>`)
 	matches := detailsRe.FindAllStringSubmatch(blockContent, -1)
@@ -382,9 +380,9 @@ func ParseMistletoeBlock(body string) (*Config, []byte, error) {
 		}
 	}
 
-	if snapshotConfig == nil {
-		return nil, nil, fmt.Errorf("snapshot data not found in Mistletoe block")
-	}
-
-	return snapshotConfig, relatedPrJSON, nil
+	// Even if data is missing, we found the block structure.
+	// But the caller logic uses `found` to mean "safe to overwrite".
+	// If it's a mangled block, we should probably still consider it "found" (so we can repair it).
+	// So return true.
+	return snapshotConfig, relatedPrJSON, true
 }
