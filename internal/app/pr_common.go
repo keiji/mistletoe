@@ -16,12 +16,20 @@ import (
 
 // PrInfo holds information about a Pull Request.
 type PrInfo struct {
-	Number      int    `json:"number"`
-	State       string `json:"state"`
-	IsDraft     bool   `json:"isDraft"`
-	URL         string `json:"url"`
-	BaseRefName string `json:"baseRefName"`
-	HeadRefOid  string `json:"headRefOid"`
+	Number             int    `json:"number"`
+	State              string `json:"state"`
+	IsDraft            bool   `json:"isDraft"`
+	URL                string `json:"url"`
+	BaseRefName        string `json:"baseRefName"`
+	HeadRefOid         string `json:"headRefOid"`
+	Author             Author `json:"author"`
+	ViewerCanEditFiles bool   `json:"viewerCanEditFiles"`
+	Body               string `json:"body"`
+}
+
+// Author represents a GitHub user.
+type Author struct {
+	Login string `json:"login"`
 }
 
 // PrStatusRow represents a row in the PR status table.
@@ -69,7 +77,7 @@ func CollectPrStatus(statusRows []StatusRow, config *Config, parallel int, ghPat
 					var displays []string
 
 					for _, u := range urls {
-						args := []string{"pr", "view", u, "--json", "number,state,isDraft,baseRefName,headRefOid"}
+						args := []string{"pr", "view", u, "--json", "number,state,isDraft,baseRefName,headRefOid,author,viewerCanEditFiles,body"}
 						out, err := RunGh(ghPath, verbose, args...)
 						if err == nil {
 							var pr PrInfo
@@ -120,7 +128,7 @@ func CollectPrStatus(statusRows []StatusRow, config *Config, parallel int, ghPat
 				}
 
 				if !isKnown && r.RepoDir != "" && r.BranchName != "HEAD" && r.BranchName != "" {
-					args := []string{"pr", "list", "--repo", *conf.URL, "--head", r.BranchName, "--state", "all", "--json", "number,state,isDraft,url,baseRefName,headRefOid"}
+					args := []string{"pr", "list", "--repo", *conf.URL, "--head", r.BranchName, "--state", "all", "--json", "number,state,isDraft,url,baseRefName,headRefOid,author,viewerCanEditFiles,body"}
 					if baseBranch != "" {
 						args = append(args, "--base", baseBranch)
 					}
@@ -615,4 +623,44 @@ func verifyGithubRequirements(repos []Repository, rows []StatusRow, parallel int
 		return nil, fmt.Errorf("GitHub validation failed:\n%s", strings.Join(errs, "\n"))
 	}
 	return existingPRs, nil
+}
+
+// GetGhUser returns the current authenticated GitHub user's login.
+func GetGhUser(ghPath string, verbose bool) (string, error) {
+	out, err := RunGh(ghPath, verbose, "api", "user", "--jq", ".login")
+	if err != nil {
+		return "", fmt.Errorf("failed to get GitHub user: %w", err)
+	}
+	return strings.TrimSpace(out), nil
+}
+
+// ValidatePrPermissionAndOverwrite checks if we can overwrite an existing PR.
+// It returns nil if allowed, or an error if permission denied or overwrite flag required.
+func ValidatePrPermissionAndOverwrite(repoID string, pr PrInfo, currentUser string, overwrite bool) error {
+	// 1. Permission Check
+	if !pr.ViewerCanEditFiles {
+		return fmt.Errorf("permission denied: you do not have edit permission for PR %s (Repo: %s)", pr.URL, repoID)
+	}
+
+	// 2. Overwrite Logic
+	// Check for Mistletoe block
+	_, _, found := ParseMistletoeBlock(pr.Body)
+	if found {
+		// Existing block found -> Safe to overwrite
+		return nil
+	}
+
+	// No Mistletoe block
+	if strings.EqualFold(pr.Author.Login, currentUser) {
+		// Creator is me -> Safe to overwrite (append)
+		return nil
+	}
+
+	// Creator is NOT me
+	if overwrite {
+		// Overwrite flag set -> Safe
+		return nil
+	}
+
+	return fmt.Errorf("PR %s (Repo: %s) was created by %s and does not have a Mistletoe block. Use --overwrite (-w) to force update", pr.URL, repoID, pr.Author.Login)
 }

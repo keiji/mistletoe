@@ -143,9 +143,9 @@ Some description...
 
 ------------------
 `
-	config, _, err := ParseMistletoeBlock(body)
-	if err != nil {
-		t.Fatalf("ParseMistletoeBlock failed: %v", err)
+	config, _, found := ParseMistletoeBlock(body)
+	if !found {
+		t.Fatalf("ParseMistletoeBlock failed: not found")
 	}
 	if len(*config.Repositories) != 1 {
 		t.Errorf("Expected 1 repo, got %d", len(*config.Repositories))
@@ -190,9 +190,9 @@ Some description...
 
 ------------------
 `
-	config2, related, err := ParseMistletoeBlock(bodyRelated)
-	if err != nil {
-		t.Fatalf("ParseMistletoeBlock failed: %v", err)
+	config2, related, found2 := ParseMistletoeBlock(bodyRelated)
+	if !found2 {
+		t.Fatalf("ParseMistletoeBlock failed: not found")
 	}
 	if len(*config2.Repositories) != 1 {
 		t.Errorf("Expected 1 repo")

@@ -64,9 +64,13 @@ func handlePrCheckout(args []string, opts GlobalOptions) {
 
 	// 3. Parse Mistletoe Block
 	fmt.Println("Parsing Mistletoe block...")
-	config, relatedJSON, err := ParseMistletoeBlock(prBody)
-	if err != nil {
-		fmt.Printf("Error parsing Mistletoe block: %v\n", err)
+	config, relatedJSON, found := ParseMistletoeBlock(prBody)
+	if !found {
+		fmt.Println("Error: Mistletoe block not found in PR body")
+		os.Exit(1)
+	}
+	if config == nil {
+		fmt.Println("Error: Snapshot data missing in Mistletoe block")
 		os.Exit(1)
 	}
 
@@ -159,7 +163,9 @@ func handlePrCheckout(args []string, opts GlobalOptions) {
 				}
 			}
 		} else {
-			fmt.Printf("Warning: related PR JSON is invalid: %v\n", err)
+			fmt.Printf("Warning: related PR JSON is invalid: %v\n", err) // err is from Unmarshal now? No, err variable scope issue.
+			// Actually err was defined in if err := json.Unmarshal...
+			// So it's fine.
 		}
 	}
 
