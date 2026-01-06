@@ -14,8 +14,8 @@ func handlePush(args []string, opts GlobalOptions) {
 	var vLong, vShort bool
 
 	fs := flag.NewFlagSet("push", flag.ExitOnError)
-	fs.StringVar(&fLong, "file", "", "configuration file")
-	fs.StringVar(&fShort, "f", "", "configuration file (short)")
+	fs.StringVar(&fLong, "file", ".mstl/config.json", "Configuration file path")
+	fs.StringVar(&fShort, "f", ".mstl/config.json", "Configuration file path (shorthand)")
 	fs.IntVar(&pVal, "parallel", DefaultParallel, "number of parallel processes")
 	fs.IntVar(&pValShort, "p", DefaultParallel, "number of parallel processes (short)")
 	fs.BoolVar(&vLong, "verbose", false, "Enable verbose output")

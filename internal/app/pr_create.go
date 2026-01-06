@@ -29,16 +29,16 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 		vShort     bool
 	)
 
-	fs.StringVar(&fLong, "file", "", "Configuration file path")
-	fs.StringVar(&fShort, "f", "", "Configuration file path (shorthand)")
+	fs.StringVar(&fLong, "file", ".mstl/config.json", "Configuration file path")
+	fs.StringVar(&fShort, "f", ".mstl/config.json", "Configuration file path (shorthand)")
 	fs.IntVar(&pVal, "parallel", DefaultParallel, "Number of parallel processes")
 	fs.IntVar(&pValShort, "p", DefaultParallel, "Number of parallel processes (shorthand)")
 	fs.StringVar(&tLong, "title", "", "Pull Request title")
 	fs.StringVar(&tShort, "t", "", "Pull Request title (shorthand)")
 	fs.StringVar(&bLong, "body", "", "Pull Request body")
 	fs.StringVar(&bShort, "b", "", "Pull Request body (shorthand)")
-	fs.StringVar(&dLong, "dependencies", "", "Dependency graph file path")
-	fs.StringVar(&dShort, "d", "", "Dependency graph file path (shorthand)")
+	fs.StringVar(&dLong, "dependencies", ".mstl/dependencies.md", "Dependency graph file path")
+	fs.StringVar(&dShort, "d", ".mstl/dependencies.md", "Dependency graph file path (shorthand)")
 	fs.BoolVar(&vLong, "verbose", false, "Enable verbose output")
 	fs.BoolVar(&vShort, "v", false, "Enable verbose output (shorthand)")
 

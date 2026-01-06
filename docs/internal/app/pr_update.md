@@ -19,8 +19,8 @@ mstl-gh pr update [options]
 
 | オプション | 短縮形 | 説明 | デフォルト |
 | :--- | :--- | :--- | :--- |
-| `--file` | `-f` | 設定ファイル (JSON) のパス。 | `mistletoe.json` |
-| `--dependencies` | `-d` | 依存関係グラフ（Mermaid形式）のMarkdownファイルパス。 | (なし) |
+| `--file` | `-f` | 設定ファイル (JSON) のパス。 | `.mstl/config.json` |
+| `--dependencies` | `-d` | 依存関係グラフ（Mermaid形式）のMarkdownファイルパス。 | `.mstl/dependencies.md` |
 | `--parallel` | `-p` | 並列実行数。 | 1 |
 | `--verbose` | `-v` | デバッグ用の詳細ログを出力（実行された git/gh コマンドを表示） | false |
 

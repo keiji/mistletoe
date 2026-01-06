@@ -17,8 +17,8 @@ mstl-gh pr create [options]
 | :--- | :--- | :--- | :--- |
 | `--title` | `-t` | PR のタイトル。 | (エディタで入力) |
 | `--body` | `-b` | PR の本文。 | (エディタで入力) |
-| `--file` | `-f` | 設定ファイル (JSON) のパス。 | `mistletoe.json` |
-| `--dependencies` | `-d` | 依存関係グラフ（Mermaid形式）のMarkdownファイルパス。 | (なし) |
+| `--file` | `-f` | 設定ファイル (JSON) のパス。 | `.mstl/config.json` |
+| `--dependencies` | `-d` | 依存関係グラフ（Mermaid形式）のMarkdownファイルパス。 | `.mstl/dependencies.md` |
 | `--parallel` | `-p` | 並列実行数。 | 1 |
 | `--overwrite` | `-w` | 既存PRの作成者が自分以外で、Mistletoeブロックがない場合でも上書きを許可する。 | false |
 | `--verbose` | `-v` | デバッグ用の詳細ログを出力（実行された git/gh コマンドを表示） | false |

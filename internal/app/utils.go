@@ -186,14 +186,42 @@ func ResolveCommonValues(fLong, fShort string, pVal, pValShort int) (string, int
 	}
 
 	// Config File
-	configFile := fLong
-	if configFile == "" {
+	defaultConfig := ".mstl/config.json"
+	var configFile string
+	var isDefault bool
+
+	if fLong != defaultConfig {
+		configFile = fLong
+		isDefault = false
+	} else if fShort != defaultConfig {
 		configFile = fShort
+		isDefault = false
+	} else {
+		configFile = defaultConfig
+		isDefault = true
 	}
 
-	// If no config file specified, check stdin
-	var configData []byte
+	// If user supplied empty string explicitly, we treat it as "no file", so we look for stdin.
 	if configFile == "" {
+		isDefault = false // effectively treated as manual override to nothing
+	}
+
+	var configData []byte
+
+	// Check Stdin if we are using defaults OR if configFile is explicitly empty
+	checkStdin := false
+	if configFile == "" {
+		checkStdin = true
+	} else if isDefault {
+		// If using default file, we also check if there is piped input to prioritize it?
+		// Or should we only check stdin if default file doesn't exist? No, explicit pipe should win.
+		stat, _ := os.Stdin.Stat()
+		if (stat.Mode() & os.ModeCharDevice) == 0 {
+			checkStdin = true
+		}
+	}
+
+	if checkStdin {
 		stat, _ := os.Stdin.Stat()
 		if (stat.Mode() & os.ModeCharDevice) == 0 {
 			// Data is being piped to stdin
@@ -201,8 +229,14 @@ func ResolveCommonValues(fLong, fShort string, pVal, pValShort int) (string, int
 			if err != nil {
 				return "", 0, nil, fmt.Errorf("failed to read from stdin: %w", err)
 			}
-
 			configData = inputData
+
+			// If we successfully read from stdin, we clear configFile so loadConfig uses data
+			// UNLESS user explicitly asked for a file?
+			// If isDefault is true, we prefer stdin.
+			// If isDefault is false (user passed -f ""), we prefer stdin.
+			// If user passed -f "somefile" (isDefault false), we shouldn't be here (checkStdin false).
+			configFile = ""
 		}
 	}
 
