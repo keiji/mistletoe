@@ -21,12 +21,12 @@ func handlePrUpdate(args []string, opts GlobalOptions) {
 		vShort    bool
 	)
 
-	fs.StringVar(&fLong, "file", ".mstl/config.json", "Configuration file path")
-	fs.StringVar(&fShort, "f", ".mstl/config.json", "Configuration file path (shorthand)")
+	fs.StringVar(&fLong, "file", DefaultConfigFile, "Configuration file path")
+	fs.StringVar(&fShort, "f", DefaultConfigFile, "Configuration file path (shorthand)")
 	fs.IntVar(&pVal, "parallel", DefaultParallel, "Number of parallel processes")
 	fs.IntVar(&pValShort, "p", DefaultParallel, "Number of parallel processes (shorthand)")
-	fs.StringVar(&dLong, "dependencies", ".mstl/dependencies.md", "Dependency graph file path")
-	fs.StringVar(&dShort, "d", ".mstl/dependencies.md", "Dependency graph file path (shorthand)")
+	fs.StringVar(&dLong, "dependencies", DefaultDependencies, "Dependency graph file path")
+	fs.StringVar(&dShort, "d", DefaultDependencies, "Dependency graph file path (shorthand)")
 	fs.BoolVar(&vLong, "verbose", false, "Enable verbose output")
 	fs.BoolVar(&vShort, "v", false, "Enable verbose output (shorthand)")
 

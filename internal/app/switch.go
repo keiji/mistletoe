@@ -19,12 +19,12 @@ func handleSwitch(args []string, opts GlobalOptions) {
 	var vLong, vShort bool
 
 	fs := flag.NewFlagSet("switch", flag.ExitOnError)
-	fs.StringVar(&fLong, "file", ".mstl/config.json", "configuration file")
-	fs.StringVar(&fShort, "f", ".mstl/config.json", "configuration file (short)")
+	fs.StringVar(&fLong, "file", DefaultConfigFile, "configuration file")
+	fs.StringVar(&fShort, "f", DefaultConfigFile, "configuration file (shorthand)")
 	fs.StringVar(&createLong, "create", "", "create branch if it does not exist")
-	fs.StringVar(&createShort, "c", "", "create branch if it does not exist (short)")
+	fs.StringVar(&createShort, "c", "", "create branch if it does not exist (shorthand)")
 	fs.IntVar(&pVal, "parallel", DefaultParallel, "number of parallel processes")
-	fs.IntVar(&pValShort, "p", DefaultParallel, "number of parallel processes (short)")
+	fs.IntVar(&pValShort, "p", DefaultParallel, "number of parallel processes (shorthand)")
 	fs.BoolVar(&vLong, "verbose", false, "Enable verbose output")
 	fs.BoolVar(&vShort, "v", false, "Enable verbose output (shorthand)")
 

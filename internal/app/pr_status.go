@@ -18,8 +18,8 @@ func handlePrStatus(args []string, opts GlobalOptions) {
 		vShort    bool
 	)
 
-	fs.StringVar(&fLong, "file", ".mstl/config.json", "Configuration file path")
-	fs.StringVar(&fShort, "f", ".mstl/config.json", "Configuration file path (shorthand)")
+	fs.StringVar(&fLong, "file", DefaultConfigFile, "Configuration file path")
+	fs.StringVar(&fShort, "f", DefaultConfigFile, "Configuration file path (shorthand)")
 	fs.IntVar(&pVal, "parallel", DefaultParallel, "Number of parallel processes")
 	fs.IntVar(&pValShort, "p", DefaultParallel, "Number of parallel processes (shorthand)")
 	fs.BoolVar(&vLong, "verbose", false, "Enable verbose output")

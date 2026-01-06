@@ -186,7 +186,7 @@ func ResolveCommonValues(fLong, fShort string, pVal, pValShort int) (string, int
 	}
 
 	// Config File
-	defaultConfig := ".mstl/config.json"
+	defaultConfig := DefaultConfigFile
 	var configFile string
 	var isDefault bool
 
