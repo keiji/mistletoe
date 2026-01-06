@@ -101,7 +101,8 @@ func TestMstlAndMstlGhCompatibility(t *testing.T) {
 
 		// Run mstl init
 		dirMstl := t.TempDir()
-		configFileMstl := filepath.Join(dirMstl, "repos.json")
+		configDirMstl := t.TempDir()
+		configFileMstl := filepath.Join(configDirMstl, "repos.json")
 		if err := os.WriteFile(configFileMstl, []byte(configContent), 0644); err != nil {
 			t.Fatalf("failed to write config: %v", err)
 		}
@@ -126,7 +127,8 @@ func TestMstlAndMstlGhCompatibility(t *testing.T) {
 
 		// Run mstl-gh init
 		dirMstlGh := t.TempDir()
-		configFileMstlGh := filepath.Join(dirMstlGh, "repos.json")
+		configDirMstlGh := t.TempDir()
+		configFileMstlGh := filepath.Join(configDirMstlGh, "repos.json")
 		if err := os.WriteFile(configFileMstlGh, []byte(configContent), 0644); err != nil {
 			t.Fatalf("failed to write config: %v", err)
 		}
