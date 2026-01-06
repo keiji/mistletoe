@@ -169,8 +169,64 @@ func PerformInit(repos []Repository, gitPath string, parallel, depth int, verbos
 	return nil
 }
 
+func validateAndPrepareInitDest(dest string) error {
+	absDest, err := filepath.Abs(dest)
+	if err != nil {
+		return fmt.Errorf("failed to resolve absolute path for %s: %w", dest, err)
+	}
+
+	info, err := os.Stat(absDest)
+	if err == nil {
+		// Exists
+		if !info.IsDir() {
+			return fmt.Errorf("specified path is a file: %s", dest)
+		}
+		// Is Directory. Check if empty.
+		f, err := os.Open(absDest)
+		if err != nil {
+			return fmt.Errorf("failed to open directory %s: %w", dest, err)
+		}
+		defer f.Close()
+
+		names, err := f.Readdirnames(1)
+		// If err == nil && len(names) > 0, it means the directory is not empty.
+		// Readdirnames returns io.EOF if empty (and n > 0).
+		if err == nil && len(names) > 0 {
+			return fmt.Errorf("specified directory is not empty: %s", dest)
+		}
+	} else if os.IsNotExist(err) {
+		// Does not exist
+		parent := filepath.Dir(absDest)
+		pInfo, pErr := os.Stat(parent)
+		if pErr != nil {
+			if os.IsNotExist(pErr) {
+				return fmt.Errorf("invalid path: parent directory %s does not exist", parent)
+			}
+			return fmt.Errorf("error checking parent directory %s: %w", parent, pErr)
+		}
+		if !pInfo.IsDir() {
+			return fmt.Errorf("parent path %s is not a directory", parent)
+		}
+
+		// Create directory
+		if err := os.Mkdir(absDest, 0755); err != nil {
+			return fmt.Errorf("failed to create directory %s: %w", absDest, err)
+		}
+	} else {
+		// Other error
+		return fmt.Errorf("error checking path %s: %w", dest, err)
+	}
+
+	// Change directory
+	if err := os.Chdir(absDest); err != nil {
+		return fmt.Errorf("failed to change directory to %s: %w", absDest, err)
+	}
+	return nil
+}
+
 func handleInit(args []string, opts GlobalOptions) {
 	var fShort, fLong string
+	var dShort, dLong string
 	var depth int
 	var pVal, pValShort int
 	var vLong, vShort bool
@@ -178,6 +234,8 @@ func handleInit(args []string, opts GlobalOptions) {
 	fs := flag.NewFlagSet("init", flag.ExitOnError)
 	fs.StringVar(&fLong, "file", "", "configuration file")
 	fs.StringVar(&fShort, "f", "", "configuration file (short)")
+	fs.StringVar(&dLong, "dest", "", "destination directory")
+	fs.StringVar(&dShort, "d", "", "destination directory (short)")
 	fs.IntVar(&depth, "depth", 0, "Create a shallow clone with a history truncated to the specified number of commits")
 	fs.IntVar(&pVal, "parallel", DefaultParallel, "number of parallel processes")
 	fs.IntVar(&pValShort, "p", DefaultParallel, "number of parallel processes (short)")
@@ -208,6 +266,18 @@ func handleInit(args []string, opts GlobalOptions) {
 
 	if err != nil {
 		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	dest := "."
+	if dLong != "" {
+		dest = dLong
+	} else if dShort != "" {
+		dest = dShort
+	}
+
+	if err := validateAndPrepareInitDest(dest); err != nil {
+		fmt.Println("Error:", err)
 		os.Exit(1)
 	}
 
