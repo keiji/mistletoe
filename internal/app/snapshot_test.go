@@ -99,7 +99,7 @@ func TestSnapshot(t *testing.T) {
 	// Run snapshot
 	outputFile := "snapshot.json"
 
-	cmd := exec.Command(binaryPath, "snapshot", "-o", outputFile)
+	cmd := exec.Command(binaryPath, "snapshot", "-o", outputFile, "-f", "")
 	cmd.Dir = tmpDir
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -187,7 +187,7 @@ func TestSnapshot_DefaultFilename(t *testing.T) {
 	setupDummyRepo(t, repo1Dir, repo1URL, repo1Branch)
 
 	// Run snapshot without -o
-	cmd := exec.Command(binaryPath, "snapshot")
+	cmd := exec.Command(binaryPath, "snapshot", "-f", "")
 	cmd.Dir = tmpDir
 	out, err := cmd.CombinedOutput()
 	if err != nil {
