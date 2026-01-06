@@ -49,21 +49,21 @@ jobs:
           GOOS=windows GOARCH=amd64 go build -trimpath -ldflags "-s -w -X main.commitHash=${{ env.SHORT_SHA }}" -o dist/windows-amd64/mstl-gh.exe ./cmd/mstl-gh
 
       - name: Upload Artifacts Linux
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: mstl-binaries-linux-amd64
           path: dist/linux-amd64/
           retention-days: 1
 
       - name: Upload Artifacts Mac
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: mstl-binaries-darwin-amd64
           path: dist/darwin-amd64/
           retention-days: 1
 
       - name: Upload Artifacts Windows
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: mstl-binaries-windows-amd64
           path: dist/windows-amd64/
