@@ -276,6 +276,13 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 	}
 
 	// 9. Execution Phase 1: Push
+	// Final Verification: Ensure revisions haven't changed since status collection
+	fmt.Println("Verifying repository states...")
+	if err := VerifyRevisionsUnchanged(config, rows, opts.GitPath, verbose); err != nil {
+		fmt.Printf("error: state verification failed: %v\n", err)
+		os.Exit(1)
+	}
+
 	if len(pushList) > 0 {
 		fmt.Println("Pushing changes...")
 		if err := executePush(pushList, rows, parallel, opts.GitPath, verbose); err != nil {
