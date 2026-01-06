@@ -14,13 +14,13 @@ jobs:
     steps:
       - name: Checkout Source (Workflow Run)
         if: ${{ github.event_name == 'workflow_run' }}
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
 
       - name: Checkout Source (Dispatch)
         if: ${{ github.event_name == 'workflow_dispatch' }}
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Go
         uses: actions/setup-go@v6
