@@ -69,7 +69,9 @@ flowchart TD
     CheckEditor -- "No" --> GenSnapshot["スナップショット生成"]
     InputContent --> GenSnapshot
 
-    GenSnapshot --> ExecPush["Push実行 (Push必要リスト)"]
+    GenSnapshot --> VerifyRevisions[["状態再確認 (リビジョン変動なし)"]]
+    VerifyRevisions -- "変更あり" --> ErrorChanged["エラー停止: 状態不整合"]
+    VerifyRevisions -- "OK" --> ExecPush["Push実行 (Push必要リスト)"]
     ExecPush --> ExecCreate["PR作成実行 (PR作成必要リスト)"]
     ExecCreate --> ExecUpdate["PR本文更新 (作成済み+更新リスト)\n(スナップショット埋め込み)"]
     ExecUpdate --> ShowFinalStatus["最終ステータス表示"]
@@ -211,11 +213,19 @@ PR 本文の末尾に、自動生成された不可視（または折りたた�
 *   **Detached HEAD 禁止**: ブランチ上にいない（Detached HEAD）リポジトリがある場合、PR 作成先が不明確なためエラー。
 *   **Baseブランチの存在**: PRの作成先となるBaseブランチが設定ファイルに指定（`base-branch` 優先、なければ `branch`）されており、かつリモートに存在しない場合、エラーとして終了します。
 
-### 3.8. デバッグ (Debugging)
+### 3.8. 状態の再確認 (Final Verification)
+
+Push実行の直前に、各リポジトリの現在のリビジョン (HEAD) が、処理開始時に収集したステータスと一致しているかを再確認します。
+これは、エディタ入力中などの待機時間に、バックグラウンドや別ターミナルでリポジトリの状態が変更されていないことを保証するための安全措置です。
+
+*   **一致**: 処理を続行します。
+*   **不一致**: エラーメッセージを表示して処理を中止します。
+
+### 3.9. デバッグ (Debugging)
 
 `--verbose` オプションが指定された場合、実行される `git` および `gh` コマンドが標準エラー出力に出力されます。また、スピナー（進行状況インジケータ）は無効化されます。
 
-### 3.9. エディタ入力の解析ルール (Editor Input Parsing Rules)
+### 3.10. エディタ入力の解析ルール (Editor Input Parsing Rules)
 
 エディタから入力されたテキストは、以下のルールに従って「タイトル」と「本文」に分割されます。
 PRタイトルの最大文字数 (`PrTitleMaxLength`) は 256 文字です。
