@@ -210,7 +210,8 @@ mstl-gh pr create -f <config_file> [options]
 **Options:**
 *   `-t, --title <string>`: Title of the Pull Request.
 *   `-b, --body <string>`: Body content of the Pull Request.
-*   `-d, --dependencies <path>`: Path to a Markdown file containing a Mermaid dependency graph.
+*   `--dependencies <path>`: Path to a Markdown file containing a Mermaid dependency graph.
+*   `--draft`: Create the Pull Request as a draft if supported by the repository.
 *   `-w, --overwrite`: Overwrite existing Pull Request description if creator matches or forced.
 *   `-p, --parallel <int>`: Number of parallel processes to use (default: 1).
 *   `-v, --verbose`: Enable verbose output.
@@ -254,7 +255,7 @@ mstl-gh pr update -f <config_file> [options]
 ```
 
 **Options:**
-*   `-d, --dependencies <path>`: Path to a Markdown file containing a Mermaid dependency graph.
+*   `--dependencies <path>`: Path to a Markdown file containing a Mermaid dependency graph.
 *   `-w, --overwrite`: Overwrite existing Pull Request description if creator matches or forced.
 *   `-p, --parallel <int>`: Number of parallel processes to use (default: 1).
 *   `-v, --verbose`: Enable verbose output.

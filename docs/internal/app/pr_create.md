@@ -18,7 +18,8 @@ mstl-gh pr create [options]
 | `--title` | `-t` | PR のタイトル。 | (エディタで入力) |
 | `--body` | `-b` | PR の本文。 | (エディタで入力) |
 | `--file` | `-f` | 設定ファイル (JSON) のパス。 | `.mstl/config.json` |
-| `--dependencies` | `-d` | 依存関係グラフ（Mermaid形式）のMarkdownファイルパス。 | `.mstl/dependencies.md` |
+| `--dependencies` | | 依存関係グラフ（Mermaid形式）のMarkdownファイルパス。 | `.mstl/dependencies.md` |
+| `--draft` | | ドラフトPRとして作成（リポジトリが対応している場合）。 | false |
 | `--parallel` | `-p` | 並列実行数。 | 1 |
 | `--overwrite` | `-w` | 既存PRの作成者が自分以外で、Mistletoeブロックがない場合でも上書きを許可する。 | false |
 | `--ignore-stdin` | | 標準入力を無視する | false |
@@ -51,7 +52,11 @@ flowchart TD
     CheckWorkable -- "Yes" --> CheckPermissions{"既存PR更新権限確認\n(後述詳細)"}
 
     CheckPermissions -- "NG" --> ErrorPermission["エラー停止: 権限なし/上書き不可"]
-    CheckPermissions -- "OK" --> CheckAllPRs{"処理対象全リポジトリに\n既存PRが存在するか？"}
+    CheckPermissions -- "OK" --> CheckDraft{"Draftオプション有効？"}
+
+    CheckDraft -- "Yes" --> MarkDraft["ドラフト作成モード"]
+    CheckDraft -- "No" --> CheckAllPRs{"処理対象全リポジトリに\n既存PRが存在するか？"}
+    MarkDraft --> CheckAllPRs
 
     CheckAllPRs -- "Yes (Updateのみ)" --> PromptUpdate["プロンプト: 説明を更新しますか？"]
     PromptUpdate -- "No" --> Stop
@@ -73,7 +78,7 @@ flowchart TD
     GenSnapshot --> VerifyRevisions[["状態再確認 (リビジョン変動なし)"]]
     VerifyRevisions -- "変更あり" --> ErrorChanged["エラー停止: 状態不整合"]
     VerifyRevisions -- "OK" --> ExecPush["Push実行 (Push必要リスト)"]
-    ExecPush --> ExecCreate["PR作成実行 (PR作成必要リスト)"]
+    ExecPush --> ExecCreate["PR作成実行 (PR作成必要リスト)\n(Draft試行 -> 失敗時通常作成)"]
     ExecCreate --> ExecUpdate["PR本文更新 (作成済み+更新リスト)\n(スナップショット埋め込み)"]
     ExecUpdate --> ShowFinalStatus["最終ステータス表示"]
     ShowFinalStatus --> Stop

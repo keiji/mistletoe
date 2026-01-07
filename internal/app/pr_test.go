@@ -283,7 +283,7 @@ func TestExecutePrCreation_NoCommitsError(t *testing.T) {
 	defer os.Unsetenv("MOCK_GH_NO_COMMITS")
 
 	// Should not return error, but should not have created PR (not in map)
-	prMap, err := executePrCreationOnly(repos, rows, 1, "gh", false, "Title", "Body")
+	prMap, err := executePrCreationOnly(repos, rows, 1, "gh", false, "Title", "Body", false)
 	if err != nil {
 		t.Errorf("Expected no error (should skip), got: %v", err)
 	}

@@ -16,7 +16,6 @@ func handlePrUpdate(args []string, opts GlobalOptions) {
 		pVal      int
 		pValShort int
 		dLong     string
-		dShort    string
 		wLong      bool
 		wShort     bool
 		vLong     bool
@@ -28,7 +27,6 @@ func handlePrUpdate(args []string, opts GlobalOptions) {
 	fs.IntVar(&pVal, "parallel", DefaultParallel, "Number of parallel processes")
 	fs.IntVar(&pValShort, "p", DefaultParallel, "Number of parallel processes (shorthand)")
 	fs.StringVar(&dLong, "dependencies", DefaultDependencies, "Dependency graph file path")
-	fs.StringVar(&dShort, "d", DefaultDependencies, "Dependency graph file path (shorthand)")
 	fs.BoolVar(&wLong, "overwrite", false, "Overwrite existing Pull Request description if creator matches or forced")
 	fs.BoolVar(&wShort, "w", false, "Overwrite existing Pull Request description (shorthand)")
 	var ignoreStdin bool
@@ -52,9 +50,6 @@ func handlePrUpdate(args []string, opts GlobalOptions) {
 		parallel = 1
 	}
 	depPath := dLong
-	if depPath == "" {
-		depPath = dShort
-	}
 	overwrite := wLong || wShort
 
 	// 1. Check gh availability
