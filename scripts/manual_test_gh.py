@@ -253,6 +253,28 @@ class MstlGhTest:
                         f"Repo C PR should list B as dependent.",
                         urls=pr_urls)
 
+    def test_pr_status_with_feature_branch_config(self):
+        print("[TEST] Running pr status with feature branch config...")
+        # 1. Update config to use feature/complex-dep
+        with open(self.config_file, "r") as f:
+            config = json.load(f)
+
+        for repo in config["repositories"]:
+            repo["branch"] = "feature/complex-dep"
+
+        with open(self.config_file, "w") as f:
+            json.dump(config, f, indent=2)
+
+        # 2. Run pr status and capture output
+        res = self.run_cmd([self.mstl_bin, "pr", "status"], cwd=self.test_dir, capture_output=True)
+        print(res.stdout)
+
+        # 3. Verify that PR URLs are present
+        if "github.com" not in res.stdout:
+             raise Exception("PR Status failed to show PR URLs when config uses feature branch.")
+
+        print("[-] PR Status successfully detected PRs with feature branch config.")
+
     def test_pr_status(self):
         print("[TEST] Running pr status...")
         self.run_cmd([self.mstl_bin, "pr", "status"], cwd=self.test_dir)
@@ -361,6 +383,7 @@ class MstlGhTest:
             self.test_switch()
             self.test_status_clean()
             self.test_pr_create()
+            self.test_pr_status_with_feature_branch_config()
             self.test_pr_status()
             self.test_pr_update()
             self.test_pr_update_permissions()

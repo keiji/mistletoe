@@ -22,9 +22,10 @@ type PrInfo struct {
 	URL                string `json:"url"`
 	BaseRefName        string `json:"baseRefName"`
 	HeadRefOid         string `json:"headRefOid"`
-	Author             Author `json:"author"`
-	ViewerCanEditFiles bool   `json:"viewerCanEditFiles"`
-	Body               string `json:"body"`
+	Author             Author     `json:"author"`
+	ViewerCanEditFiles bool       `json:"viewerCanEditFiles"`
+	Body               string     `json:"body"`
+	HeadRepository     Repository `json:"headRepository"`
 }
 
 // Author represents a GitHub user.
@@ -120,35 +121,69 @@ func CollectPrStatus(statusRows []StatusRow, config *Config, parallel int, ghPat
 				baseBranch := ""
 				if conf.BaseBranch != nil && *conf.BaseBranch != "" {
 					baseBranch = *conf.BaseBranch
-				} else if conf.Branch != nil && *conf.Branch != "" {
-					baseBranch = *conf.Branch
 				}
 				if baseBranch != "" {
 					prRow.Base = baseBranch
 				}
 
 				if !isKnown && r.RepoDir != "" && r.BranchName != "HEAD" && r.BranchName != "" {
-					args := []string{"pr", "list", "--repo", *conf.URL, "--head", r.BranchName, "--state", "all", "--json", "number,state,isDraft,url,baseRefName,headRefOid,author,viewerCanEditFiles,body"}
+					// Check for upstream (parent) repository in case of fork
+					repoURL := *conf.URL
+					configCanonicalURL := *conf.URL
+
+					outParent, errParent := RunGh(ghPath, verbose, "repo", "view", repoURL, "--json", "url,parent", "-q", ".")
+					if errParent == nil {
+						type RepoView struct {
+							URL    string `json:"url"`
+							Parent *struct {
+								URL string `json:"url"`
+							} `json:"parent"`
+						}
+						var rv RepoView
+						if json.Unmarshal([]byte(outParent), &rv) == nil {
+							// Use the canonical URL from GitHub for comparison
+							if rv.URL != "" {
+								configCanonicalURL = rv.URL
+							}
+							// Use parent URL for query if exists
+							if rv.Parent != nil && rv.Parent.URL != "" {
+								repoURL = rv.Parent.URL
+							}
+						}
+					}
+
+					args := []string{"pr", "list", "--repo", repoURL, "--head", r.BranchName, "--state", "all", "--json", "number,state,isDraft,url,baseRefName,headRefOid,author,body,headRepository"}
 					if baseBranch != "" {
 						args = append(args, "--base", baseBranch)
 					}
 
 					out, err := RunGh(ghPath, verbose, args...)
+					if verbose {
+						fmt.Printf("[%s] gh pr list output: %s\n", r.Repo, out)
+					}
 					if err == nil {
 						var prs []PrInfo
 						if err := json.Unmarshal([]byte(out), &prs); err == nil && len(prs) > 0 {
 							// Check for Open PRs
 							hasOpenPR := false
 							for _, pr := range prs {
-								if strings.EqualFold(pr.State, GitHubPrStateOpen) || (pr.IsDraft && strings.EqualFold(pr.State, GitHubPrStateOpen)) {
-									hasOpenPR = true
-									break
+								// Filter by HeadRepository matching Config URL (canonical)
+								if isPrFromConfiguredRepo(pr, configCanonicalURL) {
+									if strings.EqualFold(pr.State, GitHubPrStateOpen) || (pr.IsDraft && strings.EqualFold(pr.State, GitHubPrStateOpen)) {
+										hasOpenPR = true
+										break
+									}
 								}
 							}
 
 							// Filter PRs
 							var filteredPrs []PrInfo
 							for _, pr := range prs {
+								// Apply same repo filter
+								if !isPrFromConfiguredRepo(pr, configCanonicalURL) {
+									continue
+								}
+
 								if strings.EqualFold(pr.State, GitHubPrStateOpen) || (pr.IsDraft && strings.EqualFold(pr.State, GitHubPrStateOpen)) {
 									filteredPrs = append(filteredPrs, pr)
 								} else {
