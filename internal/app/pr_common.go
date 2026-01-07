@@ -402,7 +402,7 @@ func executePush(repos []Repository, rows []StatusRow, parallel int, gitPath str
 	return nil
 }
 
-func updatePrDescriptions(prMap map[string][]PrInfo, parallel int, ghPath string, verbose bool, snapshotData, snapshotFilename string, deps *DependencyGraph, depContent string) error {
+func updatePrDescriptions(prMap map[string][]PrInfo, parallel int, ghPath string, verbose bool, snapshotData, snapshotFilename string, deps *DependencyGraph, depContent string, overwrite bool) error {
 	if len(prMap) == 0 {
 		return nil
 	}
@@ -416,6 +416,7 @@ func updatePrDescriptions(prMap map[string][]PrInfo, parallel int, ghPath string
 	type task struct {
 		repoID string
 		url    string
+		item   PrInfo
 	}
 	var tasks []task
 	for id, items := range prMap {
@@ -424,8 +425,14 @@ func updatePrDescriptions(prMap map[string][]PrInfo, parallel int, ghPath string
 			if strings.EqualFold(item.State, GitHubPrStateMerged) || strings.EqualFold(item.State, GitHubPrStateClosed) {
 				continue
 			}
-			tasks = append(tasks, task{repoID: id, url: item.URL})
+			tasks = append(tasks, task{repoID: id, url: item.URL, item: item})
 		}
+	}
+
+	// We need current user for validation
+	currentUser, err := GetGhUser(ghPath, verbose)
+	if err != nil {
+		return fmt.Errorf("failed to get current user: %w", err)
 	}
 
 	for _, t := range tasks {
@@ -447,6 +454,19 @@ func updatePrDescriptions(prMap map[string][]PrInfo, parallel int, ghPath string
 				return
 			}
 			originalBody := strings.TrimSpace(string(bodyOut))
+
+			// Fill PrInfo Body for validation (tsk.item came from CollectPrStatus which fetched Body, but to be safe and use latest)
+			// Actually CollectPrStatus does fetch Body. But let's use the one we just fetched to be atomic?
+			// ValidatePrPermissionAndOverwrite needs Body to check for block existence.
+			tsk.item.Body = originalBody
+
+			// Validate
+			if err := ValidatePrPermissionAndOverwrite(repoID, tsk.item, currentUser, overwrite); err != nil {
+				mu.Lock()
+				errs = append(errs, fmt.Sprintf("skipping %s: %v", targetURL, err))
+				mu.Unlock()
+				return
+			}
 
 			// Generate new Mistletoe block
 			newBlock := GenerateMistletoeBody(snapshotData, snapshotFilename, repoID, prMap, deps, depContent)

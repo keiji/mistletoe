@@ -87,6 +87,7 @@ mstl init -f <config_file> [options]
 ```
 
 **Options:**
+*   `--dest <path>`: Destination directory (default: current directory).
 *   `--depth <int>`: Create a shallow clone with a history truncated to the specified number of commits.
 *   `-p, --parallel <int>`: Number of parallel processes to use (default: 1).
 *   `-v, --verbose`: Enable verbose output.
@@ -210,6 +211,7 @@ mstl-gh pr create -f <config_file> [options]
 *   `-t, --title <string>`: Title of the Pull Request.
 *   `-b, --body <string>`: Body content of the Pull Request.
 *   `-d, --dependencies <path>`: Path to a Markdown file containing a Mermaid dependency graph.
+*   `-w, --overwrite`: Overwrite existing Pull Request description if creator matches or forced.
 *   `-p, --parallel <int>`: Number of parallel processes to use (default: 1).
 *   `-v, --verbose`: Enable verbose output.
 *   If title/body are omitted, the default editor is opened.
@@ -253,6 +255,7 @@ mstl-gh pr update -f <config_file> [options]
 
 **Options:**
 *   `-d, --dependencies <path>`: Path to a Markdown file containing a Mermaid dependency graph.
+*   `-w, --overwrite`: Overwrite existing Pull Request description if creator matches or forced.
 *   `-p, --parallel <int>`: Number of parallel processes to use (default: 1).
 *   `-v, --verbose`: Enable verbose output.
 
