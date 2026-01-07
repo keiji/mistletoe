@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -28,6 +29,7 @@ func TestLoadConfig(t *testing.T) {
 		setup       func() string // Returns filename
 		wantConfig  bool          // whether we expect non-nil config
 		wantErr     error         // Expected error target
+		wantErrMsg  string        // Expected error message (substring)
 	}{
 		{
 			name: "File does not exist",
@@ -35,7 +37,7 @@ func TestLoadConfig(t *testing.T) {
 				return "non_existent_file.json"
 			},
 			wantConfig: false,
-			wantErr:    ErrConfigFileNotFound,
+			wantErrMsg: "Configuration file non_existent_file.json not found.",
 		},
 		{
 			name: "Valid file",
@@ -109,6 +111,12 @@ func TestLoadConfig(t *testing.T) {
 					t.Errorf("loadConfigFile() expected error %v, got nil", tt.wantErr)
 				} else if !errors.Is(err, tt.wantErr) {
 					t.Errorf("loadConfigFile() error = %v, want %v", err, tt.wantErr)
+				}
+			} else if tt.wantErrMsg != "" {
+				if err == nil {
+					t.Errorf("loadConfigFile() expected error containing %q, got nil", tt.wantErrMsg)
+				} else if !strings.Contains(err.Error(), tt.wantErrMsg) {
+					t.Errorf("loadConfigFile() error = %v, want error containing %q", err, tt.wantErrMsg)
 				}
 			} else {
 				if err != nil {

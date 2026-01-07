@@ -12,8 +12,6 @@ import (
 )
 
 var (
-	// ErrConfigFileNotFound indicates that the configuration file was not found.
-	ErrConfigFileNotFound = errors.New("File not found")
 	// ErrInvalidDataFormat indicates that the configuration data is invalid.
 	ErrInvalidDataFormat = errors.New("Invalid data format")
 	// ErrDuplicateID indicates that a duplicate repository ID was found.
@@ -187,7 +185,7 @@ func loadConfigFile(configFile string) (*Config, error) {
 	data, err := os.ReadFile(configFile)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, ErrConfigFileNotFound
+			return nil, fmt.Errorf("Configuration file %s not found.", configFile)
 		}
 		return nil, fmt.Errorf("Error reading file: %v.", err)
 	}
