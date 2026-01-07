@@ -97,7 +97,7 @@ def main():
         with open(dest_file, "w") as f:
             f.write("I am a file")
 
-        code, out, err = run_command([mstl_bin, "init", "-f", config_file, "--dest", dest_file], cwd=root_dir)
+        code, out, err = run_command([mstl_bin, "init", "-f", config_file, "--dest", dest_file, "--ignore-stdin"], cwd=root_dir)
         if code != 0 and "specified path is a file" in out + err: # checking combined output just in case
             log_pass("Correctly failed when dest is a file")
         else:
@@ -106,31 +106,34 @@ def main():
         # Test Case 2: Destination does not exist, parent does not exist -> Fail
         log_header("Test Case 2: Parent directory missing")
         dest_deep = os.path.join(root_dir, "missing_parent", "target")
-        code, out, err = run_command([mstl_bin, "init", "-f", config_file, "--dest", dest_deep], cwd=root_dir)
+        code, out, err = run_command([mstl_bin, "init", "-f", config_file, "--dest", dest_deep, "--ignore-stdin"], cwd=root_dir)
         if code != 0 and "does not exist" in out + err:
             log_pass("Correctly failed when parent directory is missing")
         else:
             log_fail(f"Expected failure for missing parent. Code: {code}, Output: {out}, Error: {err}")
 
-        # Test Case 3: Destination exists, not empty -> Fail
-        log_header("Test Case 3: Destination not empty")
+        # Test Case 3: Destination exists, not empty (Global check removed, but repo check strict)
+        log_header("Test Case 3: Destination not empty (with conflict)")
         dest_not_empty = os.path.join(root_dir, "not_empty_dir")
         os.makedirs(dest_not_empty)
-        with open(os.path.join(dest_not_empty, "junk.txt"), "w") as f:
+        # Create a conflicting repo directory that is not empty and not a git repo
+        conflict_repo = os.path.join(dest_not_empty, "myrepo")
+        os.makedirs(conflict_repo)
+        with open(os.path.join(conflict_repo, "junk.txt"), "w") as f:
             f.write("junk")
 
-        code, out, err = run_command([mstl_bin, "init", "-f", config_file, "--dest", dest_not_empty], cwd=root_dir)
-        if code != 0 and "is not empty" in out + err:
-            log_pass("Correctly failed when destination is not empty")
+        code, out, err = run_command([mstl_bin, "init", "-f", config_file, "--dest", dest_not_empty, "--ignore-stdin"], cwd=root_dir)
+        if code != 0 and "directory myrepo exists, is not empty" in out + err:
+            log_pass("Correctly failed when repo target is not empty and ineligible")
         else:
-            log_fail(f"Expected failure for non-empty dir. Code: {code}, Output: {out}, Error: {err}")
+            log_fail(f"Expected failure for non-empty conflicted repo. Code: {code}, Output: {out}, Error: {err}")
 
         # Test Case 4: Destination exists, empty -> Success
         log_header("Test Case 4: Destination empty")
         dest_empty = os.path.join(root_dir, "empty_dir")
         os.makedirs(dest_empty)
 
-        code, out, err = run_command([mstl_bin, "init", "-f", config_file, "--dest", dest_empty], cwd=root_dir)
+        code, out, err = run_command([mstl_bin, "init", "-f", config_file, "--dest", dest_empty, "--ignore-stdin"], cwd=root_dir)
         if code == 0:
             if os.path.exists(os.path.join(dest_empty, "myrepo", ".git")):
                 log_pass("Success: Repository cloned into empty destination")
@@ -143,7 +146,7 @@ def main():
         log_header("Test Case 5: Create new destination")
         dest_new = os.path.join(root_dir, "new_dest")
 
-        code, out, err = run_command([mstl_bin, "init", "-f", config_file, "--dest", dest_new], cwd=root_dir)
+        code, out, err = run_command([mstl_bin, "init", "-f", config_file, "--dest", dest_new, "--ignore-stdin"], cwd=root_dir)
         if code == 0:
             if os.path.isdir(dest_new) and os.path.exists(os.path.join(dest_new, "myrepo", ".git")):
                 log_pass("Success: Directory created and repository cloned")
@@ -158,19 +161,7 @@ def main():
         run_subdir = os.path.join(root_dir, "run_subdir")
         os.makedirs(run_subdir)
 
-        # NOTE: This is where we need to check if the script is robust enough.
-        # If we run "mstl init" in run_subdir, it defaults to ".", so it should check if run_subdir is empty.
-        # run_subdir IS empty (we just made it).
-        # But we need to pass the config file. Since config_file is in root_dir, we pass absolute path or relative.
-        # The script creates config_file in root_dir.
-        # So passing `-f config_file` works if config_file is absolute path.
-
-        # However, let's verify if we put anything inside run_subdir that would cause failure.
-        # If we put the config file INSIDE run_subdir, it would fail because dir is not empty.
-        # In this script, config_file is at `root_dir/config.json`.
-        # So running init in `run_subdir` (which is empty) using a config outside should work.
-
-        code, out, err = run_command([mstl_bin, "init", "-f", config_file], cwd=run_subdir)
+        code, out, err = run_command([mstl_bin, "init", "-f", config_file, "--ignore-stdin"], cwd=run_subdir)
         if code == 0:
              if os.path.exists(os.path.join(run_subdir, "myrepo", ".git")):
                 log_pass("Success: Cloned into current directory by default")

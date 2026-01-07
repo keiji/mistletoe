@@ -35,7 +35,7 @@ func TestValidateAndPrepareInitDest(t *testing.T) {
 		t.Errorf("Expected error when parent is a file, got nil")
 	}
 
-	// Case 4: Destination exists, not empty -> Error
+	// Case 4: Destination exists, not empty -> Success (Allowed now, per-repo checks handle safety)
 	destNotEmpty := filepath.Join(tempDir, "not_empty")
 	if err := os.Mkdir(destNotEmpty, 0755); err != nil {
 		t.Fatalf("Failed to create dir: %v", err)
@@ -43,9 +43,12 @@ func TestValidateAndPrepareInitDest(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(destNotEmpty, "dummy"), []byte("dummy"), 0644); err != nil {
 		t.Fatalf("Failed to create dummy file: %v", err)
 	}
-	if err := validateAndPrepareInitDest(destNotEmpty); err == nil {
-		t.Errorf("Expected error when dest is not empty, got nil")
+	// Restore CWD after success
+	origWd, _ := os.Getwd()
+	if err := validateAndPrepareInitDest(destNotEmpty); err != nil {
+		t.Errorf("Expected success when dest is not empty, got error: %v", err)
 	}
+	os.Chdir(origWd)
 
 	// Case 5: Destination exists, empty -> Success
 	destEmpty := filepath.Join(tempDir, "empty")
@@ -53,7 +56,7 @@ func TestValidateAndPrepareInitDest(t *testing.T) {
 		t.Fatalf("Failed to create dir: %v", err)
 	}
 	// We need to restore CWD after success
-	origWd, _ := os.Getwd()
+	origWd, _ = os.Getwd()
 	defer os.Chdir(origWd)
 
 	if err := validateAndPrepareInitDest(destEmpty); err != nil {
