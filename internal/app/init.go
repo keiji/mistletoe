@@ -198,10 +198,12 @@ func PerformInit(repos []Repository, gitPath string, parallel, depth int, verbos
 				}
 
 				if repo.Branch != nil && *repo.Branch != "" {
-					// Create branch
+					// Create branch (or reset if exists)
 					fmt.Printf("Creating branch %s at revision %s in %s...\n", *repo.Branch, *repo.Revision, targetDir)
-					if err := RunGitInteractive(targetDir, gitPath, verbose, "checkout", "-b", *repo.Branch); err != nil {
-						fmt.Printf("Error creating branch %s in %s: %v\n", *repo.Branch, targetDir, err)
+					// Use -B to force create/reset branch to the revision point.
+					// This matches the intent of initializing the workspace to the specified state.
+					if err := RunGitInteractive(targetDir, gitPath, verbose, "checkout", "-B", *repo.Branch); err != nil {
+						fmt.Printf("Error creating/resetting branch %s in %s: %v\n", *repo.Branch, targetDir, err)
 					}
 				}
 			} else if repo.Branch != nil && *repo.Branch != "" {

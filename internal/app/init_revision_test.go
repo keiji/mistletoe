@@ -181,9 +181,20 @@ func TestInitRevision(t *testing.T) {
 		cmd := exec.Command(binPath, "init", "--file", configFile)
 		cmd.Dir = workDir
 
-		// Expect failure
-		if err := cmd.Run(); err == nil {
-			t.Fatal("expected mstl init to fail due to existing branch, but it succeeded")
+		// Expect success (using -B behavior)
+		if err := cmd.Run(); err != nil {
+			t.Fatalf("expected mstl init to succeed, but failed: %v", err)
+		}
+
+		// Verify state
+		currentHash := getHeadHash(t, targetRepo)
+		if currentHash != targetCommit {
+			t.Errorf("expected hash %s, got %s", targetCommit, currentHash)
+		}
+
+		currentBranch := getCurrentBranch(t, targetRepo)
+		if currentBranch != targetBranch {
+			t.Errorf("expected branch %s, got %s", targetBranch, currentBranch)
 		}
 	})
 }
