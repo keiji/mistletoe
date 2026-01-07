@@ -152,7 +152,7 @@ func CollectPrStatus(statusRows []StatusRow, config *Config, parallel int, ghPat
 						}
 					}
 
-					args := []string{"pr", "list", "--repo", repoURL, "--head", r.BranchName, "--state", "all", "--json", "number,state,isDraft,url,baseRefName,headRefOid,author,viewerCanEditFiles,body,headRepository"}
+					args := []string{"pr", "list", "--repo", repoURL, "--head", r.BranchName, "--state", "all", "--json", "number,state,isDraft,url,baseRefName,headRefOid,author,body,headRepository"}
 					if baseBranch != "" {
 						args = append(args, "--base", baseBranch)
 					}
