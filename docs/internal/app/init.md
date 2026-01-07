@@ -20,6 +20,7 @@ cat config.json | mstl init [options]
 | `--dest` | `-d` | init処理を行う対象ディレクトリ。存在しない場合は作成される（親ディレクトリは存在必須） | `.` (現在のディレクトリ) |
 | `--depth` | | 指定されたコミット数に履歴を切り詰めてシャロークローンを作成 | 0 (フルクローン) |
 | `--parallel` | `-p` | クローン/チェックアウトに使用する並列プロセス数 | 1 |
+| `--ignore-stdin` | | 標準入力を無視する | false |
 | `--verbose` | `-v` | デバッグ用の詳細ログを出力（実行された git コマンドを表示） | false |
 
 ## 3. 設定構造 (Configuration Structure)

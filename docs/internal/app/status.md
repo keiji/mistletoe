@@ -16,6 +16,7 @@ mstl status [options]
 | :--- | :--- | :--- | :--- |
 | `--file` | `-f` | 設定ファイル (JSON) のパス。未指定の場合は標準入力からの読み込みを試みます。 | `.mstl/config.json` |
 | `--parallel` | `-p` | ステータス取得に使用する並列プロセス数。 | 1 |
+| `--ignore-stdin` | | 標準入力を無視する | false |
 | `--verbose` | `-v` | デバッグ用の詳細ログを出力（実行された git コマンドを表示） | false |
 
 ## 3. 出力形式 (Output Format)

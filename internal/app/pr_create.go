@@ -39,6 +39,8 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 	fs.StringVar(&bShort, "b", "", "Pull Request body (shorthand)")
 	fs.StringVar(&dLong, "dependencies", DefaultDependencies, "Dependency graph file path")
 	fs.StringVar(&dShort, "d", DefaultDependencies, "Dependency graph file path (shorthand)")
+	var ignoreStdin bool
+	fs.BoolVar(&ignoreStdin, "ignore-stdin", false, "Ignore standard input")
 	fs.BoolVar(&vLong, "verbose", false, "Enable verbose output")
 	fs.BoolVar(&vShort, "v", false, "Enable verbose output (shorthand)")
 
@@ -48,7 +50,7 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 	}
 
 	// Resolve common values
-	configPath, parallel, configData, err := ResolveCommonValues(fLong, fShort, pVal, pValShort)
+	configPath, parallel, configData, err := ResolveCommonValues(fLong, fShort, pVal, pValShort, ignoreStdin)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)

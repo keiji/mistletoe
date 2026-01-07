@@ -16,6 +16,7 @@ mstl-gh pr status [options]
 | :--- | :--- | :--- | :--- |
 | `--file` | `-f` | 設定ファイル (JSON) のパス。 | `.mstl/config.json` |
 | `--parallel` | `-p` | 並列プロセス数。 | 1 |
+| `--ignore-stdin` | | 標準入力を無視する | false |
 | `--verbose` | `-v` | デバッグ用の詳細ログを出力（実行された git/gh コマンドを表示） | false |
 
 ## 3. 出力形式 (Output Format)

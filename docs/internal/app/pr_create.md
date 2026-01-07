@@ -21,6 +21,7 @@ mstl-gh pr create [options]
 | `--dependencies` | `-d` | 依存関係グラフ（Mermaid形式）のMarkdownファイルパス。 | `.mstl/dependencies.md` |
 | `--parallel` | `-p` | 並列実行数。 | 1 |
 | `--overwrite` | `-w` | 既存PRの作成者が自分以外で、Mistletoeブロックがない場合でも上書きを許可する。 | false |
+| `--ignore-stdin` | | 標準入力を無視する | false |
 | `--verbose` | `-v` | デバッグ用の詳細ログを出力（実行された git/gh コマンドを表示） | false |
 
 ## 3. ロジックフロー (Logic Flow)

@@ -23,6 +23,7 @@ mstl switch --create <branch_name> --file <path> [options]
 | `--file` | `-f` | 設定ファイル (JSON) のパス。未指定の場合は標準入力からの読み込みを試みます。 | `.mstl/config.json` |
 | `--create` | `-c` | 指定された名前でブランチを作成（存在しない場合）し、切り替えます。 | - |
 | `--parallel` | `-p` | 処理に使用する並列プロセス数。 | 1 |
+| `--ignore-stdin` | | 標準入力を無視する | false |
 | `--verbose` | `-v` | デバッグ用の詳細ログを出力（実行された git コマンドを表示） | false |
 
 > **注意**: 位置引数としての `<branch_name>` と、`--create` オプションは排他的です。両方を同時に指定するとエラーになります。

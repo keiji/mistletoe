@@ -18,6 +18,8 @@ func handleSync(args []string, opts GlobalOptions) {
 	fs.StringVar(&fShort, "f", DefaultConfigFile, "Configuration file path (shorthand)")
 	fs.IntVar(&pVal, "parallel", DefaultParallel, "number of parallel processes")
 	fs.IntVar(&pValShort, "p", DefaultParallel, "number of parallel processes (shorthand)")
+	var ignoreStdin bool
+	fs.BoolVar(&ignoreStdin, "ignore-stdin", false, "Ignore standard input")
 	fs.BoolVar(&vLong, "verbose", false, "Enable verbose output")
 	fs.BoolVar(&vShort, "v", false, "Enable verbose output (shorthand)")
 
@@ -26,7 +28,7 @@ func handleSync(args []string, opts GlobalOptions) {
 		os.Exit(1)
 	}
 
-	configFile, parallel, configData, err := ResolveCommonValues(fLong, fShort, pVal, pValShort)
+	configFile, parallel, configData, err := ResolveCommonValues(fLong, fShort, pVal, pValShort, ignoreStdin)
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
 		os.Exit(1)

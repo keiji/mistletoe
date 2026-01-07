@@ -169,7 +169,8 @@ func RunEditor() (string, error) {
 // ResolveCommonValues resolves the configuration file path and parallel count
 // from the various flag inputs.
 // It also checks for stdin input if no config file is provided.
-func ResolveCommonValues(fLong, fShort string, pVal, pValShort int) (string, int, []byte, error) {
+// If ignoreStdin is true, standard input is never read.
+func ResolveCommonValues(fLong, fShort string, pVal, pValShort int, ignoreStdin bool) (string, int, []byte, error) {
 	// Parallel
 	parallel := DefaultParallel
 	if pVal != DefaultParallel && pVal != 0 {
@@ -208,22 +209,41 @@ func ResolveCommonValues(fLong, fShort string, pVal, pValShort int) (string, int
 
 	var configData []byte
 
-	// Check Stdin if we are using defaults OR if configFile is explicitly empty
+	// Check Stdin if:
+	// 1. ignoreStdin is FALSE
+	// 2. AND (
+	//    a. Using defaults (isDefault=true)
+	//    b. OR User explicitly passed empty string (configFile="")
+	//    c. OR User passed non-default file (we need to check for conflict with stdin)
+	// )
+
 	checkStdin := false
-	if configFile == "" {
-		checkStdin = true
-	} else if isDefault {
-		// If using default file, we also check if there is piped input to prioritize it?
-		// Or should we only check stdin if default file doesn't exist? No, explicit pipe should win.
+	stdinAvailable := false
+
+	if !ignoreStdin {
 		stat, _ := os.Stdin.Stat()
 		if (stat.Mode() & os.ModeCharDevice) == 0 {
+			stdinAvailable = true
+		}
+
+		if configFile == "" {
+			// Explicit empty string -> force stdin
 			checkStdin = true
+		} else if isDefault {
+			// Default file -> prioritize stdin if available
+			if stdinAvailable {
+				checkStdin = true
+			}
+		} else {
+			// User provided custom file -> check if stdin is also provided (Conflict)
+			if stdinAvailable {
+				return "", 0, nil, fmt.Errorf("conflict: cannot specify configuration file '%s' and use standard input simultaneously", configFile)
+			}
 		}
 	}
 
 	if checkStdin {
-		stat, _ := os.Stdin.Stat()
-		if (stat.Mode() & os.ModeCharDevice) == 0 {
+		if stdinAvailable {
 			// Data is being piped to stdin
 			inputData, err := io.ReadAll(os.Stdin)
 			if err != nil {
@@ -231,11 +251,7 @@ func ResolveCommonValues(fLong, fShort string, pVal, pValShort int) (string, int
 			}
 			configData = inputData
 
-			// If we successfully read from stdin, we clear configFile so loadConfig uses data
-			// UNLESS user explicitly asked for a file?
-			// If isDefault is true, we prefer stdin.
-			// If isDefault is false (user passed -f ""), we prefer stdin.
-			// If user passed -f "somefile" (isDefault false), we shouldn't be here (checkStdin false).
+			// Clear configFile so loadConfig uses data
 			configFile = ""
 		}
 	}

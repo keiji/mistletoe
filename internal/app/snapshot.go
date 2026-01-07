@@ -30,6 +30,8 @@ func handleSnapshot(args []string, opts GlobalOptions) {
 	fs.StringVar(&fShort, "f", DefaultConfigFile, "configuration file (shorthand)")
 	fs.IntVar(&pVal, "parallel", DefaultParallel, "number of parallel processes")
 	fs.IntVar(&pValShort, "p", DefaultParallel, "number of parallel processes (shorthand)")
+	var ignoreStdin bool
+	fs.BoolVar(&ignoreStdin, "ignore-stdin", false, "Ignore standard input")
 	fs.BoolVar(&vLong, "verbose", false, "Enable verbose output")
 	fs.BoolVar(&vShort, "v", false, "Enable verbose output (shorthand)")
 
@@ -45,7 +47,7 @@ func handleSnapshot(args []string, opts GlobalOptions) {
 
 	// Load Config (Optional) to resolve base branches
 	var config *Config
-	configPath, parallel, configData, err := ResolveCommonValues(fLong, fShort, pVal, pValShort)
+	configPath, parallel, configData, err := ResolveCommonValues(fLong, fShort, pVal, pValShort, ignoreStdin)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)

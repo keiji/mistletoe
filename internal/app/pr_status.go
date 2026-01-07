@@ -22,6 +22,8 @@ func handlePrStatus(args []string, opts GlobalOptions) {
 	fs.StringVar(&fShort, "f", DefaultConfigFile, "Configuration file path (shorthand)")
 	fs.IntVar(&pVal, "parallel", DefaultParallel, "Number of parallel processes")
 	fs.IntVar(&pValShort, "p", DefaultParallel, "Number of parallel processes (shorthand)")
+	var ignoreStdin bool
+	fs.BoolVar(&ignoreStdin, "ignore-stdin", false, "Ignore standard input")
 	fs.BoolVar(&vLong, "verbose", false, "Enable verbose output")
 	fs.BoolVar(&vShort, "v", false, "Enable verbose output (shorthand)")
 
@@ -31,7 +33,7 @@ func handlePrStatus(args []string, opts GlobalOptions) {
 	}
 
 	// Resolve common values
-	configPath, parallel, configData, err := ResolveCommonValues(fLong, fShort, pVal, pValShort)
+	configPath, parallel, configData, err := ResolveCommonValues(fLong, fShort, pVal, pValShort, ignoreStdin)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
