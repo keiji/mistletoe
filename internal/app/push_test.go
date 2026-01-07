@@ -63,7 +63,7 @@ func TestPushCmd(t *testing.T) {
 		data, _ := json.Marshal(config)
 		os.WriteFile(configFile, data, 0644)
 
-		cmd := exec.Command(binPath, "push", "-f", configFile)
+		cmd := exec.Command(binPath, "push", "-f", configFile, "--ignore-stdin")
 		cmd.Dir = workDir
 
 		// Pipe input "y"
@@ -122,7 +122,7 @@ func TestPushCmd(t *testing.T) {
 		data, _ := json.Marshal(config)
 		os.WriteFile(configFile, data, 0644)
 
-		cmd := exec.Command(binPath, "push", "-f", configFile)
+		cmd := exec.Command(binPath, "push", "-f", configFile, "--ignore-stdin")
 		cmd.Dir = workDir
 
 		// Pipe input "n"

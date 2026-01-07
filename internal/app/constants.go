@@ -42,3 +42,9 @@ const (
 	ColorYellow = 1
 	ColorGreen  = 2
 )
+
+// Default constants
+const (
+	DefaultConfigFile   = ".mstl/config.json"
+	DefaultDependencies = ".mstl/dependencies.md"
+)

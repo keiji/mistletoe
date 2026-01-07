@@ -169,7 +169,8 @@ func RunEditor() (string, error) {
 // ResolveCommonValues resolves the configuration file path and parallel count
 // from the various flag inputs.
 // It also checks for stdin input if no config file is provided.
-func ResolveCommonValues(fLong, fShort string, pVal, pValShort int) (string, int, []byte, error) {
+// If ignoreStdin is true, standard input is never read.
+func ResolveCommonValues(fLong, fShort string, pVal, pValShort int, ignoreStdin bool) (string, int, []byte, error) {
 	// Parallel
 	parallel := DefaultParallel
 	if pVal != DefaultParallel && pVal != 0 {
@@ -186,23 +187,72 @@ func ResolveCommonValues(fLong, fShort string, pVal, pValShort int) (string, int
 	}
 
 	// Config File
-	configFile := fLong
-	if configFile == "" {
+	defaultConfig := DefaultConfigFile
+	var configFile string
+	var isDefault bool
+
+	if fLong != defaultConfig {
+		configFile = fLong
+		isDefault = false
+	} else if fShort != defaultConfig {
 		configFile = fShort
+		isDefault = false
+	} else {
+		configFile = defaultConfig
+		isDefault = true
 	}
 
-	// If no config file specified, check stdin
-	var configData []byte
+	// If user supplied empty string explicitly, we treat it as "no file", so we look for stdin.
 	if configFile == "" {
+		isDefault = false // effectively treated as manual override to nothing
+	}
+
+	var configData []byte
+
+	// Check Stdin if:
+	// 1. ignoreStdin is FALSE
+	// 2. AND (
+	//    a. Using defaults (isDefault=true)
+	//    b. OR User explicitly passed empty string (configFile="")
+	//    c. OR User passed non-default file (we need to check for conflict with stdin)
+	// )
+
+	checkStdin := false
+	stdinAvailable := false
+
+	if !ignoreStdin {
 		stat, _ := os.Stdin.Stat()
 		if (stat.Mode() & os.ModeCharDevice) == 0 {
+			stdinAvailable = true
+		}
+
+		if configFile == "" {
+			// Explicit empty string -> force stdin
+			checkStdin = true
+		} else if isDefault {
+			// Default file -> prioritize stdin if available
+			if stdinAvailable {
+				checkStdin = true
+			}
+		} else {
+			// User provided custom file -> check if stdin is also provided (Conflict)
+			if stdinAvailable {
+				return "", 0, nil, fmt.Errorf("conflict: cannot specify configuration file '%s' and use standard input simultaneously", configFile)
+			}
+		}
+	}
+
+	if checkStdin {
+		if stdinAvailable {
 			// Data is being piped to stdin
 			inputData, err := io.ReadAll(os.Stdin)
 			if err != nil {
 				return "", 0, nil, fmt.Errorf("failed to read from stdin: %w", err)
 			}
-
 			configData = inputData
+
+			// Clear configFile so loadConfig uses data
+			configFile = ""
 		}
 	}
 

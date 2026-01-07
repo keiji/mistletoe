@@ -16,10 +16,11 @@ cat config.json | mstl init [options]
 
 | オプション | 短縮形 | 説明 | デフォルト |
 | :--- | :--- | :--- | :--- |
-| `--file` | `-f` | 設定ファイル (JSON) のパス。標準入力を使用する場合は省略可 | - |
+| `--file` | `-f` | 設定ファイル (JSON) のパス。標準入力を使用する場合は省略可 | `.mstl/config.json` |
 | `--dest` | `-d` | init処理を行う対象ディレクトリ。存在しない場合は作成される（親ディレクトリは存在必須） | `.` (現在のディレクトリ) |
 | `--depth` | | 指定されたコミット数に履歴を切り詰めてシャロークローンを作成 | 0 (フルクローン) |
 | `--parallel` | `-p` | クローン/チェックアウトに使用する並列プロセス数 | 1 |
+| `--ignore-stdin` | | 標準入力を無視する | false |
 | `--verbose` | `-v` | デバッグ用の詳細ログを出力（実行された git コマンドを表示） | false |
 
 ## 3. 設定構造 (Configuration Structure)
@@ -107,8 +108,11 @@ flowchart TD
         CheckBranchOnly -- No --> DefaultBranch["結果: Default Branch"]
     end
 
+    ExecLoop --> CreateMstlDir["Post-Init: .mstl作成 & 設定保存"]
+    CreateMstlDir --> Stop(["終了"])
+
     ErrorFile --> ErrorExit
-    ErrorExit --> Stop(["終了"])
+    ErrorExit --> Stop
 ```
 
 ### 4.2. 環境検証 (Environment Validation)
@@ -152,6 +156,14 @@ flowchart TD
     *   **Branch のみ**: 既存の `branch` への切り替え
     *   **どちらもなし**: クローン後、何もしない（デフォルトブランチのまま）
 
-### 4.4 デバッグ (Debugging)
+### 4.4. 初期化後の処理 (Post-Initialization)
+
+すべてのリポジトリ処理が完了した後、以下の処理が行われます。
+
+1.  **ディレクトリ作成**: `.mstl` ディレクトリを `--dest` で指定されたディレクトリ直下に作成します。
+2.  **設定保存**: 初期化に使用した設定（ファイルまたは標準入力から）を `.mstl/config.json` として保存します。
+3.  **依存関係グラフ生成**: リポジトリ一覧を基に、依存関係のないノードのみの Mermaid グラフを生成し、`.mstl/dependencies.md` として保存します。
+
+### 4.5 デバッグ (Debugging)
 
 `--verbose` オプションが指定された場合、実行される `git` コマンドが標準エラー出力に出力されます。

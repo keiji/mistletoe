@@ -47,7 +47,7 @@ func TestHandleSync(t *testing.T) {
 
 	// Helper to run sync with input
 	runSync := func(input string, extraArgs ...string) (string, error) {
-		args := []string{"sync", "--file", configPath}
+		args := []string{"sync", "--file", configPath, "--ignore-stdin"}
 		args = append(args, extraArgs...)
 		cmd := exec.Command(binPath, args...)
 		cmd.Dir = tmpDir

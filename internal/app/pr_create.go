@@ -29,16 +29,18 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 		vShort     bool
 	)
 
-	fs.StringVar(&fLong, "file", "", "Configuration file path")
-	fs.StringVar(&fShort, "f", "", "Configuration file path (shorthand)")
+	fs.StringVar(&fLong, "file", DefaultConfigFile, "Configuration file path")
+	fs.StringVar(&fShort, "f", DefaultConfigFile, "Configuration file path (shorthand)")
 	fs.IntVar(&pVal, "parallel", DefaultParallel, "Number of parallel processes")
 	fs.IntVar(&pValShort, "p", DefaultParallel, "Number of parallel processes (shorthand)")
 	fs.StringVar(&tLong, "title", "", "Pull Request title")
 	fs.StringVar(&tShort, "t", "", "Pull Request title (shorthand)")
 	fs.StringVar(&bLong, "body", "", "Pull Request body")
 	fs.StringVar(&bShort, "b", "", "Pull Request body (shorthand)")
-	fs.StringVar(&dLong, "dependencies", "", "Dependency graph file path")
-	fs.StringVar(&dShort, "d", "", "Dependency graph file path (shorthand)")
+	fs.StringVar(&dLong, "dependencies", DefaultDependencies, "Dependency graph file path")
+	fs.StringVar(&dShort, "d", DefaultDependencies, "Dependency graph file path (shorthand)")
+	var ignoreStdin bool
+	fs.BoolVar(&ignoreStdin, "ignore-stdin", false, "Ignore standard input")
 	fs.BoolVar(&vLong, "verbose", false, "Enable verbose output")
 	fs.BoolVar(&vShort, "v", false, "Enable verbose output (shorthand)")
 
@@ -48,7 +50,7 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 	}
 
 	// Resolve common values
-	configPath, parallel, configData, err := ResolveCommonValues(fLong, fShort, pVal, pValShort)
+	configPath, parallel, configData, err := ResolveCommonValues(fLong, fShort, pVal, pValShort, ignoreStdin)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)

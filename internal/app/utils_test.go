@@ -40,18 +40,18 @@ func TestResolveCommonValues(t *testing.T) {
 	}{
 		{
 			name:         "Defaults",
-			fLong:        "",
-			fShort:       "",
+			fLong:        DefaultConfigFile,
+			fShort:       DefaultConfigFile,
 			pVal:         DefaultParallel,
 			pValShort:    DefaultParallel,
-			wantConfig:   "",
+			wantConfig:   DefaultConfigFile,
 			wantParallel: DefaultParallel,
 			wantErr:      false,
 		},
 		{
 			name:         "Config from Long Flag",
 			fLong:        "config.json",
-			fShort:       "",
+			fShort:       DefaultConfigFile,
 			pVal:         DefaultParallel,
 			pValShort:    DefaultParallel,
 			wantConfig:   "config.json",
@@ -60,7 +60,7 @@ func TestResolveCommonValues(t *testing.T) {
 		},
 		{
 			name:         "Config from Short Flag",
-			fLong:        "",
+			fLong:        DefaultConfigFile,
 			fShort:       "short.json",
 			pVal:         DefaultParallel,
 			pValShort:    DefaultParallel,
@@ -80,51 +80,51 @@ func TestResolveCommonValues(t *testing.T) {
 		},
 		{
 			name:         "Parallel from Long Flag",
-			fLong:        "",
-			fShort:       "",
+			fLong:        DefaultConfigFile,
+			fShort:       DefaultConfigFile,
 			pVal:         4,
 			pValShort:    DefaultParallel,
-			wantConfig:   "",
+			wantConfig:   DefaultConfigFile,
 			wantParallel: 4,
 			wantErr:      false,
 		},
 		{
 			name:         "Parallel from Short Flag",
-			fLong:        "",
-			fShort:       "",
+			fLong:        DefaultConfigFile,
+			fShort:       DefaultConfigFile,
 			pVal:         DefaultParallel,
 			pValShort:    8,
-			wantConfig:   "",
+			wantConfig:   DefaultConfigFile,
 			wantParallel: 8,
 			wantErr:      false,
 		},
 		{
 			name:         "Parallel Long Priority",
-			fLong:        "",
-			fShort:       "",
+			fLong:        DefaultConfigFile,
+			fShort:       DefaultConfigFile,
 			pVal:         4,
 			pValShort:    8,
-			wantConfig:   "",
+			wantConfig:   DefaultConfigFile,
 			wantParallel: 4,
 			wantErr:      false,
 		},
 		{
 			name:         "Parallel Too Low",
-			fLong:        "",
-			fShort:       "",
+			fLong:        DefaultConfigFile,
+			fShort:       DefaultConfigFile,
 			pVal:         -1,
 			pValShort:    DefaultParallel,
-			wantConfig:   "",
+			wantConfig:   DefaultConfigFile,
 			wantParallel: 0,
 			wantErr:      true,
 		},
 		{
 			name:         "Parallel Too High",
-			fLong:        "",
-			fShort:       "",
+			fLong:        DefaultConfigFile,
+			fShort:       DefaultConfigFile,
 			pVal:         MaxParallel + 1,
 			pValShort:    DefaultParallel,
-			wantConfig:   "",
+			wantConfig:   DefaultConfigFile,
 			wantParallel: 0,
 			wantErr:      true,
 		},
@@ -132,7 +132,7 @@ func TestResolveCommonValues(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotConfig, gotParallel, _, err := ResolveCommonValues(tt.fLong, tt.fShort, tt.pVal, tt.pValShort)
+			gotConfig, gotParallel, _, err := ResolveCommonValues(tt.fLong, tt.fShort, tt.pVal, tt.pValShort, false)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ResolveCommonValues() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -154,35 +154,86 @@ func TestResolveCommonValues_WithStdin(t *testing.T) {
 	oldStdin := os.Stdin
 	defer func() { os.Stdin = oldStdin }()
 
-	// Create a pipe to simulate stdin
-	r, w, err := os.Pipe()
-	if err != nil {
-		t.Fatalf("Failed to create pipe: %v", err)
-	}
-	os.Stdin = r
-
-	// Write raw data to the pipe
 	testConfig := "test config data"
-	go func() {
-		defer w.Close()
-		_, _ = w.Write([]byte(testConfig))
-	}()
 
-	// Call the function
-	gotConfig, gotParallel, gotData, err := ResolveCommonValues("", "", DefaultParallel, DefaultParallel)
-	if err != nil {
-		t.Fatalf("ResolveCommonValues() unexpected error: %v", err)
-	}
+	t.Run("Explicit Empty Config with Stdin", func(t *testing.T) {
+		// Create a pipe to simulate stdin
+		r, w, err := os.Pipe()
+		if err != nil {
+			t.Fatalf("Failed to create pipe: %v", err)
+		}
+		os.Stdin = r
 
-	if gotConfig != "" {
-		t.Errorf("ResolveCommonValues() config = %v, want empty", gotConfig)
-	}
-	if gotParallel != DefaultParallel {
-		t.Errorf("ResolveCommonValues() parallel = %v, want %v", gotParallel, DefaultParallel)
-	}
-	if string(gotData) != testConfig {
-		t.Errorf("ResolveCommonValues() data = %v, want %v", string(gotData), testConfig)
-	}
+		go func() {
+			defer w.Close()
+			_, _ = w.Write([]byte(testConfig))
+		}()
+
+		// Call with Explicit Empty Config ("")
+		gotConfig, gotParallel, gotData, err := ResolveCommonValues("", "", DefaultParallel, DefaultParallel, false)
+		if err != nil {
+			t.Fatalf("ResolveCommonValues() unexpected error: %v", err)
+		}
+
+		if gotConfig != "" {
+			t.Errorf("ResolveCommonValues() config = %v, want empty", gotConfig)
+		}
+		if gotParallel != DefaultParallel {
+			t.Errorf("ResolveCommonValues() parallel = %v, want %v", gotParallel, DefaultParallel)
+		}
+		if string(gotData) != testConfig {
+			t.Errorf("ResolveCommonValues() data = %v, want %v", string(gotData), testConfig)
+		}
+	})
+
+	t.Run("Default Config with Stdin", func(t *testing.T) {
+		// Create a pipe to simulate stdin
+		r, w, err := os.Pipe()
+		if err != nil {
+			t.Fatalf("Failed to create pipe: %v", err)
+		}
+		os.Stdin = r
+
+		go func() {
+			defer w.Close()
+			_, _ = w.Write([]byte(testConfig))
+		}()
+
+		// Call with Default Config (DefaultConfigFile)
+		gotConfig, _, gotData, err := ResolveCommonValues(DefaultConfigFile, DefaultConfigFile, DefaultParallel, DefaultParallel, false)
+		if err != nil {
+			t.Fatalf("ResolveCommonValues() unexpected error: %v", err)
+		}
+
+		if gotConfig != "" {
+			t.Errorf("ResolveCommonValues() config = %v, want empty", gotConfig)
+		}
+		if string(gotData) != testConfig {
+			t.Errorf("ResolveCommonValues() data = %v, want %v", string(gotData), testConfig)
+		}
+	})
+
+	t.Run("Custom Config with Stdin (Conflict)", func(t *testing.T) {
+		// Create a pipe to simulate stdin
+		r, w, err := os.Pipe()
+		if err != nil {
+			t.Fatalf("Failed to create pipe: %v", err)
+		}
+		os.Stdin = r
+
+		go func() {
+			defer w.Close()
+			_, _ = w.Write([]byte(testConfig))
+		}()
+
+		// Call with Custom Config
+		_, _, _, err = ResolveCommonValues("custom.json", "custom.json", DefaultParallel, DefaultParallel, false)
+		if err == nil {
+			t.Errorf("ResolveCommonValues() expected error due to conflict, got nil")
+		} else if !strings.Contains(err.Error(), "conflict") {
+			t.Errorf("ResolveCommonValues() expected conflict error, got: %v", err)
+		}
+	})
 }
 
 func TestFormatDuration(t *testing.T) {
