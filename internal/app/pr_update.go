@@ -118,6 +118,9 @@ func handlePrUpdate(args []string, opts GlobalOptions) {
 
 	// 7. Identify Active PRs to Update
 	targetPrMap := make(map[string][]PrInfo)
+	// We also need a map of ALL PRs for Related Links generation
+	allPrMap := make(map[string][]PrInfo)
+
 	var activeRepos []Repository
 	repoMap := make(map[string]Repository)
 	for _, r := range *config.Repositories {
@@ -126,6 +129,8 @@ func handlePrUpdate(args []string, opts GlobalOptions) {
 
 	for _, prRow := range prRows {
 		if len(prRow.PrItems) > 0 {
+			allPrMap[prRow.Repo] = prRow.PrItems
+
 			// Check if Open
 			hasOpen := false
 			for _, item := range prRow.PrItems {
@@ -191,7 +196,9 @@ func handlePrUpdate(args []string, opts GlobalOptions) {
 	// 9. Update Descriptions
 	fmt.Println("Updating Pull Request descriptions...")
 
-	if err := updatePrDescriptions(targetPrMap, parallel, opts.GhPath, verbose, string(snapshotData), filename, deps, depContent); err != nil {
+	// Pass allPrMap so that Merged/Closed PRs are included in Related Links,
+	// but updatePrDescriptions will skip updating them.
+	if err := updatePrDescriptions(allPrMap, parallel, opts.GhPath, verbose, string(snapshotData), filename, deps, depContent); err != nil {
 		fmt.Printf("error updating descriptions: %v\n", err)
 		os.Exit(1)
 	}
