@@ -120,8 +120,6 @@ func CollectPrStatus(statusRows []StatusRow, config *Config, parallel int, ghPat
 				baseBranch := ""
 				if conf.BaseBranch != nil && *conf.BaseBranch != "" {
 					baseBranch = *conf.BaseBranch
-				} else if conf.Branch != nil && *conf.Branch != "" {
-					baseBranch = *conf.Branch
 				}
 				if baseBranch != "" {
 					prRow.Base = baseBranch
