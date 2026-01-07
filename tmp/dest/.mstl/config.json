@@ -1,0 +1,10 @@
+
+{
+  "repositories": [
+    {
+      "id": "dummy",
+      "url": "file:///app",
+      "branch": "main"
+    }
+  ]
+}
