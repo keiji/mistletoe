@@ -132,6 +132,9 @@ func CollectPrStatus(statusRows []StatusRow, config *Config, parallel int, ghPat
 					}
 
 					out, err := RunGh(ghPath, verbose, args...)
+					if verbose {
+						fmt.Printf("[%s] gh pr list output: %s\n", r.Repo, out)
+					}
 					if err == nil {
 						var prs []PrInfo
 						if err := json.Unmarshal([]byte(out), &prs); err == nil && len(prs) > 0 {
