@@ -87,6 +87,7 @@ mstl init -f <config_file> [options]
 ```
 
 **Options:**
+*   `--dest <path>`: Destination directory (default: current directory).
 *   `--depth <int>`: Create a shallow clone with a history truncated to the specified number of commits.
 *   `-p, --parallel <int>`: Number of parallel processes to use (default: 1).
 *   `-v, --verbose`: Enable verbose output.
