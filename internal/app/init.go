@@ -367,7 +367,7 @@ func handleInit(args []string, opts GlobalOptions) {
 
 	// Save dependencies.md (Mermaid graph with nodes only)
 	depPath := filepath.Join(mstlDir, "dependencies.md")
-	graphContent := "graph TD\n"
+	graphContent := "```mermaid\ngraph TD\n"
 	for _, repo := range *config.Repositories {
 		// We need getRepoName here. It is in utils.go or pr_common.go but not exported?
 		// Check if it is available. It is in pr_common.go as 'getRepoName'.
@@ -375,6 +375,7 @@ func handleInit(args []string, opts GlobalOptions) {
 		name := getRepoName(repo)
 		graphContent += fmt.Sprintf("    %s\n", name)
 	}
+	graphContent += "```\n"
 
 	if err := os.WriteFile(depPath, []byte(graphContent), 0644); err != nil {
 		fmt.Printf("Warning: Failed to write %s: %v\n", depPath, err)
