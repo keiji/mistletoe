@@ -190,8 +190,34 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 			updateList = append(updateList, repo)
 		} else {
 			if status.HasUnpushed {
-				pushList = append(pushList, repo)
-				createList = append(createList, repo)
+				// Special Case: If remote branch doesn't exist, check if local branch is identical to base branch.
+				// If so, skip (branch created but no commits).
+				skipNewBranch := false
+				if status.RemoteRev == "" {
+					baseBranch := "main"
+					if repo.BaseBranch != nil && *repo.BaseBranch != "" {
+						baseBranch = *repo.BaseBranch
+					} else if repo.Branch != nil && *repo.Branch != "" {
+						baseBranch = *repo.Branch
+					}
+
+					// We attempt to resolve origin/BaseBranch to see if it matches local HEAD.
+					// Note: status.LocalHeadFull contains the full SHA of the local branch.
+					baseRev, err := RunGit(status.RepoDir, opts.GitPath, verbose, "rev-parse", "origin/"+baseBranch)
+					if err == nil {
+						baseRev = strings.TrimSpace(baseRev)
+						if baseRev == status.LocalHeadFull {
+							skipNewBranch = true
+						}
+					}
+				}
+
+				if skipNewBranch {
+					skippedRepos = append(skippedRepos, repoName)
+				} else {
+					pushList = append(pushList, repo)
+					createList = append(createList, repo)
+				}
 			} else {
 				skippedRepos = append(skippedRepos, repoName)
 			}

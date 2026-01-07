@@ -349,6 +349,64 @@ class MstlGhTest:
         finally:
             shutil.rmtree(checkout_dir, ignore_errors=True)
 
+    def test_pr_create_skip_new_branch_no_commit(self):
+        print("[TEST] Running pr create (Skip New Branch No Commit)...")
+        branch_name = "feature/skip-test"
+
+        # 1. Switch to new branch
+        print(f"[-] Switching to {branch_name}...")
+        self.run_cmd([self.mstl_bin, "switch", "-c", branch_name], cwd=self.test_dir)
+
+        # 2. Modify A and C
+        print("[-] Modifying Repo A and C...")
+        for repo in [self.repo_a_name, self.repo_c_name]:
+            r_dir = os.path.join(self.test_dir, repo)
+            with open(os.path.join(r_dir, "skip_test.txt"), "w") as f:
+                f.write("skip test content")
+            self.run_cmd(["git", "add", "."], cwd=r_dir)
+            self.run_cmd(["git", "commit", "-m", "Add skip_test.txt"], cwd=r_dir)
+
+        # Repo B is untouched. It is on branch_name, but points to main revision.
+
+        # 3. Run pr create
+        print("[-] Running pr create...")
+        # Use --title and --body to skip editor. "yes" for confirmation.
+        self.run_cmd(
+            [self.mstl_bin, "pr", "create", "-t", "Skip Test", "-b", "Testing skip logic"],
+            cwd=self.test_dir,
+            input_str="yes\n"
+        )
+
+        # 4. Verify
+        # Check PRs for A and C
+        pr_urls = {}
+        for name, url in [("Repo A", self.repo_a_url), ("Repo C", self.repo_c_url)]:
+            res = self.run_cmd(["gh", "pr", "list", "--repo", url, "--head", branch_name, "--json", "url"], capture_output=True)
+            try:
+                prs = json.loads(res.stdout)
+                if prs:
+                    pr_urls[f"{name} PR"] = prs[0]['url']
+                else:
+                    raise Exception(f"PR should exist for {name}")
+            except:
+                raise Exception(f"Failed to check PR for {name}")
+
+        # Check NO PR for B
+        res = self.run_cmd(["gh", "pr", "list", "--repo", self.repo_b_url, "--head", branch_name, "--json", "url"], capture_output=True)
+        prs = json.loads(res.stdout)
+        if prs:
+             raise Exception(f"PR should NOT exist for Repo B, but found: {prs[0]['url']}")
+
+        # Check NO Remote Branch for B
+        # git ls-remote origin feature/skip-test
+        res = self.run_cmd(["git", "ls-remote", "origin", branch_name], cwd=os.path.join(self.test_dir, self.repo_b_name), capture_output=True)
+        if res.stdout.strip():
+             raise Exception(f"Remote branch {branch_name} should NOT exist for Repo B")
+
+        self.checkpoint("PR Create Skip Logic",
+                        "Repo A and C should have PRs. Repo B should be skipped (no PR, no remote branch).",
+                        urls=pr_urls)
+
     def cleanup(self):
         if not self.cleanup_needed:
             return
@@ -388,6 +446,7 @@ class MstlGhTest:
             self.test_pr_update()
             self.test_pr_update_permissions()
             self.test_pr_checkout()
+            self.test_pr_create_skip_new_branch_no_commit()
             print("\n" + "=" * 30)
             print("ALL TESTS PASSED")
             print("=" * 30 + "\n")
