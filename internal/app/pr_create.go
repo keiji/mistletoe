@@ -333,15 +333,9 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 	fmt.Printf("Snapshot saved to %s\n", filename)
 
 	fmt.Println("Updating Pull Request descriptions...")
-	targetPrMap := make(map[string][]PrInfo)
-	for _, r := range activeRepos {
-		rID := getRepoName(r)
-		if items, ok := finalPrMap[rID]; ok {
-			targetPrMap[rID] = items
-		}
-	}
-
-	if err := updatePrDescriptions(targetPrMap, parallel, opts.GhPath, verbose, string(snapshotData), filename, deps, depContent); err != nil {
+	// We pass finalPrMap (containing ALL PRs, including merged/closed) to ensure Related Links are complete.
+	// updatePrDescriptions will internally filter which PRs to actually update (Open/Draft only).
+	if err := updatePrDescriptions(finalPrMap, parallel, opts.GhPath, verbose, string(snapshotData), filename, deps, depContent); err != nil {
 		fmt.Printf("error updating descriptions: %v\n", err)
 		os.Exit(1)
 	}
