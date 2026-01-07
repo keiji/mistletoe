@@ -1,0 +1,78 @@
+version: 2
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: mstl
+    main: ./cmd/mstl
+    binary: mstl
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - windows
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X main.appVersion={{.Version}} -X main.commitHash={{.Commit}}
+
+  - id: mstl-gh
+    main: ./cmd/mstl-gh
+    binary: mstl-gh
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - windows
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X main.appVersion={{.Version}} -X main.commitHash={{.Commit}}
+
+archives:
+  - format: tar.gz
+    # this name template makes the archive name compatible with the standard
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- .Version }}_
+      {{- .Os }}_
+      {{- .Arch }}
+    builds:
+      - mstl
+      - mstl-gh
+    files:
+      - README.md
+      - LICENSE
+      - AGENTS.md
+
+checksum:
+  name_template: 'checksums.txt'
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+
+brews:
+  - name: mistletoe
+    repository:
+      owner: keiji
+      name: homebrew-tap
+      token: "{{ .Env.GORELEASER_GITHUB_TOKEN }}"
+    directory: Formula
+    homepage: "https://github.com/keiji/mistletoe"
+    description: "Mistletoe CLI tool"
+    install: |
+      bin.install "mstl"
+      bin.install "mstl-gh"
