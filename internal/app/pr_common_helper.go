@@ -7,8 +7,8 @@ import "strings"
 func isPrFromConfiguredRepo(pr PrInfo, configCanonicalURL string) bool {
 	if pr.HeadRepository.URL != nil && *pr.HeadRepository.URL != "" {
 		prHead := strings.TrimSuffix(*pr.HeadRepository.URL, ".git")
-		confUrl := strings.TrimSuffix(configCanonicalURL, ".git")
-		return strings.EqualFold(prHead, confUrl)
+		confURL := strings.TrimSuffix(configCanonicalURL, ".git")
+		return strings.EqualFold(prHead, confURL)
 	}
 	// Fallback: If HeadRepository is missing from response, assume it's a match to be safe.
 	return true
