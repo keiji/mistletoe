@@ -17,6 +17,8 @@ func handlePrUpdate(args []string, opts GlobalOptions) {
 		pValShort int
 		dLong     string
 		dShort    string
+		wLong      bool
+		wShort     bool
 		vLong     bool
 		vShort    bool
 	)
@@ -27,6 +29,8 @@ func handlePrUpdate(args []string, opts GlobalOptions) {
 	fs.IntVar(&pValShort, "p", DefaultParallel, "Number of parallel processes (shorthand)")
 	fs.StringVar(&dLong, "dependencies", DefaultDependencies, "Dependency graph file path")
 	fs.StringVar(&dShort, "d", DefaultDependencies, "Dependency graph file path (shorthand)")
+	fs.BoolVar(&wLong, "overwrite", false, "Overwrite existing Pull Request description if creator matches or forced")
+	fs.BoolVar(&wShort, "w", false, "Overwrite existing Pull Request description (shorthand)")
 	var ignoreStdin bool
 	fs.BoolVar(&ignoreStdin, "ignore-stdin", false, "Ignore standard input")
 	fs.BoolVar(&vLong, "verbose", false, "Enable verbose output")
@@ -51,6 +55,7 @@ func handlePrUpdate(args []string, opts GlobalOptions) {
 	if depPath == "" {
 		depPath = dShort
 	}
+	overwrite := wLong || wShort
 
 	// 1. Check gh availability
 	if err := checkGhAvailability(opts.GhPath, verbose); err != nil {
@@ -198,7 +203,7 @@ func handlePrUpdate(args []string, opts GlobalOptions) {
 
 	// Pass allPrMap so that Merged/Closed PRs are included in Related Links,
 	// but updatePrDescriptions will skip updating them.
-	if err := updatePrDescriptions(allPrMap, parallel, opts.GhPath, verbose, string(snapshotData), filename, deps, depContent); err != nil {
+	if err := updatePrDescriptions(allPrMap, parallel, opts.GhPath, verbose, string(snapshotData), filename, deps, depContent, overwrite); err != nil {
 		fmt.Printf("error updating descriptions: %v\n", err)
 		os.Exit(1)
 	}

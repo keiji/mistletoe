@@ -20,6 +20,7 @@ mstl-gh pr create [options]
 | `--file` | `-f` | 設定ファイル (JSON) のパス。 | `.mstl/config.json` |
 | `--dependencies` | `-d` | 依存関係グラフ（Mermaid形式）のMarkdownファイルパス。 | `.mstl/dependencies.md` |
 | `--parallel` | `-p` | 並列実行数。 | 1 |
+| `--overwrite` | `-w` | 既存PRの作成者が自分以外で、Mistletoeブロックがない場合でも上書きを許可する。 | false |
 | `--ignore-stdin` | | 標準入力を無視する | false |
 | `--verbose` | `-v` | デバッグ用の詳細ログを出力（実行された git/gh コマンドを表示） | false |
 
@@ -116,7 +117,9 @@ flowchart TD
     *   編集権限がある場合、以下の条件で上書き（Mistletoeブロックの追記・更新）可否を判定します。
         *   **Mistletoeブロックあり**: 既存PRに既に Mistletoe ブロックが存在する場合、**上書き可能**と判断します。
         *   **Mistletoeブロックなし & 作成者が自分**: Mistletoe ブロックがなく、PR作成者が現在のユーザーである場合、**上書き可能**と判断します。
-        *   **Mistletoeブロックなし & 作成者が他人**: Mistletoe ブロックがなく、PR作成者が現在のユーザーでない場合、**上書き不可（エラー）**と判断し、処理を中止します。
+        *   **Mistletoeブロックなし & 作成者が他人**: Mistletoe ブロックがなく、PR作成者が現在のユーザーでない場合：
+            *   `--overwrite` (`-w`) オプションが指定されていれば、**上書き可能**と判断します。
+            *   指定されていない場合、**エラー**として処理を中止し、`--overwrite` オプションの使用を促します。
 
 ### 3.4. 既存PRの更新スキップ条件 (Skip Update for Closed/Merged PRs)
 
