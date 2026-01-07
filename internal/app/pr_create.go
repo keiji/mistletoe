@@ -24,9 +24,9 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 		bLong      string
 		bShort     string
 		dLong      string
-		dShort     string
 		wLong      bool
 		wShort     bool
+		draft      bool
 		vLong      bool
 		vShort     bool
 	)
@@ -40,7 +40,7 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 	fs.StringVar(&bLong, "body", "", "Pull Request body")
 	fs.StringVar(&bShort, "b", "", "Pull Request body (shorthand)")
 	fs.StringVar(&dLong, "dependencies", DefaultDependencies, "Dependency graph file path")
-	fs.StringVar(&dShort, "d", DefaultDependencies, "Dependency graph file path (shorthand)")
+	fs.BoolVar(&draft, "draft", false, "Create Pull Request as Draft if supported")
 	fs.BoolVar(&wLong, "overwrite", false, "Overwrite existing Pull Request description if creator matches or forced")
 	fs.BoolVar(&wShort, "w", false, "Overwrite existing Pull Request description (shorthand)")
 	var ignoreStdin bool
@@ -76,9 +76,6 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 		prBody = bShort
 	}
 	depPath := dLong
-	if depPath == "" {
-		depPath = dShort
-	}
 	overwrite := wLong || wShort
 
 	// 1. Check gh availability
@@ -337,7 +334,7 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 		placeholderBlock := GeneratePlaceholderMistletoeBody()
 		prBodyWithPlaceholder := EmbedMistletoeBody(prBody, placeholderBlock)
 
-		createdMap, err := executePrCreationOnly(createList, rows, parallel, opts.GhPath, verbose, prTitle, prBodyWithPlaceholder)
+		createdMap, err := executePrCreationOnly(createList, rows, parallel, opts.GhPath, verbose, prTitle, prBodyWithPlaceholder, draft)
 		if err != nil {
 			fmt.Printf("error during PR creation: %v\n", err)
 			os.Exit(1)
@@ -404,7 +401,7 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 
 // executePrCreationOnly creates PRs for the given repositories.
 // Returns a map of RepoName -> PR URL.
-func executePrCreationOnly(repos []Repository, rows []StatusRow, parallel int, ghPath string, verbose bool, title, body string) (map[string]string, error) {
+func executePrCreationOnly(repos []Repository, rows []StatusRow, parallel int, ghPath string, verbose bool, title, body string, draft bool) (map[string]string, error) {
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, parallel)
@@ -458,38 +455,66 @@ func executePrCreationOnly(repos []Repository, rows []StatusRow, parallel int, g
 				args = append(args, "--base", baseBranch)
 			}
 
-			createOut, err := RunGh(ghPath, verbose, args...)
+			// Try with Draft if requested
+			attemptArgs := args
+			if draft {
+				attemptArgs = append(attemptArgs, "--draft")
+			}
+
+			createOut, err := RunGh(ghPath, verbose, attemptArgs...)
 			if err != nil {
 				var exitErr *exec.ExitError
 				if errors.As(err, &exitErr) {
 					stderr := string(exitErr.Stderr)
-					// Handle cases where PR might have been created externally during race
-					if strings.Contains(stderr, "already exists") {
-						out, _ := RunGh(ghPath, verbose, "pr", "list", "--repo", *r.URL, "--head", branchName, "--json", "url", "-q", ".[0].url")
-						prURL := strings.TrimSpace(out)
-						if prURL != "" {
-							fmt.Printf("[%s] Pull Request already exists: %s\n", repoName, prURL)
+
+					// Fallback Logic for Draft Not Supported
+					if draft && (strings.Contains(stderr, "Draft pull requests are not supported") || strings.Contains(stderr, "Draft pull requests cannot be created")) {
+						if verbose {
+							fmt.Printf("[%s] Draft PR not supported. Retrying as normal PR...\n", repoName)
+						}
+						// Retry without --draft (which is essentially original 'args')
+						createOut, err = RunGh(ghPath, verbose, args...)
+					}
+
+					// Check error again after potential retry
+					if err != nil {
+						// Re-check exitErr for the retry attempt
+						if errors.As(err, &exitErr) {
+							stderr = string(exitErr.Stderr)
+							// Handle cases where PR might have been created externally during race
+							if strings.Contains(stderr, "already exists") {
+								out, _ := RunGh(ghPath, verbose, "pr", "list", "--repo", *r.URL, "--head", branchName, "--json", "url", "-q", ".[0].url")
+								prURL := strings.TrimSpace(out)
+								if prURL != "" {
+									fmt.Printf("[%s] Pull Request already exists: %s\n", repoName, prURL)
+									mu.Lock()
+									prMap[repoName] = prURL
+									mu.Unlock()
+									return
+								}
+							}
+							// No commits between?
+							if strings.Contains(stderr, "No commits between") {
+								fmt.Printf("[%s] No commits between %s and %s. Skipping PR creation.\n", repoName, baseBranch, branchName)
+								return
+							}
+
 							mu.Lock()
-							prMap[repoName] = prURL
+							errs = append(errs, fmt.Sprintf("[%s] PR Create failed: %s", repoName, stderr))
 							mu.Unlock()
 							return
 						}
-					}
-					// No commits between?
-					if strings.Contains(stderr, "No commits between") {
-						fmt.Printf("[%s] No commits between %s and %s. Skipping PR creation.\n", repoName, baseBranch, branchName)
+						mu.Lock()
+						errs = append(errs, fmt.Sprintf("[%s] PR Create failed: %v", repoName, err))
+						mu.Unlock()
 						return
 					}
-
-					mu.Lock()
-					errs = append(errs, fmt.Sprintf("[%s] PR Create failed: %s", repoName, stderr))
-					mu.Unlock()
 				} else {
 					mu.Lock()
 					errs = append(errs, fmt.Sprintf("[%s] PR Create failed: %v", repoName, err))
 					mu.Unlock()
+					return
 				}
-				return
 			}
 			lines := strings.Split(strings.TrimSpace(string(createOut)), "\n")
 			// The last line typically contains the URL
