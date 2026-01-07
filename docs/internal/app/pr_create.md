@@ -44,7 +44,7 @@ flowchart TD
     Categorize --> CatPushNeed["Push必要リスト\n(Ahead or PR更新)"]
     Categorize --> CatCreateNeed["PR作成必要リスト\n(Ahead & PRなし)"]
     Categorize --> CatUpdateNeed["PR更新必要リスト\n(PRあり)"]
-    Categorize --> CatSkip["スキップリスト\n(Equal & PRなし)"]
+    Categorize --> CatSkip["スキップリスト\n(Equal or NewBranchNoCommit)"]
 
     CatSkip --> CheckWorkable{"処理対象リポジトリがあるか？\n(Create or Update)"}
     CheckWorkable -- "No" --> Stop(["終了"])
@@ -101,7 +101,8 @@ flowchart TD
         *   **Update**: 作成後の最終工程でPR本文を更新します。
 
 4.  **スキップ (No Action)**:
-    *   **条件**: 有効なPRが存在せず、かつローカルブランチとリモートブランチが同期している (`Equal`)。
+    *   **条件A**: 有効なPRが存在せず、かつローカルブランチとリモートブランチが同期している (`Equal`)。
+    *   **条件B**: 有効なPRが存在せず、ローカルブランチと同名のリモートブランチが存在せず、かつローカルブランチのリビジョンがBaseブランチのリビジョンと一致している（「ブランチは作成したがコミットはしていない」状態）。
     *   **アクション**: PushもPR作成もしません。メモリ上で「PR不要」として保持し、後続の処理から除外します。
 
 ### 3.3. 既存PRの権限確認と上書きルール (Permission Check & Overwrite Rules)
