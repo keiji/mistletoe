@@ -259,6 +259,14 @@ func handleInit(args []string, opts GlobalOptions) {
 		parallel = 1
 	}
 
+	// Resolve absolute path for config file before any directory change
+	if configFile != "" {
+		absPath, err := filepath.Abs(configFile)
+		if err == nil {
+			configFile = absPath
+		}
+	}
+
 	var config *Config
 	if configFile != "" {
 		config, err = loadConfigFile(configFile)
@@ -289,50 +297,51 @@ func handleInit(args []string, opts GlobalOptions) {
 	}
 
 	// Post-init: Create .mstl directory and save config/dependencies
-	mstlDir := filepath.Join(dest, ".mstl")
+	mstlDir := ".mstl"
 	if err := os.MkdirAll(mstlDir, 0755); err != nil {
 		fmt.Printf("Warning: Failed to create .mstl directory: %v\n", err)
+		return
+	}
+
+	// Save config.json
+	// If loaded from file, we read it again to copy (preserving comments/structure if possible,
+	// but loadConfigFile returns parsed struct. Ideally we copy original bytes).
+	// Since we have configData (from pipe) or we can read configFile.
+	var dataToWrite []byte
+	if configFile != "" {
+		var errRead error
+		dataToWrite, errRead = os.ReadFile(configFile)
+		if errRead != nil {
+			// Should not happen as we loaded it successfully before
+			fmt.Printf("Warning: Failed to read config file for copying: %v\n", errRead)
+		}
 	} else {
-		// Save config.json
-		// If loaded from file, we read it again to copy (preserving comments/structure if possible,
-		// but loadConfigFile returns parsed struct. Ideally we copy original bytes).
-		// Since we have configData (from pipe) or we can read configFile.
-		var dataToWrite []byte
-		if configFile != "" {
-			var errRead error
-			dataToWrite, errRead = os.ReadFile(configFile)
-			if errRead != nil {
-				// Should not happen as we loaded it successfully before
-				fmt.Printf("Warning: Failed to read config file for copying: %v\n", errRead)
-			}
+		dataToWrite = configData
+	}
+
+	if len(dataToWrite) > 0 {
+		configPath := filepath.Join(mstlDir, "config.json")
+		if err := os.WriteFile(configPath, dataToWrite, 0644); err != nil {
+			fmt.Printf("Warning: Failed to write %s: %v\n", configPath, err)
 		} else {
-			dataToWrite = configData
+			fmt.Printf("Configuration saved to %s\n", configPath)
 		}
+	}
 
-		if len(dataToWrite) > 0 {
-			configPath := filepath.Join(mstlDir, "config.json")
-			if err := os.WriteFile(configPath, dataToWrite, 0644); err != nil {
-				fmt.Printf("Warning: Failed to write %s: %v\n", configPath, err)
-			} else {
-				fmt.Printf("Configuration saved to %s\n", configPath)
-			}
-		}
+	// Save dependencies.md (Mermaid graph with nodes only)
+	depPath := filepath.Join(mstlDir, "dependencies.md")
+	graphContent := "graph TD\n"
+	for _, repo := range *config.Repositories {
+		// We need getRepoName here. It is in utils.go or pr_common.go but not exported?
+		// Check if it is available. It is in pr_common.go as 'getRepoName'.
+		// It is not exported. But internal/app package shares the scope.
+		name := getRepoName(repo)
+		graphContent += fmt.Sprintf("    %s\n", name)
+	}
 
-		// Save dependencies.md (Mermaid graph with nodes only)
-		depPath := filepath.Join(mstlDir, "dependencies.md")
-		graphContent := "graph TD\n"
-		for _, repo := range *config.Repositories {
-			// We need getRepoName here. It is in utils.go or pr_common.go but not exported?
-			// Check if it is available. It is in pr_common.go as 'getRepoName'.
-			// It is not exported. But internal/app package shares the scope.
-			name := getRepoName(repo)
-			graphContent += fmt.Sprintf("    %s\n", name)
-		}
-
-		if err := os.WriteFile(depPath, []byte(graphContent), 0644); err != nil {
-			fmt.Printf("Warning: Failed to write %s: %v\n", depPath, err)
-		} else {
-			fmt.Printf("Dependencies graph saved to %s\n", depPath)
-		}
+	if err := os.WriteFile(depPath, []byte(graphContent), 0644); err != nil {
+		fmt.Printf("Warning: Failed to write %s: %v\n", depPath, err)
+	} else {
+		fmt.Printf("Dependencies graph saved to %s\n", depPath)
 	}
 }
