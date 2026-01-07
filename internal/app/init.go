@@ -3,6 +3,7 @@ package app
 import (
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sync"
@@ -28,6 +29,24 @@ func branchExistsLocallyOrRemotely(gitPath, dir, branch string, verbose bool) (b
 	return false, nil
 }
 
+// isDirEmpty checks if a directory is empty.
+func isDirEmpty(dir string) (bool, error) {
+	f, err := os.Open(dir)
+	if err != nil {
+		return false, err
+	}
+	defer f.Close()
+
+	_, err = f.Readdirnames(1)
+	if err == nil {
+		return false, nil // Not empty
+	}
+	if err == io.EOF {
+		return true, nil
+	}
+	return false, err
+}
+
 // validateEnvironment checks if the current directory state is consistent with the configuration.
 func validateEnvironment(repos []Repository, gitPath string, verbose bool) error {
 	for _, repo := range repos {
@@ -44,52 +63,81 @@ func validateEnvironment(repos []Repository, gitPath string, verbose bool) error
 			return fmt.Errorf("target %s exists and is not a directory", targetDir)
 		}
 
-		// Check if it is a git repo
+		// Check eligibility
+		isEligible := false
+		var eligibilityErr error
+
 		gitDir := filepath.Join(targetDir, ".git")
 		if _, err := os.Stat(gitDir); err == nil {
-			// It's a git repo. Check remote.
+			// Is Git Repo. Check details.
+			// 1. URL
 			currentURL, err := RunGit(targetDir, gitPath, verbose, "config", "--get", "remote.origin.url")
 			if err != nil {
-				// Failed to get remote origin (maybe none configured).
-				return fmt.Errorf("directory %s is a git repo but failed to get remote origin: %v", targetDir, err)
-			}
+				eligibilityErr = fmt.Errorf("failed to get remote origin for %s: %v", targetDir, err)
+			} else if currentURL != *repo.URL {
+				eligibilityErr = fmt.Errorf("directory %s remote origin mismatch: expected %s, got %s", targetDir, *repo.URL, currentURL)
+			} else {
+				// URL Matches. Check Branches/Revision.
+				checksPassed := true
 
-			if currentURL != *repo.URL {
-				return fmt.Errorf("directory %s exists with different remote origin: %s (expected %s)", targetDir, currentURL, *repo.URL)
-			}
+				// Branch
+				if repo.Branch != nil && *repo.Branch != "" {
+					exists, err := branchExistsLocallyOrRemotely(gitPath, targetDir, *repo.Branch, verbose)
+					if err != nil {
+						eligibilityErr = fmt.Errorf("failed to check branch %s in %s: %v", *repo.Branch, targetDir, err)
+						checksPassed = false
+					} else if !exists {
+						eligibilityErr = fmt.Errorf("directory %s missing required branch: %s", targetDir, *repo.Branch)
+						checksPassed = false
+					}
+				}
 
-			// If Revision is specified and Branch is specified, check if branch already exists.
-			if repo.Revision != nil && *repo.Revision != "" && repo.Branch != nil && *repo.Branch != "" {
-				exists, err := branchExistsLocallyOrRemotely(gitPath, targetDir, *repo.Branch, verbose)
-				if err != nil {
-					return fmt.Errorf("failed to check branch existence for %s: %v", targetDir, err)
+				// BaseBranch
+				if checksPassed && repo.BaseBranch != nil && *repo.BaseBranch != "" {
+					exists, err := branchExistsLocallyOrRemotely(gitPath, targetDir, *repo.BaseBranch, verbose)
+					if err != nil {
+						eligibilityErr = fmt.Errorf("failed to check base-branch %s in %s: %v", *repo.BaseBranch, targetDir, err)
+						checksPassed = false
+					} else if !exists {
+						eligibilityErr = fmt.Errorf("directory %s missing required base-branch: %s", targetDir, *repo.BaseBranch)
+						checksPassed = false
+					}
 				}
-				if exists {
-					return fmt.Errorf("branch %s already exists in %s (locally or remotely), skipping init", *repo.Branch, targetDir)
+
+				// Revision
+				if checksPassed && repo.Revision != nil && *repo.Revision != "" {
+					// Check local existence of revision
+					_, err := RunGit(targetDir, gitPath, verbose, "cat-file", "-e", *repo.Revision+"^{commit}")
+					if err != nil {
+						eligibilityErr = fmt.Errorf("directory %s missing required revision: %s", targetDir, *repo.Revision)
+						checksPassed = false
+					}
+				}
+
+				if checksPassed {
+					isEligible = true
 				}
 			}
-			// Match -> OK.
 		} else {
-			// Not a git repo. Check if empty.
-			err := func() error {
-				f, err := os.Open(targetDir)
-				if err != nil {
-					return fmt.Errorf("failed to open directory %s: %v", targetDir, err)
-				}
-				defer f.Close()
-
-				_, err = f.Readdirnames(1)
-				if err == nil {
-					// No error means we found at least one file/dir, so it's not empty.
-					return fmt.Errorf("directory %s exists, is not a git repo, and is not empty", targetDir)
-				}
-				// io.EOF is expected if empty.
-				return nil
-			}()
-			if err != nil {
-				return err
-			}
+			eligibilityErr = fmt.Errorf("directory %s exists and is not a git repository", targetDir)
 		}
+
+		if isEligible {
+			continue // Eligible -> Proceed to Normal Init
+		}
+
+		// Ineligible. Check if empty.
+		empty, err := isDirEmpty(targetDir)
+		if err != nil {
+			return fmt.Errorf("failed to check emptiness of %s: %v", targetDir, err)
+		}
+
+		if empty {
+			continue // Empty -> Proceed to Init (Clone)
+		}
+
+		// Not empty and Ineligible -> Error
+		return fmt.Errorf("directory %s exists, is not empty, and is ineligible for init: %v", targetDir, eligibilityErr)
 	}
 	return nil
 }
@@ -180,19 +228,6 @@ func validateAndPrepareInitDest(dest string) error {
 		// Exists
 		if !info.IsDir() {
 			return fmt.Errorf("specified path is a file: %s", dest)
-		}
-		// Is Directory. Check if empty.
-		f, err := os.Open(absDest)
-		if err != nil {
-			return fmt.Errorf("failed to open directory %s: %w", dest, err)
-		}
-		defer f.Close()
-
-		names, err := f.Readdirnames(1)
-		// If err == nil && len(names) > 0, it means the directory is not empty.
-		// Readdirnames returns io.EOF if empty (and n > 0).
-		if err == nil && len(names) > 0 {
-			return fmt.Errorf("specified directory is not empty: %s", dest)
 		}
 	} else if os.IsNotExist(err) {
 		// Does not exist
