@@ -14,7 +14,7 @@ func printCommonVersionInfo(opts GlobalOptions) {
 		v = fmt.Sprintf("%s-%s", AppVersion, CommitHash)
 	}
 	fmt.Printf("%s version %s\n", AppName, v)
-	fmt.Println("Copyright 2025 ARIYAMA Keiji")
+	fmt.Println("Copyright 2025-2026 ARIYAMA Keiji")
 	fmt.Println("https://github.com/keiji/mistletoe")
 	fmt.Println()
 
