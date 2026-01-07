@@ -420,6 +420,10 @@ func updatePrDescriptions(prMap map[string][]PrInfo, parallel int, ghPath string
 	var tasks []task
 	for id, items := range prMap {
 		for _, item := range items {
+			// Filter out Merged or Closed PRs
+			if strings.EqualFold(item.State, GitHubPrStateMerged) || strings.EqualFold(item.State, GitHubPrStateClosed) {
+				continue
+			}
 			tasks = append(tasks, task{repoID: id, url: item.URL})
 		}
 	}
@@ -433,19 +437,6 @@ func updatePrDescriptions(prMap map[string][]PrInfo, parallel int, ghPath string
 
 			targetURL := tsk.url
 			repoID := tsk.repoID
-
-			// Check PR State
-			stateOut, err := RunGh(ghPath, verbose, "pr", "view", targetURL, "--json", "state", "-q", ".state")
-			if err != nil {
-				mu.Lock()
-				errs = append(errs, fmt.Sprintf("failed to check state for PR %s: %v", targetURL, err))
-				mu.Unlock()
-				return
-			}
-			state := strings.TrimSpace(string(stateOut))
-			if state == "MERGED" || state == "CLOSED" {
-				return
-			}
 
 			// Get current body
 			bodyOut, err := RunGh(ghPath, verbose, "pr", "view", targetURL, "--json", "body", "-q", ".body")

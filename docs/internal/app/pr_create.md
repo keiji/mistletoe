@@ -122,7 +122,8 @@ flowchart TD
 
 ### 3.4. 既存PRの更新スキップ条件 (Skip Update for Closed/Merged PRs)
 
-既存のPull Requestが存在する場合でも、そのステータスが `MERGED` または `CLOSED` である場合、Descriptionの更新（スナップショットの埋め込み）はスキップされます（これらのリポジトリは上記分類ロジックにおける「PRなし」として扱われますが、変更がなければ「スキップ」となります）。
+既存のPull Requestが存在する場合でも、そのステータスが `MERGED` または `CLOSED` である場合、Descriptionの更新（スナップショットの埋め込み）は**明示的にスキップ**されます。
+これらのPRは、ステータス収集時には「既存PRあり」として検出されますが、本文更新処理（`updatePrDescriptions`）の段階でフィルタリングされ、APIコールを行わずに無視されます。したがって、Open（またはDraft）状態のPRのみが更新対象となります。
 
 ### 3.5. 依存関係の解析 (Dependency Parsing)
 
