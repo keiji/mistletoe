@@ -7,7 +7,9 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -446,20 +448,72 @@ func updatePrDescriptions(prMap map[string][]PrInfo, parallel int, ghPath string
 			targetURL := tsk.url
 			repoID := tsk.repoID
 
-			// Get current body
-			bodyOut, err := RunGh(ghPath, verbose, "pr", "view", targetURL, "--json", "body", "-q", ".body")
+			// Get current body and permissions via GraphQL
+			// We use GraphQL because 'gh pr view' JSON output might miss viewerCanEditFiles key in some contexts,
+			// leading to false negatives in permission checks.
+			owner, repo, number, err := parsePrURL(targetURL)
 			if err != nil {
 				mu.Lock()
-				errs = append(errs, fmt.Sprintf("failed to view PR %s: %v", targetURL, err))
+				errs = append(errs, fmt.Sprintf("failed to parse PR URL %s: %v", targetURL, err))
 				mu.Unlock()
 				return
 			}
-			originalBody := strings.TrimSpace(string(bodyOut))
 
-			// Fill PrInfo Body for validation (tsk.item came from CollectPrStatus which fetched Body, but to be safe and use latest)
-			// Actually CollectPrStatus does fetch Body. But let's use the one we just fetched to be atomic?
-			// ValidatePrPermissionAndOverwrite needs Body to check for block existence.
-			tsk.item.Body = originalBody
+			query := `query($owner: String!, $name: String!, $number: Int!) {
+  repository(owner: $owner, name: $name) {
+    pullRequest(number: $number) {
+      body
+      viewerCanEditFiles
+      author {
+        login
+      }
+    }
+  }
+}`
+
+			out, err := RunGh(ghPath, verbose, "api", "graphql",
+				"-F", "owner="+owner,
+				"-F", "name="+repo,
+				"-F", "number="+strconv.Itoa(number),
+				"-f", "query="+query)
+
+			if err != nil {
+				mu.Lock()
+				errs = append(errs, fmt.Sprintf("failed to fetch PR details via GraphQL for %s: %v", targetURL, err))
+				mu.Unlock()
+				return
+			}
+
+			// Parse GraphQL Response
+			type GqlResponse struct {
+				Data struct {
+					Repository struct {
+						PullRequest struct {
+							Body               string `json:"body"`
+							ViewerCanEditFiles bool   `json:"viewerCanEditFiles"`
+							Author             struct {
+								Login string `json:"login"`
+							} `json:"author"`
+						} `json:"pullRequest"`
+					} `json:"repository"`
+				} `json:"data"`
+			}
+
+			var resp GqlResponse
+			if err := json.Unmarshal([]byte(out), &resp); err != nil {
+				mu.Lock()
+				errs = append(errs, fmt.Sprintf("failed to parse GraphQL response for %s: %v", targetURL, err))
+				mu.Unlock()
+				return
+			}
+
+			prData := resp.Data.Repository.PullRequest
+
+			// Update tsk.item with latest info
+			tsk.item.Body = prData.Body
+			tsk.item.ViewerCanEditFiles = prData.ViewerCanEditFiles
+			tsk.item.Author = Author{Login: prData.Author.Login}
+			originalBody := prData.Body
 
 			// Validate
 			if err := ValidatePrPermissionAndOverwrite(repoID, tsk.item, currentUser, overwrite); err != nil {
@@ -491,6 +545,24 @@ func updatePrDescriptions(prMap map[string][]PrInfo, parallel int, ghPath string
 		return fmt.Errorf("errors updating descriptions:\n%s", strings.Join(errs, "\n"))
 	}
 	return nil
+}
+
+func parsePrURL(url string) (owner, repo string, number int, err error) {
+	// Matches https://github.com/OWNER/REPO/pull/NUMBER
+	// Also handles http, no .git (PR URLs usually don't have .git)
+	re := regexp.MustCompile(`github\.com/([^/]+)/([^/]+)/pull/(\d+)`)
+	matches := re.FindStringSubmatch(url)
+	if len(matches) != 4 {
+		return "", "", 0, fmt.Errorf("invalid PR URL format: %s", url)
+	}
+	owner = matches[1]
+	repo = matches[2]
+	numStr := matches[3]
+	number, err = strconv.Atoi(numStr)
+	if err != nil {
+		return "", "", 0, fmt.Errorf("invalid PR number in URL: %s", url)
+	}
+	return owner, repo, number, nil
 }
 
 func getRepoName(r Repository) string {
