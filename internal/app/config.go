@@ -4,11 +4,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
 	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"os"
 )
 
 var (
@@ -48,6 +48,10 @@ type Repository struct {
 // Config represents the top-level configuration structure.
 type Config struct {
 	Repositories *[]Repository `json:"repositories"`
+	// BaseDir is the directory where the configuration file is located.
+	// It is used to resolve relative paths for repositories.
+	// This field is not serialized.
+	BaseDir string `json:"-"`
 }
 
 // ParseConfig parses the configuration JSON data.
@@ -147,9 +151,9 @@ func isValidGitRef(ref string) bool {
 	return safeGitRefRegex.MatchString(ref)
 }
 
-// GetRepoDir determines the checkout directory name.
+// GetRepoDirName determines the checkout directory name (relative path).
 // If ID is present and not empty, it is used. Otherwise, it is derived from the URL.
-func GetRepoDir(repo Repository) string {
+func GetRepoDirName(repo Repository) string {
 	if repo.ID != nil && *repo.ID != "" {
 		return *repo.ID
 	}
@@ -160,6 +164,12 @@ func GetRepoDir(repo Repository) string {
 	url := strings.TrimRight(*repo.URL, "/")
 	base := path.Base(url)
 	return strings.TrimSuffix(base, ".git")
+}
+
+// GetRepoPath returns the absolute or relative path to the repository,
+// joining BaseDir and the repository directory name.
+func (c *Config) GetRepoPath(repo Repository) string {
+	return filepath.Join(c.BaseDir, GetRepoDirName(repo))
 }
 
 // loadConfigData parses configuration from a byte slice.
@@ -182,7 +192,12 @@ func loadConfigFile(configFile string) (*Config, error) {
 		return nil, errors.New("Error: Specify configuration file using --file or -f.")
 	}
 
-	data, err := os.ReadFile(configFile)
+	absPath, err := filepath.Abs(configFile)
+	if err != nil {
+		return nil, fmt.Errorf("Error getting absolute path for config file: %v.", err)
+	}
+
+	data, err := os.ReadFile(absPath)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, fmt.Errorf("Configuration file %s not found.", configFile)
@@ -190,5 +205,10 @@ func loadConfigFile(configFile string) (*Config, error) {
 		return nil, fmt.Errorf("Error reading file: %v.", err)
 	}
 
-	return loadConfigData(data)
+	config, err := loadConfigData(data)
+	if err != nil {
+		return nil, err
+	}
+
+	return config, nil
 }

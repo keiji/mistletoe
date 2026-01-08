@@ -106,7 +106,7 @@ func handleSwitch(args []string, opts GlobalOptions) {
 			sem <- struct{}{}
 			defer func() { <-sem }()
 
-			dir := GetRepoDir(repo)
+			dir := config.GetRepoPath(repo)
 
 			// Check if directory exists
 			if _, err := os.Stat(dir); os.IsNotExist(err) {
@@ -126,7 +126,7 @@ func handleSwitch(args []string, opts GlobalOptions) {
 		// Strict mode: All must exist
 		var missing []string
 		for _, repo := range *config.Repositories {
-			dir := GetRepoDir(repo)
+			dir := config.GetRepoPath(repo)
 			if !dirExists[dir] {
 				missing = append(missing, *repo.URL+" ("+dir+")")
 			}
@@ -148,7 +148,7 @@ func handleSwitch(args []string, opts GlobalOptions) {
 				sem <- struct{}{}
 				defer func() { <-sem }()
 
-				dir := GetRepoDir(repo)
+				dir := config.GetRepoPath(repo)
 				fmt.Printf("Switching %s to branch %s...\n", dir, branchName)
 				if err := RunGitInteractive(dir, opts.GitPath, verbose, "checkout", branchName); err != nil {
 					fmt.Printf("Error switching branch for %s: %v.\n", dir, err)
@@ -166,7 +166,7 @@ func handleSwitch(args []string, opts GlobalOptions) {
 				sem <- struct{}{}
 				defer func() { <-sem }()
 
-				dir := GetRepoDir(repo)
+				dir := config.GetRepoPath(repo)
 				mu.Lock()
 				exists := dirExists[dir]
 				mu.Unlock()

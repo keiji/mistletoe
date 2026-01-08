@@ -21,7 +21,7 @@ func VerifyRevisionsUnchanged(config *Config, originalRows []StatusRow, gitPath 
 			continue
 		}
 
-		targetDir := GetRepoDir(repo)
+		targetDir := config.GetRepoPath(repo)
 		output, err := RunGit(targetDir, gitPath, verbose, "rev-parse", "HEAD")
 		if err != nil {
 			return fmt.Errorf("failed to get current revision for %s: %v", repoName, err)

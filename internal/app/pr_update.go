@@ -172,7 +172,7 @@ func handlePrUpdate(args []string, opts GlobalOptions) {
 
 	if len(pushList) > 0 {
 		fmt.Println("Pushing changes for repositories with active Pull Requests...")
-		if err := executePush(pushList, rows, parallel, opts.GitPath, verbose); err != nil {
+		if err := executePush(pushList, config.BaseDir, rows, parallel, opts.GitPath, verbose); err != nil {
 			fmt.Printf("error during push: %v\n", err)
 			os.Exit(1)
 		}

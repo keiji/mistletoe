@@ -104,7 +104,7 @@ func TestValidateEnvironment(t *testing.T) {
 			}
 
 			// Pass false for verbose
-			err := validateEnvironment(tt.repos, "git", false)
+			err := validateEnvironment(tt.repos, "", "git", false)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("validateEnvironment() error = %v, wantErr %v", err, tt.wantErr)
 			}

@@ -141,7 +141,7 @@ func handleSnapshot(args []string, opts GlobalOptions) {
 			var baseBranchPtr *string
 			if config != nil && config.Repositories != nil {
 				for _, confRepo := range *config.Repositories {
-					confID := GetRepoDir(confRepo)
+					confID := GetRepoDirName(confRepo)
 					if confID == dirName {
 						if confRepo.BaseBranch != nil && *confRepo.BaseBranch != "" {
 							baseBranchPtr = confRepo.BaseBranch
@@ -224,7 +224,7 @@ func GenerateSnapshotVerbose(config *Config, gitPath string, verbose bool) ([]by
 
 	// Iterate config repos and check if they exist on disk.
 	for _, repo := range *config.Repositories {
-		dir := GetRepoDir(repo)
+		dir := config.GetRepoPath(repo)
 		if _, err := os.Stat(dir); err != nil {
 			// Skip missing repos
 			continue
@@ -314,7 +314,7 @@ func GenerateSnapshotFromStatus(config *Config, statusRows []StatusRow) ([]byte,
 	}
 
 	for _, repo := range *config.Repositories {
-		repoName := GetRepoDir(repo)
+		repoName := GetRepoDirName(repo)
 		if repo.ID != nil && *repo.ID != "" {
 			repoName = *repo.ID
 		}
