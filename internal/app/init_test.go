@@ -131,14 +131,32 @@ func TestPerformInit(t *testing.T) {
 		t.Fatalf("failed to create seed dir: %v", err)
 	}
 	defer os.RemoveAll(seedDir)
-	RunGit(seedDir, "git", false, "init")
-	os.WriteFile(filepath.Join(seedDir, "README.md"), []byte("# Test"), 0644)
-	RunGit(seedDir, "git", false, "add", "README.md")
-	RunGit(seedDir, "git", false, "commit", "-m", "Initial")
-	RunGit(seedDir, "git", false, "remote", "add", "origin", remoteDir)
-	RunGit(seedDir, "git", false, "push", "origin", "master")
+	if _, err := RunGit(seedDir, "git", false, "init"); err != nil {
+		t.Fatalf("failed to init seed repo: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(seedDir, "README.md"), []byte("# Test"), 0644); err != nil {
+		t.Fatalf("failed to write file: %v", err)
+	}
+	if _, err := RunGit(seedDir, "git", false, "add", "README.md"); err != nil {
+		t.Fatalf("failed to add file: %v", err)
+	}
+	if _, err := RunGit(seedDir, "git", false, "commit", "-m", "Initial"); err != nil {
+		t.Fatalf("failed to commit: %v", err)
+	}
+	// Force master branch to avoid init.defaultBranch issues (main vs master)
+	if _, err := RunGit(seedDir, "git", false, "branch", "-M", "master"); err != nil {
+		t.Fatalf("failed to rename branch to master: %v", err)
+	}
+	if _, err := RunGit(seedDir, "git", false, "remote", "add", "origin", remoteDir); err != nil {
+		t.Fatalf("failed to add remote: %v", err)
+	}
+	if _, err := RunGit(seedDir, "git", false, "push", "origin", "master"); err != nil {
+		t.Fatalf("failed to push: %v", err)
+	}
 	// Update HEAD in bare repo
-	RunGit(remoteDir, "git", false, "symbolic-ref", "HEAD", "refs/heads/master")
+	if _, err := RunGit(remoteDir, "git", false, "symbolic-ref", "HEAD", "refs/heads/master"); err != nil {
+		t.Fatalf("failed to set HEAD: %v", err)
+	}
 
 	// Prepare workspace
 	workDir, err := os.MkdirTemp("", "mstl-test-work")
