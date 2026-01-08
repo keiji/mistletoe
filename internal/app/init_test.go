@@ -134,6 +134,13 @@ func TestPerformInit(t *testing.T) {
 	if _, err := RunGit(seedDir, "git", false, "init"); err != nil {
 		t.Fatalf("failed to init seed repo: %v", err)
 	}
+	// Configure git user for commit
+	if _, err := RunGit(seedDir, "git", false, "config", "user.email", "test@example.com"); err != nil {
+		t.Fatalf("failed to config user.email: %v", err)
+	}
+	if _, err := RunGit(seedDir, "git", false, "config", "user.name", "Test User"); err != nil {
+		t.Fatalf("failed to config user.name: %v", err)
+	}
 	if err := os.WriteFile(filepath.Join(seedDir, "README.md"), []byte("# Test"), 0644); err != nil {
 		t.Fatalf("failed to write file: %v", err)
 	}
