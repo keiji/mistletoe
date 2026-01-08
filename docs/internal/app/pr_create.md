@@ -189,6 +189,7 @@ PR 本文の末尾に、自動生成された不可視（または折りたた�
         *   **Dependencies**: このリポジトリが依存している先のリポジトリのPR。
         *   **Dependents**: このリポジトリに依存している元のリポジトリのPR。
         *   **Others**: 依存関係がない、またはグラフに含まれないリポジトリのPR。
+            *   **注記**: Dependencies と Dependents が存在せず、Others のみが存在する場合、"Others" の小見出しは省略され、リストが直接表示されます。
     *   指定がない場合は、単一のリストとして全関連PRを表示します。
 2.  **関連 PR リンク (JSON形式, `<details>` 内)**:
     *   ファイル名: `mistletoe-related-pr-[identifier].json`
