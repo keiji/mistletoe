@@ -111,3 +111,72 @@ func TestValidateEnvironment(t *testing.T) {
 		})
 	}
 }
+
+func TestPerformInit(t *testing.T) {
+	// Setup a "remote" bare repo
+	remoteDir, err := os.MkdirTemp("", "mstl-test-remote")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(remoteDir)
+
+	// Initialize bare repo
+	if _, err := RunGit(remoteDir, "git", false, "init", "--bare"); err != nil {
+		t.Fatalf("failed to init bare repo: %v", err)
+	}
+	// We need to push something to it so it has HEAD
+	// Create a seeder repo
+	seedDir, err := os.MkdirTemp("", "mstl-test-seed")
+	if err != nil {
+		t.Fatalf("failed to create seed dir: %v", err)
+	}
+	defer os.RemoveAll(seedDir)
+	RunGit(seedDir, "git", false, "init")
+	os.WriteFile(filepath.Join(seedDir, "README.md"), []byte("# Test"), 0644)
+	RunGit(seedDir, "git", false, "add", "README.md")
+	RunGit(seedDir, "git", false, "commit", "-m", "Initial")
+	RunGit(seedDir, "git", false, "remote", "add", "origin", remoteDir)
+	RunGit(seedDir, "git", false, "push", "origin", "master")
+	// Update HEAD in bare repo
+	RunGit(remoteDir, "git", false, "symbolic-ref", "HEAD", "refs/heads/master")
+
+	// Prepare workspace
+	workDir, err := os.MkdirTemp("", "mstl-test-work")
+	if err != nil {
+		t.Fatalf("failed to create work dir: %v", err)
+	}
+	defer os.RemoveAll(workDir)
+
+	repoID := "repo1"
+	repoURL := "file://" + remoteDir // Use file protocol for cloning
+	branch := "master"
+
+	repos := []Repository{
+		{
+			ID:     &repoID,
+			URL:    &repoURL,
+			Branch: &branch,
+		},
+	}
+
+	// Run PerformInit
+	err = PerformInit(repos, workDir, "git", 1, 0, false)
+	if err != nil {
+		t.Fatalf("PerformInit failed: %v", err)
+	}
+
+	// Verify clone
+	targetDir := filepath.Join(workDir, repoID)
+	if _, err := os.Stat(targetDir); os.IsNotExist(err) {
+		t.Fatalf("target dir %s not created", targetDir)
+	}
+	if _, err := os.Stat(filepath.Join(targetDir, "README.md")); os.IsNotExist(err) {
+		t.Fatalf("README.md not found in cloned repo")
+	}
+
+	// Verify idempotency (run again)
+	err = PerformInit(repos, workDir, "git", 1, 0, false)
+	if err != nil {
+		t.Fatalf("PerformInit (idempotency) failed: %v", err)
+	}
+}
