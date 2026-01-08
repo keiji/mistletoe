@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -349,7 +350,7 @@ func RenderPrStatusTable(rows []PrStatusRow) {
 }
 
 // executePush pushes changes for the given repositories.
-func executePush(repos []Repository, rows []StatusRow, parallel int, gitPath string, verbose bool) error {
+func executePush(repos []Repository, baseDir string, rows []StatusRow, parallel int, gitPath string, verbose bool) error {
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, parallel)
 	var mu sync.Mutex
@@ -367,7 +368,7 @@ func executePush(repos []Repository, rows []StatusRow, parallel int, gitPath str
 			sem <- struct{}{}
 			defer func() { <-sem }()
 
-			repoDir := GetRepoDir(r)
+			repoDir := filepath.Join(baseDir, GetRepoDirName(r))
 			repoName := getRepoName(r)
 
 			branchName := ""
@@ -497,7 +498,7 @@ func getRepoName(r Repository) string {
 		return *r.ID
 	}
 	// Fallback to dir name
-	return GetRepoDir(r)
+	return GetRepoDirName(r)
 }
 
 // resolveRemoteBranchHash tries to resolve the remote branch hash locally first,
@@ -548,7 +549,7 @@ func checkGhAvailability(ghPath string, verbose bool) error {
 // verifyGithubRequirements checks GitHub URL, permissions, base branch existence, and existing PRs.
 // It returns a map of RepoName -> Existing PR URL.
 // Accepts knownPRs map[string][]string (ID -> []URL) to optimize existing PR check.
-func verifyGithubRequirements(repos []Repository, rows []StatusRow, parallel int, gitPath, ghPath string, verbose bool, knownPRs map[string][]string) (map[string]string, error) {
+func verifyGithubRequirements(repos []Repository, baseDir string, rows []StatusRow, parallel int, gitPath, ghPath string, verbose bool, knownPRs map[string][]string) (map[string]string, error) {
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, parallel)
@@ -602,7 +603,7 @@ func verifyGithubRequirements(repos []Repository, rows []StatusRow, parallel int
 			}
 
 			if baseBranch != "" {
-				repoDir := GetRepoDir(r)
+				repoDir := filepath.Join(baseDir, GetRepoDirName(r))
 				remoteHash, err := resolveRemoteBranchHash(repoDir, gitPath, baseBranch, verbose)
 				if err != nil {
 					mu.Lock()
@@ -629,7 +630,7 @@ func verifyGithubRequirements(repos []Repository, rows []StatusRow, parallel int
 			}
 
 			// Fallback to query
-			repoDir := GetRepoDir(r)
+			repoDir := filepath.Join(baseDir, GetRepoDirName(r))
 			branchName := ""
 
 			if row, ok := statusMap[repoName]; ok && row.BranchName != "" {

@@ -49,9 +49,9 @@ func isDirEmpty(dir string) (bool, error) {
 }
 
 // validateEnvironment checks if the current directory state is consistent with the configuration.
-func validateEnvironment(repos []Repository, gitPath string, verbose bool) error {
+func validateEnvironment(repos []Repository, baseDir, gitPath string, verbose bool) error {
 	for _, repo := range repos {
-		targetDir := GetRepoDir(repo)
+		targetDir := filepath.Join(baseDir, GetRepoDirName(repo))
 		info, err := os.Stat(targetDir)
 		if os.IsNotExist(err) {
 			continue // Directory doesn't exist, safe to clone
@@ -144,8 +144,8 @@ func validateEnvironment(repos []Repository, gitPath string, verbose bool) error
 }
 
 // PerformInit executes the initialization (clone/checkout) logic for the given repositories.
-func PerformInit(repos []Repository, gitPath string, parallel, depth int, verbose bool) error {
-	if err := validateEnvironment(repos, gitPath, verbose); err != nil {
+func PerformInit(repos []Repository, baseDir, gitPath string, parallel, depth int, verbose bool) error {
+	if err := validateEnvironment(repos, baseDir, gitPath, verbose); err != nil {
 		return fmt.Errorf("error validating environment: %w", err)
 	}
 
@@ -165,7 +165,7 @@ func PerformInit(repos []Repository, gitPath string, parallel, depth int, verbos
 				gitArgs = append(gitArgs, "--depth", fmt.Sprintf("%d", depth))
 			}
 			gitArgs = append(gitArgs, *repo.URL)
-			targetDir := GetRepoDir(repo)
+			targetDir := filepath.Join(baseDir, GetRepoDirName(repo))
 
 			// Explicitly pass target directory to avoid ambiguity and to know where to checkout later.
 			gitArgs = append(gitArgs, targetDir)
@@ -326,7 +326,7 @@ func handleInit(args []string, opts GlobalOptions) {
 		os.Exit(1)
 	}
 
-	if err := PerformInit(*config.Repositories, opts.GitPath, parallel, depth, verbose); err != nil {
+	if err := PerformInit(*config.Repositories, "", opts.GitPath, parallel, depth, verbose); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}

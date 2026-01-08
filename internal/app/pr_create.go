@@ -299,7 +299,7 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 		prExistsMapURLs[k] = urls
 	}
 
-	_, err = verifyGithubRequirements(activeRepos, rows, parallel, opts.GitPath, opts.GhPath, verbose, prExistsMapURLs)
+	_, err = verifyGithubRequirements(activeRepos, config.BaseDir, rows, parallel, opts.GitPath, opts.GhPath, verbose, prExistsMapURLs)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -315,7 +315,7 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 
 	if len(pushList) > 0 {
 		fmt.Println("Pushing changes...")
-		if err := executePush(pushList, rows, parallel, opts.GitPath, verbose); err != nil {
+		if err := executePush(pushList, config.BaseDir, rows, parallel, opts.GitPath, verbose); err != nil {
 			fmt.Printf("error during push: %v\n", err)
 			os.Exit(1)
 		}

@@ -178,7 +178,7 @@ func handlePrCheckout(args []string, opts GlobalOptions) {
 	fmt.Println("Initializing repositories based on snapshot...")
 	// The snapshot contains the target state. We treat it as the config.
 	// PerformInit handles validation, cloning, and checking out.
-	if err := PerformInit(*config.Repositories, opts.GitPath, parallel, 0, verbose); err != nil {
+	if err := PerformInit(*config.Repositories, "", opts.GitPath, parallel, 0, verbose); err != nil {
 		fmt.Printf("Error during initialization: %v\n", err)
 		// We continue to status even if some failed? Or exit?
 		// Usually Init failure is critical.

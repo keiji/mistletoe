@@ -32,7 +32,7 @@ type StatusRow struct {
 // ValidateRepositoriesIntegrity checks if repositories exist and are valid.
 func ValidateRepositoriesIntegrity(config *Config, gitPath string, verbose bool) error {
 	for _, repo := range *config.Repositories {
-		targetDir := GetRepoDir(repo)
+		targetDir := config.GetRepoPath(repo)
 		info, err := os.Stat(targetDir)
 		if os.IsNotExist(err) {
 			continue
@@ -76,7 +76,7 @@ func CollectStatus(config *Config, parallel int, gitPath string, verbose bool, n
 			sem <- struct{}{}
 			defer func() { <-sem }()
 
-			row := getRepoStatus(repo, gitPath, verbose, noFetch)
+			row := getRepoStatus(repo, config.BaseDir, gitPath, verbose, noFetch)
 			if row != nil {
 				mu.Lock()
 				rows = append(rows, *row)
@@ -93,12 +93,9 @@ func CollectStatus(config *Config, parallel int, gitPath string, verbose bool, n
 	return rows
 }
 
-func getRepoStatus(repo Repository, gitPath string, verbose bool, noFetch bool) *StatusRow {
-	targetDir := GetRepoDir(repo)
-	repoName := targetDir
-	if repo.ID != nil && *repo.ID != "" {
-		repoName = *repo.ID
-	}
+func getRepoStatus(repo Repository, baseDir, gitPath string, verbose bool, noFetch bool) *StatusRow {
+	targetDir := filepath.Join(baseDir, GetRepoDirName(repo))
+	repoName := GetRepoDirName(repo)
 
 	if _, err := os.Stat(targetDir); os.IsNotExist(err) {
 		return nil

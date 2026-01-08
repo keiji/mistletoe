@@ -3,6 +3,7 @@ package app
 import (
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -19,26 +20,23 @@ func TestVerifyRevisionsUnchanged(t *testing.T) {
 	initialHead := strings.TrimSpace(string(out))
 
 	// Construct Config
+	repoID := filepath.Base(contentDir)
+	baseDir := filepath.Dir(contentDir)
+
 	config := &Config{
 		Repositories: &[]Repository{
 			{
-				ID:  strPtr("repo1"),
+				ID:  strPtr(repoID),
 				URL: strPtr(remoteURL),
 			},
 		},
+		BaseDir: baseDir,
 	}
-
-	// Hack: We need GetRepoDir to return contentDir.
-	// GetRepoDir uses filepath.Join(r.baseDir, *r.ID).
-	// Since we can't set baseDir (private), we rely on setting ID to the absolute path.
-	// However, GetRepoDir joins baseDir + ID. If baseDir is empty (which it is for manually created Config),
-	// it returns ID.
-	*(*config.Repositories)[0].ID = contentDir
 
 	// Construct StatusRow matching the initial state
 	rows := []StatusRow{
 		{
-			Repo:          contentDir, // Repo name in map matches the ID we set
+			Repo:          repoID, // Repo name in map matches the ID
 			LocalHeadFull: initialHead,
 		},
 	}
