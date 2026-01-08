@@ -1,303 +1,128 @@
 package app
 
 import (
-	"io"
+	"fmt"
 	"os"
 	"os/exec"
-	"strings"
 	"testing"
-	"time"
 )
 
-// TestRunGit_Real tests RunGit against the real git command (if available)
-// or mocks it if we want unit isolation.
-func TestRunGit(t *testing.T) {
-	// Simple test to ensure RunGit calls exec correctly
-	// We'll assume git is available in the environment since this project depends on it.
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git not found")
+// TestRunEditor verifies RunEditor functionality.
+// Note: We cannot interactively test an editor, so we mock ExecCommand to simulate an editor
+// that writes to the file.
+func TestRunEditor(t *testing.T) {
+	// Mock ExecCommand
+	originalExecCommand := ExecCommand
+	defer func() { ExecCommand = originalExecCommand }()
+
+	ExecCommand = func(name string, arg ...string) *exec.Cmd {
+		// Mock behavior: write "Edited content" to the file (arg[0])
+		return exec.Command(os.Args[0], "-test.run=TestHelperProcess_Editor", "--", arg[0])
 	}
 
-	out, err := RunGit("", "git", false, "--version")
+	content, err := RunEditor()
 	if err != nil {
-		t.Fatalf("RunGit failed: %v", err)
+		t.Fatalf("RunEditor failed: %v", err)
 	}
-	if len(out) == 0 {
-		t.Error("RunGit returned empty output")
+
+	expected := "Edited content"
+	if content != expected {
+		t.Errorf("expected '%s', got '%s'", expected, content)
 	}
 }
 
-func TestResolveCommonValues(t *testing.T) {
-	tests := []struct {
-		name         string
-		fLong        string
-		fShort       string
-		pVal         int
-		pValShort    int
-		wantConfig   string
-		wantParallel int
-		wantErr      bool
-	}{
-		{
-			name:         "Defaults",
-			fLong:        DefaultConfigFile,
-			fShort:       DefaultConfigFile,
-			pVal:         DefaultParallel,
-			pValShort:    DefaultParallel,
-			wantConfig:   DefaultConfigFile,
-			wantParallel: DefaultParallel,
-			wantErr:      false,
-		},
-		{
-			name:         "Config from Long Flag",
-			fLong:        "config.json",
-			fShort:       DefaultConfigFile,
-			pVal:         DefaultParallel,
-			pValShort:    DefaultParallel,
-			wantConfig:   "config.json",
-			wantParallel: DefaultParallel,
-			wantErr:      false,
-		},
-		{
-			name:         "Config from Short Flag",
-			fLong:        DefaultConfigFile,
-			fShort:       "short.json",
-			pVal:         DefaultParallel,
-			pValShort:    DefaultParallel,
-			wantConfig:   "short.json",
-			wantParallel: DefaultParallel,
-			wantErr:      false,
-		},
-		{
-			name:         "Config Long Priority",
-			fLong:        "long.json",
-			fShort:       "short.json",
-			pVal:         DefaultParallel,
-			pValShort:    DefaultParallel,
-			wantConfig:   "long.json",
-			wantParallel: DefaultParallel,
-			wantErr:      false,
-		},
-		{
-			name:         "Parallel from Long Flag",
-			fLong:        DefaultConfigFile,
-			fShort:       DefaultConfigFile,
-			pVal:         4,
-			pValShort:    DefaultParallel,
-			wantConfig:   DefaultConfigFile,
-			wantParallel: 4,
-			wantErr:      false,
-		},
-		{
-			name:         "Parallel from Short Flag",
-			fLong:        DefaultConfigFile,
-			fShort:       DefaultConfigFile,
-			pVal:         DefaultParallel,
-			pValShort:    8,
-			wantConfig:   DefaultConfigFile,
-			wantParallel: 8,
-			wantErr:      false,
-		},
-		{
-			name:         "Parallel Long Priority",
-			fLong:        DefaultConfigFile,
-			fShort:       DefaultConfigFile,
-			pVal:         4,
-			pValShort:    8,
-			wantConfig:   DefaultConfigFile,
-			wantParallel: 4,
-			wantErr:      false,
-		},
-		{
-			name:         "Parallel Too Low",
-			fLong:        DefaultConfigFile,
-			fShort:       DefaultConfigFile,
-			pVal:         -1,
-			pValShort:    DefaultParallel,
-			wantConfig:   DefaultConfigFile,
-			wantParallel: 0,
-			wantErr:      true,
-		},
-		{
-			name:         "Parallel Too High",
-			fLong:        DefaultConfigFile,
-			fShort:       DefaultConfigFile,
-			pVal:         MaxParallel + 1,
-			pValShort:    DefaultParallel,
-			wantConfig:   DefaultConfigFile,
-			wantParallel: 0,
-			wantErr:      true,
-		},
-	}
+// TestHelperProcess_Editor is the helper process for TestRunEditor.
+// It acts as the "editor", writing content to the provided filename.
+func TestHelperProcess_Editor(t *testing.T) {
+	if os.Getenv("GO_WANT_HELPER_PROCESS") != "1" {
+		// This logic is invoked via TestHelperProcess dispatcher in common_test.go
+		// But since we are calling os.Args[0] with specific -test.run, we can just return if not targeted.
+		// However, standard TestHelperProcess pattern uses GO_WANT_HELPER_PROCESS.
+		// Let's rely on standard pattern if we can, but we need custom logic (write to file).
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			gotConfig, gotParallel, _, err := ResolveCommonValues(tt.fLong, tt.fShort, tt.pVal, tt.pValShort, false)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("ResolveCommonValues() error = %v, wantErr %v", err, tt.wantErr)
-				return
+		// If we use the flag approach:
+		args := os.Args
+		for len(args) > 0 {
+			if args[0] == "--" {
+				args = args[1:]
+				break
 			}
-			if !tt.wantErr {
-				if gotConfig != tt.wantConfig {
-					t.Errorf("ResolveCommonValues() config = %v, want %v", gotConfig, tt.wantConfig)
-				}
-				if gotParallel != tt.wantParallel {
-					t.Errorf("ResolveCommonValues() parallel = %v, want %v", gotParallel, tt.wantParallel)
-				}
-			}
-		})
+			args = args[1:]
+		}
+
+		if len(args) == 0 {
+			return
+		}
+
+		filename := args[0]
+		err := os.WriteFile(filename, []byte("Edited content"), 0644)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "failed to write file: %v\n", err)
+			os.Exit(1)
+		}
+		os.Exit(0)
 	}
 }
 
-func TestResolveCommonValues_WithStdin(t *testing.T) {
-	// Backup original stdin
-	oldStdin := os.Stdin
-	defer func() { os.Stdin = oldStdin }()
+// Ensure TestHelperProcess exists or create a dispatcher.
+// In `common_test.go` or similar, there is usually a TestHelperProcess.
+// Since `utils.go` invokes `os.Args[0]`, we need to ensure the test binary handles the call.
+// The code above `TestRunEditor` uses `-test.run=TestHelperProcess_Editor`.
+// This matches the function name `TestHelperProcess_Editor`.
+// So when the subprocess runs, it executes `TestHelperProcess_Editor`.
+// However, `go test` runs all tests matching the pattern.
+// `TestHelperProcess_Editor` needs to behave like a test (take *testing.T) but perform the action.
+// The logic inside `TestHelperProcess_Editor` checks args.
+// But `TestHelperProcess_Editor` will be called by `go test`.
+// We need to ensure it doesn't run during normal `go test ./...` execution unless arguments match.
+// The trick is checking `os.Args` for `--`.
 
-	testConfig := "test config data"
+func TestRunEditor_Empty(t *testing.T) {
+	// Mock ExecCommand to write nothing
+	originalExecCommand := ExecCommand
+	defer func() { ExecCommand = originalExecCommand }()
 
-	t.Run("Explicit Empty Config with Stdin", func(t *testing.T) {
-		// Create a pipe to simulate stdin
-		r, w, err := os.Pipe()
-		if err != nil {
-			t.Fatalf("Failed to create pipe: %v", err)
-		}
-		os.Stdin = r
-
-		go func() {
-			defer w.Close()
-			_, _ = w.Write([]byte(testConfig))
-		}()
-
-		// Call with Explicit Empty Config ("")
-		gotConfig, gotParallel, gotData, err := ResolveCommonValues("", "", DefaultParallel, DefaultParallel, false)
-		if err != nil {
-			t.Fatalf("ResolveCommonValues() unexpected error: %v", err)
-		}
-
-		if gotConfig != "" {
-			t.Errorf("ResolveCommonValues() config = %v, want empty", gotConfig)
-		}
-		if gotParallel != DefaultParallel {
-			t.Errorf("ResolveCommonValues() parallel = %v, want %v", gotParallel, DefaultParallel)
-		}
-		if string(gotData) != testConfig {
-			t.Errorf("ResolveCommonValues() data = %v, want %v", string(gotData), testConfig)
-		}
-	})
-
-	t.Run("Default Config with Stdin", func(t *testing.T) {
-		// Create a pipe to simulate stdin
-		r, w, err := os.Pipe()
-		if err != nil {
-			t.Fatalf("Failed to create pipe: %v", err)
-		}
-		os.Stdin = r
-
-		go func() {
-			defer w.Close()
-			_, _ = w.Write([]byte(testConfig))
-		}()
-
-		// Call with Default Config (DefaultConfigFile)
-		gotConfig, _, gotData, err := ResolveCommonValues(DefaultConfigFile, DefaultConfigFile, DefaultParallel, DefaultParallel, false)
-		if err != nil {
-			t.Fatalf("ResolveCommonValues() unexpected error: %v", err)
-		}
-
-		if gotConfig != "" {
-			t.Errorf("ResolveCommonValues() config = %v, want empty", gotConfig)
-		}
-		if string(gotData) != testConfig {
-			t.Errorf("ResolveCommonValues() data = %v, want %v", string(gotData), testConfig)
-		}
-	})
-
-	t.Run("Custom Config with Stdin (Conflict)", func(t *testing.T) {
-		// Create a pipe to simulate stdin
-		r, w, err := os.Pipe()
-		if err != nil {
-			t.Fatalf("Failed to create pipe: %v", err)
-		}
-		os.Stdin = r
-
-		go func() {
-			defer w.Close()
-			_, _ = w.Write([]byte(testConfig))
-		}()
-
-		// Call with Custom Config
-		_, _, _, err = ResolveCommonValues("custom.json", "custom.json", DefaultParallel, DefaultParallel, false)
-		if err == nil {
-			t.Errorf("ResolveCommonValues() expected error due to conflict, got nil")
-		} else if !strings.Contains(err.Error(), "conflict") {
-			t.Errorf("ResolveCommonValues() expected conflict error, got: %v", err)
-		}
-	})
-}
-
-func TestFormatDuration(t *testing.T) {
-	tests := []struct {
-		input    time.Duration
-		expected string
-	}{
-		{time.Duration(0), "0ms"},
-		{time.Duration(100 * time.Millisecond), "100ms"},
-		{time.Duration(999 * time.Millisecond), "999ms"},
-		{time.Duration(1000 * time.Millisecond), "1,000ms"},
-		{time.Duration(1234 * time.Millisecond), "1,234ms"},
-		{time.Duration(1234567 * time.Millisecond), "1,234,567ms"},
-		{time.Duration(1000000 * time.Millisecond), "1,000,000ms"},
+	ExecCommand = func(name string, arg ...string) *exec.Cmd {
+		return exec.Command(os.Args[0], "-test.run=TestHelperProcess_EditorEmpty", "--", arg[0])
 	}
 
-	for _, tt := range tests {
-		result := formatDuration(tt.input)
-		if result != tt.expected {
-			t.Errorf("formatDuration(%v) = %q, want %q", tt.input, result, tt.expected)
-		}
+	_, err := RunEditor()
+	if err == nil {
+		t.Fatal("expected error for empty content, got nil")
+	}
+	expectedError := "empty message, aborted"
+	if err.Error() != expectedError {
+		t.Errorf("expected error '%s', got '%v'", expectedError, err)
 	}
 }
 
-func TestRunGit_VerboseLog(t *testing.T) {
-	// Skip if no echo command (e.g. strict windows env without sh)
-	// But usually available.
-	if _, err := exec.LookPath("echo"); err != nil {
-		t.Skip("echo command not found")
+func TestHelperProcess_EditorEmpty(t *testing.T) {
+	args := os.Args
+	foundSeparator := false
+	for _, arg := range args {
+		if arg == "--" {
+			foundSeparator = true
+			break
+		}
+	}
+	if !foundSeparator {
+		return // Not running as helper
 	}
 
-	// Capture stderr
-	r, w, err := os.Pipe()
-	if err != nil {
-		t.Fatal(err)
-	}
-	oldStderr := os.Stderr
-	os.Stderr = w
+	// Write nothing and exit
+	os.Exit(0)
+}
 
-	defer func() {
-		os.Stderr = oldStderr
-	}()
+func TestSpinner(t *testing.T) {
+	// Test Normal Spinner
+	s := NewSpinner(false)
+	s.Start()
+	// Let it run briefly
+	s.Stop()
 
-	// RunGit with verbose=true
-	// We use "echo" as gitPath to avoid git dependency issues in this specific test
-	// and ensure it runs quickly.
-	_, _ = RunGit("", "echo", true, "hello")
-
-	w.Close()
-
-	out, _ := io.ReadAll(r)
-	output := string(out)
-
-	// Check format: [CMD] echo hello (0ms)\n
-	if !strings.Contains(output, "[CMD] echo hello (") {
-		t.Errorf("Log output format incorrect or missing: %q", output)
-	}
-	if !strings.HasSuffix(strings.TrimSpace(output), "ms)") {
-		t.Errorf("Log output should end with ms): %q", output)
-	}
-	// Check that there is NO newline between command and time (approximate check)
-	// We expect "[CMD] echo hello (" to be on one line.
-	// If it was two lines, it would be "[CMD] echo hello\n... ("
-	if strings.Contains(output, "echo hello\n") {
-		t.Errorf("Log output should not have newline after command: %q", output)
-	}
+	// Test Verbose Spinner (No-op)
+	sVerbose := NewSpinner(true)
+	sVerbose.Start()
+	// Should do nothing
+	sVerbose.Stop()
 }

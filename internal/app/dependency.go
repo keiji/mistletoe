@@ -44,20 +44,16 @@ func ParseDependencies(content string, validIDs []string) (*DependencyGraph, err
 	scanner := bufio.NewScanner(strings.NewReader(content))
 
 	// Regex to split by arrows.
-	// Matches:
-	// 1. Mutual arrows: <...>
-	// 2. Simple directed arrows: -->, ==>, -.->, etc. ([-=.]+>)
-	// 3. Labeled directed arrows: -- text -->, == text ==>, etc.
-	//    Starts with --, ==, -.
-	//    Middle is quoted string or non-greedy chars.
-	//    Ends with >, preceded by --, ==, -., -..
-	// Note: We ignore undirected arrows like --o, --x, ---
-	arrowRe := regexp.MustCompile(`\s*(<[-=.]+>|[-=.]+>|(?:--|==|-\.)\s*(?:".*?"|.+?)\s*(?:--|==|-\.|-\.\.)>)\s*`)
+	// Supports:
+	// 1. Simple arrows: -->, ---, -.->, ==>
+	// 2. Labeled arrows: -- text -->, == text ==>, -. text .->
+	// This regex is simplified to catch the arrow part.
+	// It looks for a sequence starting with <, -, or = and ending with >.
+	// It handles the "middle" part for labels.
+	arrowRe := regexp.MustCompile(`\s*<?(?:--|==|-\.)(?:.*?)>`)
 
 	// Regex to extract ID: start of string, take valid chars
 	// Valid mstl IDs: ^[a-zA-Z0-9._-]+$
-	// Mermaid nodes might be: ID["Label"], ID{Label}, ID(Label), etc.
-	// We take the first continuous sequence of valid ID characters.
 	idRe := regexp.MustCompile(`^([a-zA-Z0-9._-]+)`)
 
 	lineNum := 0
@@ -68,23 +64,37 @@ func ParseDependencies(content string, validIDs []string) (*DependencyGraph, err
 			continue
 		}
 
-		// Find arrow
+		// Find arrow location
 		loc := arrowRe.FindStringIndex(line)
 		if loc == nil {
 			continue
 		}
 
-		arrowStr := line[loc[0]:loc[1]]
-		arrowStr = strings.TrimSpace(arrowStr)
+		arrowStr := strings.TrimSpace(line[loc[0]:loc[1]])
 
 		leftRaw := strings.TrimSpace(line[:loc[0]])
 		rightRaw := strings.TrimSpace(line[loc[1]:])
+
+		// Handle labels attached to the right side if they were not consumed by arrowRe fully.
+		// For example `-->|label| B`.
+		// arrowRe above `\s*<?(?:--|==|-\.)(?:.*?)>` catches ` -->` but maybe not `|label|`.
+		// Actually, `-->` matches `(?:--|==|-\.)(?:.*?)>`. `-->` starts with `--`, middle is empty, ends with `>`.
+
+		// If rightRaw starts with `|`, it's a label like `|text| ID`.
+		if strings.HasPrefix(rightRaw, "|") {
+			pipeIdx := strings.Index(rightRaw[1:], "|")
+			if pipeIdx != -1 {
+				// pipeIdx is index relative to rightRaw[1:], so actual end index is 1 + pipeIdx + 1
+				endIdx := pipeIdx + 2
+				rightRaw = strings.TrimSpace(rightRaw[endIdx:])
+			}
+		}
 
 		leftID := extractID(leftRaw, idRe)
 		rightID := extractID(rightRaw, idRe)
 
 		if leftID == "" || rightID == "" {
-			continue // Skip malformed lines or those without valid IDs
+			continue
 		}
 
 		// Validation
@@ -95,15 +105,10 @@ func ParseDependencies(content string, validIDs []string) (*DependencyGraph, err
 			return nil, fmt.Errorf("line %d: repository ID '%s' not found in configuration", lineNum, rightID)
 		}
 
-		// Add dependencies
-		// A --> B means A depends on B
-		// A <--> B means A depends on B AND B depends on A
-
 		// Forward: A -> B
 		addDependency(graph, leftID, rightID)
 
-		// Check if mutual
-		// Starts with <
+		// Check if mutual: starts with `<`
 		if strings.HasPrefix(arrowStr, "<") {
 			// B -> A
 			addDependency(graph, rightID, leftID)
