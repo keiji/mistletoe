@@ -446,20 +446,31 @@ func updatePrDescriptions(prMap map[string][]PrInfo, parallel int, ghPath string
 			targetURL := tsk.url
 			repoID := tsk.repoID
 
-			// Get current body
-			bodyOut, err := RunGh(ghPath, verbose, "pr", "view", targetURL, "--json", "body", "-q", ".body")
+			// Get current body and permissions
+			// We need to fetch viewerCanEditFiles and author again because for newly created PRs (via pr create),
+			// these fields are missing in tsk.item.
+			out, err := RunGh(ghPath, verbose, "pr", "view", targetURL, "--json", "body,viewerCanEditFiles,author")
 			if err != nil {
 				mu.Lock()
 				errs = append(errs, fmt.Sprintf("failed to view PR %s: %v", targetURL, err))
 				mu.Unlock()
 				return
 			}
-			originalBody := strings.TrimSpace(string(bodyOut))
 
-			// Fill PrInfo Body for validation (tsk.item came from CollectPrStatus which fetched Body, but to be safe and use latest)
-			// Actually CollectPrStatus does fetch Body. But let's use the one we just fetched to be atomic?
-			// ValidatePrPermissionAndOverwrite needs Body to check for block existence.
-			tsk.item.Body = originalBody
+			// Parse JSON to update tsk.item
+			var latestPr PrInfo
+			if err := json.Unmarshal([]byte(out), &latestPr); err != nil {
+				mu.Lock()
+				errs = append(errs, fmt.Sprintf("failed to parse PR info for %s: %v", targetURL, err))
+				mu.Unlock()
+				return
+			}
+
+			// Update tsk.item with latest info
+			tsk.item.Body = latestPr.Body
+			tsk.item.ViewerCanEditFiles = latestPr.ViewerCanEditFiles
+			tsk.item.Author = latestPr.Author
+			originalBody := latestPr.Body
 
 			// Validate
 			if err := ValidatePrPermissionAndOverwrite(repoID, tsk.item, currentUser, overwrite); err != nil {
