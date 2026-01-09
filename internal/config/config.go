@@ -1,0 +1,215 @@
+// Package config handles configuration loading and validation.
+package config
+
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"path"
+	"path/filepath"
+	"regexp"
+	"strings"
+	"os"
+)
+
+var (
+	// ErrInvalidDataFormat indicates that the configuration data is invalid.
+	ErrInvalidDataFormat = errors.New("Invalid data format")
+	// ErrDuplicateID indicates that a duplicate repository ID was found.
+	ErrDuplicateID = errors.New("Duplicate repository ID")
+	// ErrInvalidFilePath indicates that the file path is invalid.
+	ErrInvalidFilePath = errors.New("Invalid file path")
+	// ErrInvalidID indicates that the repository ID is invalid.
+	ErrInvalidID = errors.New("Invalid repository ID")
+	// ErrInvalidURL indicates that the repository URL is invalid.
+	ErrInvalidURL = errors.New("Invalid repository URL")
+	// ErrInvalidGitRef indicates that the git reference is invalid.
+	ErrInvalidGitRef = errors.New("Invalid git reference")
+)
+
+var (
+	// idRegex enforces safe characters for directory names.
+	// Alphanumeric, underscore, hyphen, dot.
+	idRegex = regexp.MustCompile(`^[a-zA-Z0-9._-]+$`)
+
+	// safeGitRefRegex allows alphanumeric, slash, dot, underscore, hyphen.
+	// It is a subset of what git allows, but safe for our usage.
+	safeGitRefRegex = regexp.MustCompile(`^[a-zA-Z0-9./_-]+$`)
+)
+
+// Repository represents a single repository configuration.
+type Repository struct {
+	ID         *string  `json:"id"`
+	URL        *string  `json:"url"`
+	Branch     *string  `json:"branch,omitempty"`
+	Revision   *string  `json:"revision,omitempty"`
+	BaseBranch *string  `json:"base-branch,omitempty"`
+}
+
+// Config represents the top-level configuration structure.
+type Config struct {
+	Repositories *[]Repository `json:"repositories"`
+	// BaseDir is the directory where the configuration file is located.
+	// It is used to resolve relative paths for repositories.
+	// This field is not serialized.
+	BaseDir string `json:"-"`
+}
+
+// ParseConfig parses the configuration JSON data.
+func ParseConfig(data []byte) (*Config, error) {
+	var config Config
+	if err := json.Unmarshal(data, &config); err != nil {
+		return nil, ErrInvalidDataFormat
+	}
+
+	if config.Repositories == nil {
+		return nil, ErrInvalidDataFormat
+	}
+
+	for _, repo := range *config.Repositories {
+		if repo.URL == nil {
+			return nil, ErrInvalidDataFormat
+		}
+	}
+
+	return &config, nil
+}
+
+// validateRepositories checks for duplicate IDs in the repository list.
+// If an ID is missing, it is derived from the URL.
+func validateRepositories(repos []Repository) error {
+	seenIDs := make(map[string]bool)
+	for i := range repos {
+		repo := &repos[i]
+		if repo.ID == nil || *repo.ID == "" {
+			if repo.URL == nil {
+				// Should have been caught by ParseConfig, but just in case
+				continue
+			}
+			url := strings.TrimRight(*repo.URL, "/")
+			base := path.Base(url)
+			id := strings.TrimSuffix(base, ".git")
+			repo.ID = &id
+		}
+
+		// Validate ID
+		if !idRegex.MatchString(*repo.ID) {
+			return fmt.Errorf("%w: %s (contains unsafe characters)", ErrInvalidID, *repo.ID)
+		}
+		if *repo.ID == "." || *repo.ID == ".." {
+			return fmt.Errorf("%w: %s (cannot be . or ..)", ErrInvalidID, *repo.ID)
+		}
+		// Redundant check for abs path (idRegex excludes slash/backslash), but kept for clarity
+		if filepath.IsAbs(*repo.ID) {
+			return fmt.Errorf("%w: %s (must be relative)", ErrInvalidFilePath, *repo.ID)
+		}
+
+		// Validate URL
+		if repo.URL != nil {
+			if strings.HasPrefix(*repo.URL, "ext::") {
+				return fmt.Errorf("%w: %s (ext:: protocol not allowed)", ErrInvalidURL, *repo.URL)
+			}
+			// Check for control characters
+			if strings.ContainsAny(*repo.URL, "\n\r\t") {
+				return fmt.Errorf("%w: %s (contains control characters)", ErrInvalidURL, *repo.URL)
+			}
+		}
+
+		// Validate Branch
+		if repo.Branch != nil && *repo.Branch != "" {
+			if !isValidGitRef(*repo.Branch) {
+				return fmt.Errorf("%w: %s", ErrInvalidGitRef, *repo.Branch)
+			}
+		}
+
+		// Validate BaseBranch
+		if repo.BaseBranch != nil && *repo.BaseBranch != "" {
+			if !isValidGitRef(*repo.BaseBranch) {
+				return fmt.Errorf("%w: %s", ErrInvalidGitRef, *repo.BaseBranch)
+			}
+		}
+
+		// Validate Revision
+		if repo.Revision != nil && *repo.Revision != "" {
+			if !isValidGitRef(*repo.Revision) {
+				return fmt.Errorf("%w: %s", ErrInvalidGitRef, *repo.Revision)
+			}
+		}
+
+		if seenIDs[*repo.ID] {
+			return fmt.Errorf("%w: %s", ErrDuplicateID, *repo.ID)
+		}
+		seenIDs[*repo.ID] = true
+	}
+	return nil
+}
+
+func isValidGitRef(ref string) bool {
+	// Prevent flag injection
+	if strings.HasPrefix(ref, "-") {
+		return false
+	}
+	return safeGitRefRegex.MatchString(ref)
+}
+
+// GetRepoDirName determines the checkout directory name (relative path).
+// If ID is present and not empty, it is used. Otherwise, it is derived from the URL.
+func GetRepoDirName(repo Repository) string {
+	if repo.ID != nil && *repo.ID != "" {
+		return *repo.ID
+	}
+	// Derive from URL using path.Base because URLs use forward slashes
+	if repo.URL == nil {
+		return ""
+	}
+	url := strings.TrimRight(*repo.URL, "/")
+	base := path.Base(url)
+	return strings.TrimSuffix(base, ".git")
+}
+
+// GetRepoPath returns the absolute or relative path to the repository,
+// joining BaseDir and the repository directory name.
+func (c *Config) GetRepoPath(repo Repository) string {
+	return filepath.Join(c.BaseDir, GetRepoDirName(repo))
+}
+
+// LoadConfigData parses configuration from a byte slice.
+func LoadConfigData(data []byte) (*Config, error) {
+	config, err := ParseConfig(data)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := validateRepositories(*config.Repositories); err != nil {
+		return nil, fmt.Errorf("Error validating configuration: %v.", err)
+	}
+
+	return config, nil
+}
+
+// LoadConfigFile reads a configuration file and returns a Config object.
+func LoadConfigFile(configFile string) (*Config, error) {
+	if configFile == "" {
+		return nil, errors.New("Error: Specify configuration file using --file or -f.")
+	}
+
+	absPath, err := filepath.Abs(configFile)
+	if err != nil {
+		return nil, fmt.Errorf("Error getting absolute path for config file: %v.", err)
+	}
+
+	data, err := os.ReadFile(absPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, fmt.Errorf("Configuration file %s not found.", configFile)
+		}
+		return nil, fmt.Errorf("Error reading file: %v.", err)
+	}
+
+	config, err := LoadConfigData(data)
+	if err != nil {
+		return nil, err
+	}
+
+	return config, nil
+}
