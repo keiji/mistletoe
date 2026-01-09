@@ -8,7 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
+	"io"
 	"os/exec"
 	"path/filepath"
 	"regexp"
@@ -305,8 +305,8 @@ func SortPrs(prs []PrInfo) {
 }
 
 // RenderPrStatusTable renders the PR status table.
-func RenderPrStatusTable(rows []PrStatusRow) {
-	table := tablewriter.NewTable(os.Stdout,
+func RenderPrStatusTable(w io.Writer, rows []PrStatusRow) {
+	table := tablewriter.NewTable(w,
 		tablewriter.WithHeaderAutoFormat(tw.Off),
 		tablewriter.WithRowAutoWrap(tw.WrapNone),
 		tablewriter.WithRendition(tw.Rendition{
@@ -350,9 +350,9 @@ func RenderPrStatusTable(rows []PrStatusRow) {
 		_ = table.Append(row.Repo, row.Base, row.LocalBranchRev, statusStr, prContent)
 	}
 	if err := table.Render(); err != nil {
-		fmt.Printf("Error rendering table: %v\n", err)
+		fmt.Fprintf(w, "Error rendering table: %v\n", err)
 	}
-	fmt.Printf("Status Legend: %s Pullable, %s Unpushed, %s Conflict\n", StatusSymbolPullable, StatusSymbolUnpushed, StatusSymbolConflict)
+	fmt.Fprintf(w, "Status Legend: %s Pullable, %s Unpushed, %s Conflict\n", StatusSymbolPullable, StatusSymbolUnpushed, StatusSymbolConflict)
 }
 
 // executePush pushes changes for the given repositories.

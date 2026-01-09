@@ -1,7 +1,9 @@
 package app
 
 import (
+	"bytes"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -50,4 +52,56 @@ func TestSortPrs(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestRenderPrStatusTable(t *testing.T) {
+	rows := []PrStatusRow{
+		{
+			StatusRow: StatusRow{
+				Repo:           "repo1",
+				LocalBranchRev: "main:abc",
+				HasUnpushed:    false,
+			},
+			PrNumber:  "#1",
+			PrState:   "OPEN",
+			PrURL:     "https://github.com/org/repo1/pull/1",
+			PrDisplay: "https://github.com/org/repo1/pull/1 [OPEN]",
+			Base:      "main",
+		},
+		{
+			StatusRow: StatusRow{
+				Repo:           "repo2",
+				LocalBranchRev: "dev:def",
+				HasUnpushed:    true,
+			},
+			PrNumber:  "N/A",
+			PrState:   "",
+			PrURL:     "",
+			PrDisplay: "-",
+			Base:      "dev",
+		},
+	}
+
+	var buf bytes.Buffer
+	RenderPrStatusTable(&buf, rows)
+
+	output := buf.String()
+
+	assertContains := func(t *testing.T, out, substr string) {
+		t.Helper()
+		if !strings.Contains(out, substr) {
+			t.Errorf("Expected output to contain %q, but it didn't.", substr)
+		}
+	}
+
+	assertContains(t, output, "repo1")
+	assertContains(t, output, "#1")
+	assertContains(t, output, "OPEN")
+	assertContains(t, output, "repo2")
+	assertContains(t, output, "N/A")
+
+	// repo2 has Unpushed
+	assertContains(t, output, StatusSymbolUnpushed)
+
+	assertContains(t, output, "Status Legend:")
 }

@@ -197,5 +197,5 @@ func handlePrCheckout(args []string, opts GlobalOptions) {
 	prRows := CollectPrStatus(rows, config, parallel, opts.GhPath, verbose, nil)
 	spinner.Stop()
 
-	RenderPrStatusTable(prRows)
+	RenderPrStatusTable(Stdout, prRows)
 }

@@ -140,7 +140,7 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 	// Initial Check: No known PRs yet
 	prRows := CollectPrStatus(rows, config, parallel, opts.GhPath, verbose, nil)
 	spinner.Stop()
-	RenderPrStatusTable(prRows)
+	RenderPrStatusTable(Stdout, prRows)
 
 	// 6. Check for Behind/Conflict/Detached
 	// Abort if pull required (behind)
@@ -398,7 +398,7 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 		}
 		displayRows = append(displayRows, row)
 	}
-	RenderPrStatusTable(displayRows)
+	RenderPrStatusTable(Stdout, displayRows)
 
 	fmt.Println("Done.")
 }

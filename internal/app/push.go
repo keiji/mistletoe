@@ -74,7 +74,7 @@ func handlePush(args []string, opts GlobalOptions) {
 
 	spinner.Stop()
 
-	RenderStatusTable(rows)
+	RenderStatusTable(Stdout, rows)
 
 	ValidateStatusForAction(rows, true)
 

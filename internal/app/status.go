@@ -72,5 +72,5 @@ func handleStatus(args []string, opts GlobalOptions) {
 
 	spinner.Stop()
 
-	RenderStatusTable(rows)
+	RenderStatusTable(Stdout, rows)
 }
