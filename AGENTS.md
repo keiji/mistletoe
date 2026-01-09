@@ -4,6 +4,22 @@
     *   Prioritize **Japanese** for basic interactions, and include **English** as well.
     *   For **Pull Requests and Comments**, all interactions must be in **Japanese**.
 
+# Development Guidelines
+
+## Code Style & Design
+
+*   **Google Go Style Guide**: The code must strictly follow the [Google Go Style Guide](https://google.github.io/styleguide/go/).
+    *   Use `MixedCaps` for naming.
+    *   Package names should be short, lowercase, and singular.
+    *   Error strings should not be capitalized (unless beginning with proper nouns or acronyms) and should not end with punctuation.
+*   **General Go Software Design**:
+    *   Avoid monolithic packages. Use the `internal/` directory to organize code into logical packages (e.g., `git`, `gh`, `config`, `ui`).
+    *   Avoid `utils` or `common` packages. instead, name packages by their domain.
+    *   Keep interfaces small and defined where they are used.
+*   **Testability**:
+    *   Design code to be testable. Use dependency injection or mockable variables (like `ExecCommand`) for external interactions (Git, filesystem, etc.).
+    *   Ensure tests cover edge cases and error conditions.
+
 # Pull Request Guidelines
 
 Before creating a Pull Request, ensure that you verify not only that the build succeeds but also that the `revive` checks pass. **This is a strict requirement; the CI process will fail if any linting errors are detected.**
@@ -38,6 +54,7 @@ To run `revive` in the sandbox environment:
 
 *   [Material Design Writing Best Practices](https://m3.material.io/foundations/writing/best-practices)
 *   [Digital.gov Style Guide](https://digital.gov/style-guide)
+*   [Google Go Style Guide](https://google.github.io/styleguide/go/)
 
 ## Documentation Guidelines
 
