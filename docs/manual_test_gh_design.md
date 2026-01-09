@@ -1,79 +1,76 @@
-# mstl-gh 手動テスト設計書
+# mstl-gh Manual Test Design
 
-本書は、`mstl-gh` コマンドラインツールの機能（特に GitHub 連携機能）を検証するための Python スクリプトの設計概要を記述します。
+This document describes the design of the manual testing scripts for `mstl-gh`, specifically focusing on the interactive testing scripts.
 
-## 1. 概要 (Overview)
+## 1. Overview
 
-本テストスクリプトは、GitHub CLI (`gh`) を使用して実際にプライベートリポジトリを作成し、`mstl-gh` の各サブコマンドを実行して動作を検証します。
-既存のリポジトリへの影響を防ぐため、UUID を用いた一意なリポジトリ名を使用し、厳格な安全確認を行います。
+The manual testing suite consists of interactive Python scripts that guide a human tester through various `mstl-gh` workflows (e.g., creating Pull Requests, updating them). Unlike fully automated tests, these scripts:
+1.  Set up a temporary environment (GitHub repositories).
+2.  Describe a test scenario and expected outcome to the user.
+3.  Prompt the user to execute the command (or verify execution).
+4.  Ask the user to verify the result manually (e.g., by checking a browser).
+5.  Clean up the environment.
 
-## 2. 前提条件 (Prerequisites)
+## 2. Scripts Structure
 
-*   Python 3.x
-*   Go (`mstl-gh` のビルド用)
-*   GitHub CLI (`gh`) がインストールされ、認証済みであること (`gh auth status` で確認)。
-    *   `repo` スコープの権限が必要です。
+### 2.1. Shared Libraries
+*   `scripts/gh_test_env.py`: Handles the setup and teardown of the test environment.
+    *   Generates unique repository names (UUID-based).
+    *   Creates private repositories using `gh repo create`.
+    *   Builds the `mstl-gh` binary.
+    *   Generates configuration (`mistletoe.json`) and dependency graphs.
+    *   Cleans up (renames and deletes) repositories.
+*   `scripts/interactive_runner.py`: Manages the user interaction flow.
+    *   Parses arguments (e.g., `-o/--output`).
+    *   Displays test scenarios and expected results.
+    *   Prompts for confirmation (`yes/no`).
+    *   Logs results (PASS/FAIL/SKIP) to stdout and optionally to a file.
 
-## 3. 安全機構 (Safety Mechanisms)
+### 2.2. Test Scripts
+*   `scripts/manual_test_gh_pr_create.py`: Tests the "Create Pull Request" workflow.
+    *   **Scenario:** Creates 3 repositories with a dependency chain (A -> B -> C).
+    *   **Action:** Runs `mstl-gh pr create` interactively.
+    *   **Verification:** User checks if PRs are created with correct dependency links.
 
-誤操作を防ぐため、以下の安全チェックを実装します。
+### 2.3. Legacy Scripts
+*   `scripts/manual_test_gh.py`: The original monolithic test script.
+    *   **Safety:** Requires the user to type "I AGREE" to proceed.
+    *   **Scope:** Runs a fixed sequence of all tests (`init`, `switch`, `status`, `pr create`, etc.).
 
-1.  **既存リポジトリの確認:** `gh repo list` を実行し、リポジトリが1つでも存在する場合、警告を表示します。
-2.  **ユーザー同意:** 以下の内容を含む警告を表示し、ユーザーに "I AGREE" の入力を求めます。
-    *   既存のリポジトリが存在すること。
-    *   （万が一の）既存リポジトリ破壊のリスク。
-    *   今回作成する一時リポジトリのリスト。
-3.  **一意な名前:** リポジトリ名には UUID を含めます (例: `mistletoe-test-[UUID]-A`)。
-4.  **安全な中断:** ユーザーが `Ctrl+C` で中断した場合、一時リポジトリを削除するか、デバッグ用に残すかを尋ねます。
-5.  **クリーンアップ:** テスト終了時（成功時、または中断時に削除を選択した場合）、リポジトリ名をリネームした上で削除します。
+## 3. Usage
 
-## 4. テストフローとチェックポイント (Test Flow & Checkpoints)
+### Running a Test
+```bash
+python3 scripts/manual_test_gh_pr_create.py [-o results.log]
+```
 
-スクリプトは一連の操作を実行しますが、重要な状態変化の後に **チェックポイント** を設けます。
-チェックポイントでは、期待される状態（Expected State）と現在の状態（Current State）を表示し、ユーザーによる目視確認を待ちます。
+### Flow
+1.  **Setup:** The script creates temporary repositories (e.g., `mistletoe-test-1234-A`).
+2.  **Prompt:** The script displays the expected result.
+    ```
+    [Expected Result]
+    This test will create Pull Requests in...
+    Do you want to execute the process? [Y/n]:
+    ```
+3.  **Execution:** The script runs `mstl-gh` commands. The user may need to interact with the CLI (e.g., typing "yes").
+4.  **Verification:** The script asks if the result matches the expectation.
+    ```
+    Process complete. Is the behavior as expected? [Y/n]:
+    ```
+5.  **Logging:** The result is logged.
+6.  **Cleanup:** The script asks to delete the temporary repositories.
 
-### 4.1. 準備 (Setup)
-1.  UUID を生成します。
-2.  3つのプライベートリポジトリ (`repo-A`, `repo-B`, `repo-C`) を `gh repo create` で作成します。
-3.  これらを指す設定ファイル `mistletoe.json` を生成します。
-4.  複雑な依存関係テスト用に、依存関係グラフファイル `dependencies.mmd` を作成します（A -> B -> C）。
-5.  `mstl-gh` バイナリをビルドします。
+## 4. Implementation Details
 
-### 4.2. 初期化 (`init`)
-*   **コマンド:** `mstl-gh init -f mistletoe.json`
-*   **チェックポイント 1:** 初期化完了
-    *   期待される状態: 全てのリポジトリがクローンされ、デフォルトブランチ（main）であること。
+*   **Language:** Python 3.
+*   **Dependencies:** `gh` CLI (authenticated), `git`, `go` (for building).
+*   **Output:** All user-facing messages are in English.
+*   **Safety:** Repositories are strictly namespaced with UUIDs. Cleanup handles renaming to `*-deleting` before deletion to prevent accidental data loss.
 
-### 4.3. ステータスとスイッチ (`status`, `switch`)
-*   **コマンド:** `mstl-gh switch -c feature/complex-dep`
-*   **チェックポイント 2:** ブランチ作成完了
-    *   期待される状態: 全てのリポジトリが `feature/complex-dep` ブランチであること。
+## 5. Future Extensions
 
-### 4.4. 依存関係を含む PR 作成 (`pr create`)
-*   **操作:** 各リポジトリで空のコミットを作成し、プッシュします。
-*   **コマンド:** `mstl-gh pr create -t "Complex Dependency PR" -b "Testing complex dependencies" -d dependencies.mmd`
-*   **チェックポイント 3:** PR 作成完了
-    *   期待される状態: 各リポジトリに PR が作成され、PR 本文に依存関係グラフとリンク（Dependencies/Dependents）が正しく記載されていること。
-    *   ユーザーアクション: ブラウザで作成された PR を開き、依存関係の表示を確認する。
-
-### 4.5. PRステータス (`pr status`)
-*   **コマンド:** `mstl-gh pr status`
-*   **検証:** 作成した PR が表示されること。
-
-### 4.6. PR更新 (`pr update`)
-*   **操作:** `repo-C` でさらにコミットしてプッシュします。
-*   **コマンド:** `mstl-gh pr update`
-*   **チェックポイント 4:** PR 更新完了
-    *   期待される状態: `repo-C` の変更が反映され、関連する PR の Mistletoe ブロック（スナップショットなど）が更新されていること。
-
-### 4.7. スナップショットとチェックアウト (`snapshot`, `pr checkout`)
-*   **操作:** テスト用ディレクトリを一度削除（または別ディレクトリを使用）。
-*   **コマンド:** `mstl-gh pr checkout -u [Repo-A PR URL]`
-*   **チェックポイント 5:** チェックアウト完了
-    *   期待される状態: `repo-A` の PR から依存関係を辿り、`repo-B`, `repo-C` も含めて環境が復元されていること。
-
-## 5. 実装の詳細 (Internal Logic)
-
-*   **チェックポイント関数:** `checkpoint(name, expected_state)` 関数を実装し、ユーザー入力を待ちます。
-*   **シグナルハンドリング:** `signal.signal(signal.SIGINT, handler)` を使用して `Ctrl+C` を捕捉し、クリーンアップの可否を対話的に決定します。
-*   **依存関係グラフ:** Mermaid 記法で `A --> B`, `B --> C` を記述したファイルを作成し、`pr create` の `-d` オプションに渡します。
+To add a new test scenario:
+1.  Create a new script (e.g., `scripts/manual_test_gh_pr_sync.py`).
+2.  Import `GhTestEnv` and `InteractiveRunner`.
+3.  Define the scenario logic function.
+4.  Call `runner.execute_scenario()`.
