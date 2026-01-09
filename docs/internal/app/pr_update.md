@@ -4,8 +4,9 @@
 
 `pr update` サブコマンドは、既に存在するPull Request (PR) を更新します。
 対象となるリポジトリ（OpenまたはDraft状態のPRが存在するもの）に対して、以下の処理を行います：
-1.  **Push**: ローカルブランチがリモートより進んでいる場合、変更をPushします。
-2.  **Description更新**: PRのDescriptionに含まれるMistletoeブロック（スナップショット情報および依存関係グラフ）を最新の状態に更新します。
+1.  **Status**: PRステータスを表示し、ユーザーに更新の可否を確認します。
+2.  **Push**: ローカルブランチがリモートより進んでいる場合、変更をPushします。
+3.  **Description更新**: PRのDescriptionに含まれるMistletoeブロック（スナップショット情報および依存関係グラフ）を最新の状態に更新します。
 
 新しいPRの作成は行いません。
 
@@ -46,7 +47,10 @@ flowchart TD
     Categorize --> CheckTarget{"更新可能なPRがあるか？\n(Open/Draft)"}
 
     CheckTarget -- "No" --> Stop(["終了 (更新対象なし)"])
-    CheckTarget -- "Yes" --> VerifyPush{"Pushが必要か？\n(Ahead)"}
+    CheckTarget -- "Yes" --> Prompt{"更新を実行しますか？\n(Yes/No)"}
+
+    Prompt -- "No" --> Stop
+    Prompt -- "Yes" --> VerifyPush{"Pushが必要か？\n(Ahead)"}
 
     VerifyPush -- "Yes" --> ExecPush["Push実行"]
     VerifyPush -- "No" --> GenSnapshot["スナップショット生成"]
@@ -69,8 +73,12 @@ flowchart TD
     *   **条件**: マージ競合が発生している。
     *   **アクション**: **エラー停止**。
 
-3.  **Pull Requestの更新 (Update PR)**:
-    *   **条件**: 有効な（OpenまたはDraft状態の）Pull Requestが存在する。
+3.  **ユーザー確認 (User Confirmation)**:
+    *   **条件**: 更新可能なPRが存在し、エラーがない場合。
+    *   **アクション**: ユーザーに更新を実行するか確認します（Yes/No）。
+
+4.  **Pull Requestの更新 (Update PR)**:
+    *   **条件**: ユーザーがYesを選択した場合。
     *   **アクション**:
         *   **Push**: ローカルがリモートより進んでいる場合 (`Ahead`)、`git push origin <branch>` を実行します。
         *   **Update**: DescriptionのMistletoeブロックを置換・追記します。
