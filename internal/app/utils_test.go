@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 	"testing"
+	"time"
 )
 
 // TestRunEditor verifies RunEditor functionality.
@@ -125,4 +127,160 @@ func TestSpinner(t *testing.T) {
 	sVerbose.Start()
 	// Should do nothing
 	sVerbose.Stop()
+}
+
+func TestFormatDuration(t *testing.T) {
+	tests := []struct {
+		d    time.Duration
+		want string
+	}{
+		{0, "0ms"},
+		{100 * time.Millisecond, "100ms"},
+		{1234 * time.Millisecond, "1,234ms"},
+		{1000 * time.Millisecond, "1,000ms"},
+		{1234567 * time.Millisecond, "1,234,567ms"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.want, func(t *testing.T) {
+			if got := formatDuration(tt.d); got != tt.want {
+				t.Errorf("formatDuration(%v) = %v, want %v", tt.d, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestResolveCommonValues(t *testing.T) {
+	originalStdin := Stdin
+	defer func() { Stdin = originalStdin }()
+
+	tests := []struct {
+		name        string
+		fLong       string
+		fShort      string
+		pVal        int
+		pValShort   int
+		ignoreStdin bool
+		stdinData   string
+		wantFile    string
+		wantP       int
+		wantData    string
+		wantErr     bool
+	}{
+		{
+			name:      "Defaults",
+			fLong:     DefaultConfigFile,
+			fShort:    DefaultConfigFile,
+			wantFile:  "", // With strings.Reader(""), logic assumes Stdin is piped but empty, so clears configFile
+			wantP:     1,
+			wantData:  "",
+			stdinData: "",
+		},
+		{
+			name:        "Explicit File Long",
+			fLong:       "custom.json",
+			fShort:      DefaultConfigFile,
+			ignoreStdin: true, // Simulate TTY/No pipe
+			wantFile:    "custom.json",
+			wantP:       1,
+		},
+		{
+			name:        "Explicit File Short",
+			fLong:       DefaultConfigFile,
+			fShort:      "short.json",
+			ignoreStdin: true, // Simulate TTY/No pipe
+			wantFile:    "short.json",
+			wantP:       1,
+		},
+		{
+			name:        "Parallel Long",
+			fLong:       DefaultConfigFile,
+			fShort:      DefaultConfigFile,
+			pVal:        4,
+			pValShort:   0,
+			ignoreStdin: true, // Simulate TTY/No pipe
+			wantFile:    DefaultConfigFile,
+			wantP:       4,
+		},
+		{
+			name:        "Parallel Short",
+			fLong:       DefaultConfigFile,
+			fShort:      DefaultConfigFile,
+			pVal:        0,
+			pValShort:   8,
+			ignoreStdin: true, // Simulate TTY/No pipe
+			wantFile:    DefaultConfigFile,
+			wantP:       8,
+		},
+		{
+			name:      "Parallel Invalid Low",
+			pVal:      -1,
+			wantErr:   true,
+		},
+		{
+			name:      "Parallel Invalid High",
+			pVal:      200,
+			wantErr:   true,
+		},
+		{
+			name:      "Stdin used when default file and stdin available",
+			fLong:     DefaultConfigFile,
+			fShort:    DefaultConfigFile,
+			stdinData: `{"repositories": []}`,
+			wantFile:  "", // Cleared when using stdin
+			wantData:  `{"repositories": []}`,
+			wantP:     1,
+		},
+		{
+			name:      "Stdin ignored when ignoreStdin true",
+			fLong:     DefaultConfigFile,
+			fShort:    DefaultConfigFile,
+			ignoreStdin: true,
+			stdinData: `{"repositories": []}`,
+			wantFile:  DefaultConfigFile, // Uses default file
+			wantData:  "",
+			wantP:     1,
+		},
+		{
+			name:      "Conflict: Custom file and Stdin",
+			fLong:     "custom.json",
+			fShort:    DefaultConfigFile,
+			stdinData: `{"repositories": []}`,
+			wantErr:   true,
+		},
+		{
+			name:      "Explicit empty file forces Stdin",
+			fLong:     "",
+			fShort:    DefaultConfigFile, // fLong takes precedence as empty
+			stdinData: `{"repositories": []}`,
+			wantFile:  "",
+			wantData:  `{"repositories": []}`,
+			wantP:     1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.stdinData != "" {
+				Stdin = strings.NewReader(tt.stdinData)
+			} else {
+				Stdin = strings.NewReader("")
+			}
+
+			gotFile, gotP, gotData, err := ResolveCommonValues(tt.fLong, tt.fShort, tt.pVal, tt.pValShort, tt.ignoreStdin)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ResolveCommonValues() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if gotFile != tt.wantFile {
+				t.Errorf("ResolveCommonValues() file = %v, want %v", gotFile, tt.wantFile)
+			}
+			if gotP != tt.wantP {
+				t.Errorf("ResolveCommonValues() p = %v, want %v", gotP, tt.wantP)
+			}
+			if string(gotData) != tt.wantData {
+				t.Errorf("ResolveCommonValues() data = %v, want %v", string(gotData), tt.wantData)
+			}
+		})
+	}
 }

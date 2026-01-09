@@ -1,6 +1,8 @@
 package app
 
-import "strings"
+import (
+	"strings"
+)
 
 // isPrFromConfiguredRepo checks if the PR's head repository matches the configured repository URL.
 // It handles potential .git suffix differences and URL protocol variations by relying on canonical URL comparison if available.
