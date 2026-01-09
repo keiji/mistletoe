@@ -1,6 +1,10 @@
 package app
 
 import (
+	conf "mistletoe/internal/config"
+)
+
+import (
 	"encoding/json"
 	"os"
 	"os/exec"
@@ -34,7 +38,7 @@ func TestInit_MissingBranchAndRevision(t *testing.T) {
 	if err := exec.Command("git", "init", contentDir).Run(); err != nil {
 		t.Fatalf("failed to init content repo: %v", err)
 	}
-	// Config user
+	// conf.Config user
 	if err := exec.Command("git", "-C", contentDir, "config", "user.email", "test@example.com").Run(); err != nil {
 		t.Fatalf("failed to config user.email: %v", err)
 	}
@@ -69,11 +73,11 @@ func TestInit_MissingBranchAndRevision(t *testing.T) {
 		repoID := "repo-defaults"
 		configFile := filepath.Join(t.TempDir(), "repos.json")
 
-		// Config with NO Branch and NO Revision
-		// We use Repository struct but set fields to defaults
+		// conf.Config with NO Branch and NO Revision
+		// We use conf.Repository struct but set fields to defaults
 		// When marshaled, omitempty will remove them
-		config := Config{
-			Repositories: &[]Repository{
+		config := conf.Config{
+			Repositories: &[]conf.Repository{
 				{URL: &repoURL, ID: &repoID}, // Branch and Revision are ""
 			},
 		}

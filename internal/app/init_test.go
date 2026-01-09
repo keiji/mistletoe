@@ -1,6 +1,10 @@
 package app
 
 import (
+	conf "mistletoe/internal/config"
+)
+
+import (
 	"os"
 	"path/filepath"
 	"testing"
@@ -32,7 +36,7 @@ func TestValidateEnvironment(t *testing.T) {
 	tests := []struct {
 		name    string
 		setup   func() // Function to set up the environment state
-		repos   []Repository
+		repos   []conf.Repository
 		wantErr bool
 	}{
 		{
@@ -40,7 +44,7 @@ func TestValidateEnvironment(t *testing.T) {
 			setup: func() {
 				// No setup needed, dir shouldn't exist
 			},
-			repos: []Repository{
+			repos: []conf.Repository{
 				{URL: &repoURL, ID: &repoID},
 			},
 			wantErr: false,
@@ -52,7 +56,7 @@ func TestValidateEnvironment(t *testing.T) {
 					t.Fatalf("failed to create dir: %v", err)
 				}
 			},
-			repos: []Repository{
+			repos: []conf.Repository{
 				{URL: &repoURL, ID: &repoID},
 			},
 			wantErr: false,
@@ -67,7 +71,7 @@ func TestValidateEnvironment(t *testing.T) {
 					t.Fatalf("failed to create file: %v", err)
 				}
 			},
-			repos: []Repository{
+			repos: []conf.Repository{
 				{URL: &repoURL, ID: &repoID},
 			},
 			wantErr: true,
@@ -77,7 +81,7 @@ func TestValidateEnvironment(t *testing.T) {
 			setup: func() {
 				createDummyGitRepo(t, repoID, repoURL)
 			},
-			repos: []Repository{
+			repos: []conf.Repository{
 				{URL: &repoURL, ID: &repoID},
 			},
 			wantErr: false,
@@ -87,7 +91,7 @@ func TestValidateEnvironment(t *testing.T) {
 			setup: func() {
 				createDummyGitRepo(t, repoID, "https://github.com/other/repo.git")
 			},
-			repos: []Repository{
+			repos: []conf.Repository{
 				{URL: &repoURL, ID: &repoID},
 			},
 			wantErr: true,
@@ -176,7 +180,7 @@ func TestPerformInit(t *testing.T) {
 	repoURL := "file://" + remoteDir // Use file protocol for cloning
 	branch := "master"
 
-	repos := []Repository{
+	repos := []conf.Repository{
 		{
 			ID:     &repoID,
 			URL:    &repoURL,

@@ -1,4 +1,4 @@
-package app
+package config
 
 import (
 	"errors"
@@ -6,11 +6,9 @@ import (
 	"reflect"
 	"strings"
 	"testing"
-
-	"mistletoe/internal/config"
 )
 
-func TestLoadConfig(t *testing.T) {
+func TestLoadConfigFile(t *testing.T) {
 	// Helper to create temp file
 	createTempFile := func(content string) string {
 		tmpfile, err := os.CreateTemp("", "config_test_*.json")
@@ -55,7 +53,7 @@ func TestLoadConfig(t *testing.T) {
 				return createTempFile(`{ invalid json }`)
 			},
 			wantConfig: false,
-			wantErr:    config.ErrInvalidDataFormat,
+			wantErr:    ErrInvalidDataFormat,
 		},
 		{
 			name: "Missing repositories key",
@@ -63,7 +61,7 @@ func TestLoadConfig(t *testing.T) {
 				return createTempFile(`{}`)
 			},
 			wantConfig: false,
-			wantErr:    config.ErrInvalidDataFormat,
+			wantErr:    ErrInvalidDataFormat,
 		},
 		{
 			name: "Repositories key is null",
@@ -71,7 +69,7 @@ func TestLoadConfig(t *testing.T) {
 				return createTempFile(`{"repositories": null}`)
 			},
 			wantConfig: false,
-			wantErr:    config.ErrInvalidDataFormat,
+			wantErr:    ErrInvalidDataFormat,
 		},
 		{
 			name: "Repositories empty array (valid)",
@@ -87,7 +85,7 @@ func TestLoadConfig(t *testing.T) {
 				return createTempFile(`{"repositories": [{"id": "test"}]}`)
 			},
 			wantConfig: false,
-			wantErr:    config.ErrInvalidDataFormat,
+			wantErr:    ErrInvalidDataFormat,
 		},
 		{
 			name: "Repo URL is null",
@@ -95,7 +93,7 @@ func TestLoadConfig(t *testing.T) {
 				return createTempFile(`{"repositories": [{"url": null}]}`)
 			},
 			wantConfig: false,
-			wantErr:    config.ErrInvalidDataFormat,
+			wantErr:    ErrInvalidDataFormat,
 		},
 	}
 
@@ -106,41 +104,37 @@ func TestLoadConfig(t *testing.T) {
 				defer os.Remove(filename)
 			}
 
-			cfg, err := loadConfigFile(filename)
+			cfg, err := LoadConfigFile(filename)
 
 			if tt.wantErr != nil {
 				if err == nil {
-					t.Errorf("loadConfigFile() expected error %v, got nil", tt.wantErr)
+					t.Errorf("LoadConfigFile() expected error %v, got nil", tt.wantErr)
 				} else if !errors.Is(err, tt.wantErr) {
-					t.Errorf("loadConfigFile() error = %v, want %v", err, tt.wantErr)
+					t.Errorf("LoadConfigFile() error = %v, want %v", err, tt.wantErr)
 				}
 			} else if tt.wantErrMsg != "" {
 				if err == nil {
-					t.Errorf("loadConfigFile() expected error containing %q, got nil", tt.wantErrMsg)
+					t.Errorf("LoadConfigFile() expected error containing %q, got nil", tt.wantErrMsg)
 				} else if !strings.Contains(err.Error(), tt.wantErrMsg) {
-					t.Errorf("loadConfigFile() error = %v, want error containing %q", err, tt.wantErrMsg)
+					t.Errorf("LoadConfigFile() error = %v, want error containing %q", err, tt.wantErrMsg)
 				}
 			} else {
 				if err != nil {
-					t.Errorf("loadConfigFile() unexpected error: %v", err)
+					t.Errorf("LoadConfigFile() unexpected error: %v", err)
 				}
 				if tt.wantConfig && cfg == nil {
-					t.Error("loadConfigFile() expected config, got nil")
+					t.Error("LoadConfigFile() expected config, got nil")
 				}
 			}
 		})
 	}
 }
 
-func ptr(s string) *string {
-	return &s
-}
-
 func TestParseConfig(t *testing.T) {
 	tests := []struct {
 		name    string
 		input   string
-		want    *config.Config
+		want    *Config
 		wantErr bool
 	}{
 		{
@@ -153,11 +147,11 @@ func TestParseConfig(t *testing.T) {
 					}
 				]
 			}`,
-			want: &config.Config{
-				Repositories: func() *[]config.Repository {
+			want: &Config{
+				Repositories: func() *[]Repository {
 					s := "user/repo"
 					b := "main"
-					r := []config.Repository{
+					r := []Repository{
 						{
 							URL:    &s,
 							Branch: &b,

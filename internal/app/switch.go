@@ -1,6 +1,10 @@
 package app
 
 import (
+	conf "mistletoe/internal/config"
+)
+
+import (
 	"flag"
 	"fmt"
 	"os"
@@ -50,11 +54,11 @@ func handleSwitch(args []string, opts GlobalOptions) {
 		createBranchName = createShort
 	}
 
-	var config *Config
+	var config *conf.Config
 	if configFile != "" {
-		config, err = loadConfigFile(configFile)
+		config, err = conf.LoadConfigFile(configFile)
 	} else {
-		config, err = loadConfigData(configData)
+		config, err = conf.LoadConfigData(configData)
 	}
 
 	if err != nil {
@@ -101,7 +105,7 @@ func handleSwitch(args []string, opts GlobalOptions) {
 	// Pre-check phase
 	for _, repo := range *config.Repositories {
 		wg.Add(1)
-		go func(repo Repository) {
+		go func(repo conf.Repository) {
 			defer wg.Done()
 			sem <- struct{}{}
 			defer func() { <-sem }()
@@ -143,7 +147,7 @@ func handleSwitch(args []string, opts GlobalOptions) {
 		// Execute Checkout
 		for _, repo := range *config.Repositories {
 			wg.Add(1)
-			go func(repo Repository) {
+			go func(repo conf.Repository) {
 				defer wg.Done()
 				sem <- struct{}{}
 				defer func() { <-sem }()
@@ -161,7 +165,7 @@ func handleSwitch(args []string, opts GlobalOptions) {
 		// Create mode
 		for _, repo := range *config.Repositories {
 			wg.Add(1)
-			go func(repo Repository) {
+			go func(repo conf.Repository) {
 				defer wg.Done()
 				sem <- struct{}{}
 				defer func() { <-sem }()

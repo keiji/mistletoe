@@ -1,6 +1,10 @@
 package app
 
 import (
+	conf "mistletoe/internal/config"
+)
+
+import (
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -14,8 +18,8 @@ func TestGenerateSnapshotFromStatus(t *testing.T) {
 	branch := "feature/abc"
 	revision := "abcdef1234567890"
 
-	config := &Config{
-		Repositories: &[]Repository{
+	config := &conf.Config{
+		Repositories: &[]conf.Repository{
 			{
 				ID:     &repoID,
 				URL:    &repoURL,
@@ -45,7 +49,7 @@ func TestGenerateSnapshotFromStatus(t *testing.T) {
 	}
 
 	// Verify JSON content
-	var snapshotConfig Config
+	var snapshotConfig conf.Config
 	if err := json.Unmarshal(data, &snapshotConfig); err != nil {
 		t.Fatalf("failed to unmarshal result: %v", err)
 	}
@@ -87,11 +91,11 @@ func TestGenerateSnapshotVerbose(t *testing.T) {
 	// Get the revision
 	rev, _ := RunGit(repoDir, "git", false, "rev-parse", "HEAD")
 
-	// Create Config pointing to this repo
+	// Create conf.Config pointing to this repo
 	configID := repoName // using dirname as ID for simplicity
 	configURL := remoteURL
-	config := &Config{
-		Repositories: &[]Repository{
+	config := &conf.Config{
+		Repositories: &[]conf.Repository{
 			{
 				ID:  &configID,
 				URL: &configURL,
@@ -115,7 +119,7 @@ func TestGenerateSnapshotVerbose(t *testing.T) {
 	}
 
 	// Verify JSON
-	var snapshotConfig Config
+	var snapshotConfig conf.Config
 	if err := json.Unmarshal(data, &snapshotConfig); err != nil {
 		t.Fatalf("failed to unmarshal result: %v", err)
 	}

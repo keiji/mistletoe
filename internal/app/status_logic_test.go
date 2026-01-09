@@ -1,6 +1,10 @@
 package app
 
 import (
+	conf "mistletoe/internal/config"
+)
+
+import (
 	"os"
 	"path/filepath"
 	"strings"
@@ -26,7 +30,7 @@ func TestValidateRepositoriesIntegrity(t *testing.T) {
 	tests := []struct {
 		name    string
 		setup   func()
-		repos   []Repository
+		repos   []conf.Repository
 		wantErr bool
 	}{
 		{
@@ -34,7 +38,7 @@ func TestValidateRepositoriesIntegrity(t *testing.T) {
 			setup: func() {
 				// No dir
 			},
-			repos: []Repository{
+			repos: []conf.Repository{
 				{ID: &repoID, URL: &repoURL},
 			},
 			wantErr: false,
@@ -44,7 +48,7 @@ func TestValidateRepositoriesIntegrity(t *testing.T) {
 			setup: func() {
 				os.Mkdir(repoID, 0755)
 			},
-			repos: []Repository{
+			repos: []conf.Repository{
 				{ID: &repoID, URL: &repoURL},
 			},
 			wantErr: true,
@@ -54,7 +58,7 @@ func TestValidateRepositoriesIntegrity(t *testing.T) {
 			setup: func() {
 				os.WriteFile(repoID, []byte("file"), 0644)
 			},
-			repos: []Repository{
+			repos: []conf.Repository{
 				{ID: &repoID, URL: &repoURL},
 			},
 			wantErr: true,
@@ -64,7 +68,7 @@ func TestValidateRepositoriesIntegrity(t *testing.T) {
 			setup: func() {
 				createDummyGitRepo(t, repoID, repoURL)
 			},
-			repos: []Repository{
+			repos: []conf.Repository{
 				{ID: &repoID, URL: &repoURL},
 			},
 			wantErr: false,
@@ -74,7 +78,7 @@ func TestValidateRepositoriesIntegrity(t *testing.T) {
 			setup: func() {
 				createDummyGitRepo(t, repoID, otherURL)
 			},
-			repos: []Repository{
+			repos: []conf.Repository{
 				{ID: &repoID, URL: &repoURL},
 			},
 			wantErr: true,
@@ -87,7 +91,7 @@ func TestValidateRepositoriesIntegrity(t *testing.T) {
 			if tt.setup != nil {
 				tt.setup()
 			}
-			config := Config{Repositories: &tt.repos}
+			config := conf.Config{Repositories: &tt.repos}
 			err := ValidateRepositoriesIntegrity(&config, "git", false)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ValidateRepositoriesIntegrity() error = %v, wantErr %v", err, tt.wantErr)
@@ -117,7 +121,7 @@ func TestCollectStatus(t *testing.T) {
 	exec.Command("git", "clone", remoteDir, localDir).Run()
 	configureGitUser(t, localDir)
 
-	// Config
+	// conf.Config
 	id := "local"
 	url := remoteDir // Use file path as URL
 	branch := "master" // git init default is master usually in these tests unless configured
@@ -127,8 +131,8 @@ func TestCollectStatus(t *testing.T) {
 		branch = "main"
 	}
 
-	repo1 := Repository{ID: &id, URL: &url, Branch: &branch}
-	config1 := Config{Repositories: &[]Repository{repo1}}
+	repo1 := conf.Repository{ID: &id, URL: &url, Branch: &branch}
+	config1 := conf.Config{Repositories: &[]conf.Repository{repo1}}
 
 	rows1 := CollectStatus(&config1, 1, "git", false, false)
 	if len(rows1) != 1 {
@@ -162,8 +166,8 @@ func TestCollectStatus(t *testing.T) {
 	exec.Command("git", "-C", localDir, "commit", "--allow-empty", "-m", "local-diverged").Run()
 
 	// We need config to point to specific branch for Pullable check
-	repo := Repository{ID: &id, URL: &url, Branch: &branch}
-	config := Config{Repositories: &[]Repository{repo}}
+	repo := conf.Repository{ID: &id, URL: &url, Branch: &branch}
+	config := conf.Config{Repositories: &[]conf.Repository{repo}}
 
 	rows := CollectStatus(&config, 1, "git", false, false)
 	if !rows[0].HasUnpushed {
