@@ -6,6 +6,8 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"mistletoe/internal/config"
 )
 
 func TestLoadConfig(t *testing.T) {
@@ -53,7 +55,7 @@ func TestLoadConfig(t *testing.T) {
 				return createTempFile(`{ invalid json }`)
 			},
 			wantConfig: false,
-			wantErr:    ErrInvalidDataFormat,
+			wantErr:    config.ErrInvalidDataFormat,
 		},
 		{
 			name: "Missing repositories key",
@@ -61,7 +63,7 @@ func TestLoadConfig(t *testing.T) {
 				return createTempFile(`{}`)
 			},
 			wantConfig: false,
-			wantErr:    ErrInvalidDataFormat,
+			wantErr:    config.ErrInvalidDataFormat,
 		},
 		{
 			name: "Repositories key is null",
@@ -69,7 +71,7 @@ func TestLoadConfig(t *testing.T) {
 				return createTempFile(`{"repositories": null}`)
 			},
 			wantConfig: false,
-			wantErr:    ErrInvalidDataFormat,
+			wantErr:    config.ErrInvalidDataFormat,
 		},
 		{
 			name: "Repositories empty array (valid)",
@@ -85,7 +87,7 @@ func TestLoadConfig(t *testing.T) {
 				return createTempFile(`{"repositories": [{"id": "test"}]}`)
 			},
 			wantConfig: false,
-			wantErr:    ErrInvalidDataFormat,
+			wantErr:    config.ErrInvalidDataFormat,
 		},
 		{
 			name: "Repo URL is null",
@@ -93,7 +95,7 @@ func TestLoadConfig(t *testing.T) {
 				return createTempFile(`{"repositories": [{"url": null}]}`)
 			},
 			wantConfig: false,
-			wantErr:    ErrInvalidDataFormat,
+			wantErr:    config.ErrInvalidDataFormat,
 		},
 	}
 
@@ -104,7 +106,7 @@ func TestLoadConfig(t *testing.T) {
 				defer os.Remove(filename)
 			}
 
-			config, err := loadConfigFile(filename)
+			cfg, err := loadConfigFile(filename)
 
 			if tt.wantErr != nil {
 				if err == nil {
@@ -122,180 +124,8 @@ func TestLoadConfig(t *testing.T) {
 				if err != nil {
 					t.Errorf("loadConfigFile() unexpected error: %v", err)
 				}
-				if tt.wantConfig && config == nil {
+				if tt.wantConfig && cfg == nil {
 					t.Error("loadConfigFile() expected config, got nil")
-				}
-			}
-		})
-	}
-}
-
-func TestIDDerivationAndDuplicates(t *testing.T) {
-	tests := []struct {
-		name     string
-		repos    []Repository
-		wantErr  bool
-		checkIDs map[int]string // Index -> Expected ID
-	}{
-		{
-			name: "Explicit ID OK",
-			repos: []Repository{
-				{URL: ptr("u1"), ID: ptr("id1")},
-				{URL: ptr("u2"), ID: ptr("id2")},
-			},
-			wantErr: false,
-		},
-		{
-			name: "Implicit ID Derivation (.git)",
-			repos: []Repository{
-				{URL: ptr("https://github.com/foo/bar.git")},
-			},
-			wantErr:  false,
-			checkIDs: map[int]string{0: "bar"},
-		},
-		{
-			name: "Implicit ID Derivation (no .git)",
-			repos: []Repository{
-				{URL: ptr("https://github.com/foo/baz")},
-			},
-			wantErr:  false,
-			checkIDs: map[int]string{0: "baz"},
-		},
-		{
-			name: "Implicit ID Derivation (mixed)",
-			repos: []Repository{
-				{URL: ptr("https://github.com/foo/alpha.git")},
-				{URL: ptr("https://github.com/foo/beta")},
-			},
-			wantErr:  false,
-			checkIDs: map[int]string{0: "alpha", 1: "beta"},
-		},
-		{
-			name: "Duplicate Explicit IDs",
-			repos: []Repository{
-				{URL: ptr("u1"), ID: ptr("dup")},
-				{URL: ptr("u2"), ID: ptr("dup")},
-			},
-			wantErr: true,
-		},
-		{
-			name: "Duplicate Explicit and Implicit",
-			repos: []Repository{
-				{URL: ptr("https://github.com/foo/bar.git")}, // -> bar
-				{URL: ptr("u2"), ID: ptr("bar")},
-			},
-			wantErr: true,
-		},
-		{
-			name: "Duplicate Implicit",
-			repos: []Repository{
-				{URL: ptr("https://github.com/foo/bar.git")}, // -> bar
-				{URL: ptr("https://gitlab.com/other/bar")},   // -> bar
-			},
-			wantErr: true,
-		},
-		{
-			name: "Invalid ID (Special characters)",
-			repos: []Repository{
-				{URL: ptr("u1"), ID: ptr("foo/bar")},
-			},
-			wantErr: true,
-		},
-		{
-			name: "Invalid ID (Special characters 2)",
-			repos: []Repository{
-				{URL: ptr("u1"), ID: ptr("foo*bar")},
-			},
-			wantErr: true,
-		},
-		{
-			name: "Invalid ID (Dot)",
-			repos: []Repository{
-				{URL: ptr("u1"), ID: ptr(".")},
-			},
-			wantErr: true,
-		},
-		{
-			name: "Invalid ID (Double Dot)",
-			repos: []Repository{
-				{URL: ptr("u1"), ID: ptr("..")},
-			},
-			wantErr: true,
-		},
-		{
-			name: "Invalid URL (ext::)",
-			repos: []Repository{
-				{URL: ptr("ext::sh -c evil")},
-			},
-			wantErr: true,
-		},
-		{
-			name: "Invalid URL (Control char)",
-			repos: []Repository{
-				{URL: ptr("https://example.com/repo\n.git")},
-			},
-			wantErr: true,
-		},
-		{
-			name: "Invalid Branch (Start with -)",
-			repos: []Repository{
-				{URL: ptr("u1"), ID: ptr("valid"), Branch: ptr("-flags")},
-			},
-			wantErr: true,
-		},
-		{
-			name: "Invalid Branch (Special char)",
-			repos: []Repository{
-				{URL: ptr("u1"), ID: ptr("valid"), Branch: ptr("foo;bar")},
-			},
-			wantErr: true,
-		},
-		{
-			name: "Valid Branch (Slash OK)",
-			repos: []Repository{
-				{URL: ptr("u1"), ID: ptr("valid"), Branch: ptr("feature/new-ui")},
-			},
-			wantErr: false,
-		},
-		{
-			name: "Invalid BaseBranch (Special char)",
-			repos: []Repository{
-				{URL: ptr("u1"), ID: ptr("valid"), BaseBranch: ptr("foo;bar")},
-			},
-			wantErr: true,
-		},
-		{
-			name: "Valid BaseBranch",
-			repos: []Repository{
-				{URL: ptr("u1"), ID: ptr("valid"), BaseBranch: ptr("main")},
-			},
-			wantErr: false,
-		},
-		{
-			name: "Invalid Revision (Start with -)",
-			repos: []Repository{
-				{URL: ptr("u1"), ID: ptr("valid"), Revision: ptr("-flags")},
-			},
-			wantErr: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := validateRepositories(tt.repos)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("validateRepositories() error = %v, wantErr %v", err, tt.wantErr)
-			}
-
-			if err == nil && tt.checkIDs != nil {
-				for idx, expectedID := range tt.checkIDs {
-					if tt.repos[idx].ID == nil || *tt.repos[idx].ID != expectedID {
-						got := "<nil>"
-						if tt.repos[idx].ID != nil {
-							got = *tt.repos[idx].ID
-						}
-						t.Errorf("Repo[%d] ID = %s, want %s", idx, got, expectedID)
-					}
 				}
 			}
 		})
@@ -310,7 +140,7 @@ func TestParseConfig(t *testing.T) {
 	tests := []struct {
 		name    string
 		input   string
-		want    *Config
+		want    *config.Config
 		wantErr bool
 	}{
 		{
@@ -323,11 +153,11 @@ func TestParseConfig(t *testing.T) {
 					}
 				]
 			}`,
-			want: &Config{
-				Repositories: func() *[]Repository {
+			want: &config.Config{
+				Repositories: func() *[]config.Repository {
 					s := "user/repo"
 					b := "main"
-					r := []Repository{
+					r := []config.Repository{
 						{
 							URL:    &s,
 							Branch: &b,
