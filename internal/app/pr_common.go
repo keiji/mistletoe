@@ -787,3 +787,48 @@ func ValidatePrPermissionAndOverwrite(repoID string, pr PrInfo, currentUser stri
 
 	return fmt.Errorf("PR %s (Repo: %s) was created by %s and does not have a Mistletoe block. Use --overwrite (-w) to force update", pr.URL, repoID, pr.Author.Login)
 }
+
+// CreatePrStatusRow constructs a PrStatusRow from a StatusRow and a list of PrInfo objects.
+// This is used to display the final status without re-fetching data.
+func CreatePrStatusRow(statusRow StatusRow, prInfos []PrInfo, configuredBaseBranch string) PrStatusRow {
+	prRow := PrStatusRow{StatusRow: statusRow}
+
+	if configuredBaseBranch != "" {
+		prRow.Base = configuredBaseBranch
+	}
+
+	if len(prInfos) == 0 {
+		prRow.PrNumber = "N/A"
+		return prRow
+	}
+
+	// Sort PRs
+	SortPrs(prInfos)
+
+	// Format PR column & Collect Items
+	var prLines []string
+	var items []PrInfo
+	for _, pr := range prInfos {
+		displayState := getPrDisplayState(pr)
+		line := fmt.Sprintf("%s [%s]", pr.URL, displayState)
+		if displayState == DisplayPrStateMerged || displayState == DisplayPrStateClosed {
+			line = AnsiFgGray + line + AnsiReset
+		}
+		prLines = append(prLines, line)
+		items = append(items, pr)
+	}
+	prRow.PrDisplay = strings.Join(prLines, "\n")
+	prRow.PrItems = items
+
+	// Set other fields based on the first (most relevant) PR
+	topPr := prInfos[0]
+	prRow.PrURL = topPr.URL
+	prRow.PrNumber = fmt.Sprintf("#%d", topPr.Number)
+	prRow.PrState = topPr.State // Raw state
+
+	if prRow.Base == "" {
+		prRow.Base = topPr.BaseRefName
+	}
+
+	return prRow
+}

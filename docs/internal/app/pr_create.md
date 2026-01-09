@@ -80,7 +80,7 @@ flowchart TD
     VerifyRevisions -- "OK" --> ExecPush["Push実行 (Push必要リスト)"]
     ExecPush --> ExecCreate["PR作成実行 (PR作成必要リスト)\n(Draft試行 -> 失敗時通常作成)"]
     ExecCreate --> ExecUpdate["PR本文更新 (作成済み+更新リスト)\n(スナップショット埋め込み)"]
-    ExecUpdate --> ShowFinalStatus["最終ステータス表示"]
+    ExecUpdate --> ShowFinalStatus["最終ステータス表示 (メモリ情報より構成)"]
     ShowFinalStatus --> Stop
 ```
 

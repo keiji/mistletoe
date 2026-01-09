@@ -345,7 +345,9 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 		}
 		for k, url := range createdMap {
 			// Created PR is always OPEN
-			finalPrMap[k] = append(finalPrMap[k], PrInfo{URL: url, State: "OPEN"})
+			// We try to parse the number from URL for display
+			_, _, num, _ := parsePrURL(url)
+			finalPrMap[k] = append(finalPrMap[k], PrInfo{URL: url, State: "OPEN", Number: num})
 		}
 	}
 
@@ -372,23 +374,43 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 		os.Exit(1)
 	}
 
-	// 11. Show Status (Final)
-	fmt.Println("Collecting final status...")
-	spinner = NewSpinner(verbose)
-	spinner.Start()
-	finalRows := CollectStatus(config, parallel, opts.GitPath, verbose, true)
+	// 11. Show Status (Final) - Optimized: No network calls
+	fmt.Println("Updating status display...")
 
-	knownPRsForStatus := make(map[string][]string)
-	for k, items := range finalPrMap {
-		var urls []string
-		for _, item := range items {
-			urls = append(urls, item.URL)
+	// Update rows based on pushed status
+	for i := range rows {
+		// If repo was in pushList, update its status
+		wasPushed := false
+		for _, p := range pushList {
+			if getRepoName(p) == rows[i].Repo {
+				wasPushed = true
+				break
+			}
 		}
-		knownPRsForStatus[k] = urls
+
+		if wasPushed {
+			rows[i].HasUnpushed = false
+			rows[i].RemoteRev = rows[i].LocalBranchRev
+			rows[i].RemoteColor = ColorNone
+			rows[i].IsPullable = false
+			rows[i].HasConflict = false
+		}
 	}
 
-	finalPrRows := CollectPrStatus(finalRows, config, parallel, opts.GhPath, verbose, knownPRsForStatus)
-	spinner.Stop()
+	// Construct final PR rows from memory
+	var finalPrRows []PrStatusRow
+	for _, row := range rows {
+		prInfos := finalPrMap[row.Repo]
+		// Resolve configured base branch for display
+		baseBranch := ""
+		repoConf := repoMap[row.Repo]
+		if repoConf.BaseBranch != nil && *repoConf.BaseBranch != "" {
+			baseBranch = *repoConf.BaseBranch
+		}
+
+		prRow := CreatePrStatusRow(row, prInfos, baseBranch)
+		finalPrRows = append(finalPrRows, prRow)
+	}
 
 	// Filter for Display (Open or Draft only)
 	var displayRows []PrStatusRow
