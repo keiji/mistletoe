@@ -230,6 +230,22 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 		}
 	}
 
+	if len(createList) > 0 {
+		fmt.Println("The following repositories are ready for Pull Request creation:")
+		for _, r := range createList {
+			fmt.Printf(" - %s\n", getRepoName(r))
+		}
+		fmt.Println()
+	}
+
+	if len(updateList) > 0 {
+		fmt.Println("The following repositories have existing Pull Requests (will be updated):")
+		for _, r := range updateList {
+			fmt.Printf(" - %s\n", getRepoName(r))
+		}
+		fmt.Println()
+	}
+
 	if len(skippedRepos) > 0 {
 		fmt.Println("The following repositories will be skipped (no changes and no existing PR):")
 		for _, r := range skippedRepos {

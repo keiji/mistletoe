@@ -47,7 +47,8 @@ flowchart TD
     Categorize --> CatUpdateNeed["PR更新必要リスト\n(PRあり)"]
     Categorize --> CatSkip["スキップリスト\n(Equal or NewBranchNoCommit)"]
 
-    CatSkip --> CheckWorkable{"処理対象リポジトリがあるか？\n(Create or Update)"}
+    CatSkip --> DisplayLists[リスト表示\n(Create / Update / Skip)]
+    DisplayLists --> CheckWorkable{"処理対象リポジトリがあるか？\n(Create or Update)"}
     CheckWorkable -- "No" --> Stop(["終了"])
     CheckWorkable -- "Yes" --> CheckPermissions{"既存PR更新権限確認\n(後述詳細)"}
 
