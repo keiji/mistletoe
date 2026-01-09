@@ -1,6 +1,10 @@
 package app
 
 import (
+	conf "mistletoe/internal/config"
+)
+
+import (
 	"flag"
 	"fmt"
 	"io"
@@ -49,9 +53,9 @@ func isDirEmpty(dir string) (bool, error) {
 }
 
 // validateEnvironment checks if the current directory state is consistent with the configuration.
-func validateEnvironment(repos []Repository, baseDir, gitPath string, verbose bool) error {
+func validateEnvironment(repos []conf.Repository, baseDir, gitPath string, verbose bool) error {
 	for _, repo := range repos {
-		targetDir := filepath.Join(baseDir, GetRepoDirName(repo))
+		targetDir := filepath.Join(baseDir, conf.GetRepoDirName(repo))
 		info, err := os.Stat(targetDir)
 		if os.IsNotExist(err) {
 			continue // Directory doesn't exist, safe to clone
@@ -144,7 +148,7 @@ func validateEnvironment(repos []Repository, baseDir, gitPath string, verbose bo
 }
 
 // PerformInit executes the initialization (clone/checkout) logic for the given repositories.
-func PerformInit(repos []Repository, baseDir, gitPath string, parallel, depth int, verbose bool) error {
+func PerformInit(repos []conf.Repository, baseDir, gitPath string, parallel, depth int, verbose bool) error {
 	if err := validateEnvironment(repos, baseDir, gitPath, verbose); err != nil {
 		return fmt.Errorf("error validating environment: %w", err)
 	}
@@ -154,7 +158,7 @@ func PerformInit(repos []Repository, baseDir, gitPath string, parallel, depth in
 
 	for _, repo := range repos {
 		wg.Add(1)
-		go func(repo Repository) {
+		go func(repo conf.Repository) {
 			defer wg.Done()
 			sem <- struct{}{}
 			defer func() { <-sem }()
@@ -165,7 +169,7 @@ func PerformInit(repos []Repository, baseDir, gitPath string, parallel, depth in
 				gitArgs = append(gitArgs, "--depth", fmt.Sprintf("%d", depth))
 			}
 			gitArgs = append(gitArgs, *repo.URL)
-			targetDir := filepath.Join(baseDir, GetRepoDirName(repo))
+			targetDir := filepath.Join(baseDir, conf.GetRepoDirName(repo))
 
 			// Explicitly pass target directory to avoid ambiguity and to know where to checkout later.
 			gitArgs = append(gitArgs, targetDir)
@@ -304,11 +308,11 @@ func handleInit(args []string, opts GlobalOptions) {
 		}
 	}
 
-	var config *Config
+	var config *conf.Config
 	if configFile != "" {
-		config, err = loadConfigFile(configFile)
+		config, err = conf.LoadConfigFile(configFile)
 	} else {
-		config, err = loadConfigData(configData)
+		config, err = conf.LoadConfigData(configData)
 	}
 
 	if err != nil {
@@ -351,7 +355,7 @@ func handleInit(args []string, opts GlobalOptions) {
 
 		// Save config.json
 		// If loaded from file, we read it again to copy (preserving comments/structure if possible,
-		// but loadConfigFile returns parsed struct. Ideally we copy original bytes).
+		// but conf.LoadConfigFile returns parsed struct. Ideally we copy original bytes).
 		// Since we have configData (from pipe) or we can read configFile.
 		var dataToWrite []byte
 		if configFile != "" {

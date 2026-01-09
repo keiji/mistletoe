@@ -1,6 +1,10 @@
 package app
 
 import (
+	conf "mistletoe/internal/config"
+)
+
+import (
 	"encoding/json"
 	"fmt"
 	"os"
@@ -85,8 +89,8 @@ func TestInitRevision(t *testing.T) {
 		repoID := "repo-rev-only"
 		configFile := filepath.Join(t.TempDir(), "repos.json")
 		targetCommit := commits[1] // The middle commit
-		config := Config{
-			Repositories: &[]Repository{
+		config := conf.Config{
+			Repositories: &[]conf.Repository{
 				{URL: &repoURL, ID: &repoID, Revision: &targetCommit},
 			},
 		}
@@ -120,8 +124,8 @@ func TestInitRevision(t *testing.T) {
 		configFile := filepath.Join(t.TempDir(), "repos.json")
 		targetCommit := commits[0] // The first commit
 		targetBranch := "new-feature"
-		config := Config{
-			Repositories: &[]Repository{
+		config := conf.Config{
+			Repositories: &[]conf.Repository{
 				{URL: &repoURL, ID: &repoID, Revision: &targetCommit, Branch: &targetBranch},
 			},
 		}
@@ -168,8 +172,8 @@ func TestInitRevision(t *testing.T) {
 
 		configFile := filepath.Join(t.TempDir(), "repos.json")
 		targetCommit := commits[0]
-		config := Config{
-			Repositories: &[]Repository{
+		config := conf.Config{
+			Repositories: &[]conf.Repository{
 				{URL: &repoURL, ID: &repoID, Revision: &targetCommit, Branch: &targetBranch},
 			},
 		}

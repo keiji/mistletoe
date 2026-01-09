@@ -1,6 +1,10 @@
 package app
 
 import (
+	conf "mistletoe/internal/config"
+)
+
+import (
 	"fmt"
 	"os"
 	"testing"
@@ -17,8 +21,8 @@ func TestCollectPrStatus_ErrorHandling(t *testing.T) {
 
 	id := "."
 	url := "https://github.com/user/repo/pull/1"
-	repo := Repository{ID: &id, URL: &url}
-	config := &Config{Repositories: &[]Repository{repo}}
+	repo := conf.Repository{ID: &id, URL: &url}
+	config := &conf.Config{Repositories: &[]conf.Repository{repo}}
 	rows := []StatusRow{{Repo: id, BranchName: "main"}}
 	knownPRs := map[string][]string{id: {url}}
 

@@ -1,6 +1,10 @@
 package app
 
 import (
+	conf "mistletoe/internal/config"
+)
+
+import (
 	"testing"
 )
 
@@ -28,7 +32,7 @@ func TestIsPrFromConfiguredRepo(t *testing.T) {
 			want:               true,
 		},
 		{
-			name:               "Match with missing .git in Config",
+			name:               "Match with missing .git in conf.Config",
 			prHeadURL:          &urlStr,
 			configCanonicalURL: "https://github.com/owner/repo",
 			want:               true,
@@ -62,7 +66,7 @@ func TestIsPrFromConfiguredRepo(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			pr := PrInfo{
-				HeadRepository: Repository{
+				HeadRepository: conf.Repository{
 					URL: tt.prHeadURL,
 				},
 			}

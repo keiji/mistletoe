@@ -1,12 +1,16 @@
 package app
 
 import (
+	conf "mistletoe/internal/config"
+)
+
+import (
 	"fmt"
 	"strings"
 )
 
 // VerifyRevisionsUnchanged checks if the current HEAD revision of repositories matches the status collected earlier.
-func VerifyRevisionsUnchanged(config *Config, originalRows []StatusRow, gitPath string, verbose bool) error {
+func VerifyRevisionsUnchanged(config *conf.Config, originalRows []StatusRow, gitPath string, verbose bool) error {
 	statusMap := make(map[string]StatusRow)
 	for _, row := range originalRows {
 		statusMap[row.Repo] = row

@@ -1,6 +1,10 @@
 package app
 
 import (
+	conf "mistletoe/internal/config"
+)
+
+import (
 	"fmt"
 	"os"
 	"path/filepath"
@@ -30,7 +34,7 @@ type StatusRow struct {
 }
 
 // ValidateRepositoriesIntegrity checks if repositories exist and are valid.
-func ValidateRepositoriesIntegrity(config *Config, gitPath string, verbose bool) error {
+func ValidateRepositoriesIntegrity(config *conf.Config, gitPath string, verbose bool) error {
 	for _, repo := range *config.Repositories {
 		targetDir := config.GetRepoPath(repo)
 		info, err := os.Stat(targetDir)
@@ -63,7 +67,7 @@ func ValidateRepositoriesIntegrity(config *Config, gitPath string, verbose bool)
 }
 
 // CollectStatus collects status for all repositories.
-func CollectStatus(config *Config, parallel int, gitPath string, verbose bool, noFetch bool) []StatusRow {
+func CollectStatus(config *conf.Config, parallel int, gitPath string, verbose bool, noFetch bool) []StatusRow {
 	var rows []StatusRow
 	var mu sync.Mutex
 	var wg sync.WaitGroup
@@ -71,7 +75,7 @@ func CollectStatus(config *Config, parallel int, gitPath string, verbose bool, n
 
 	for _, repo := range *config.Repositories {
 		wg.Add(1)
-		go func(repo Repository) {
+		go func(repo conf.Repository) {
 			defer wg.Done()
 			sem <- struct{}{}
 			defer func() { <-sem }()
@@ -93,9 +97,9 @@ func CollectStatus(config *Config, parallel int, gitPath string, verbose bool, n
 	return rows
 }
 
-func getRepoStatus(repo Repository, baseDir, gitPath string, verbose bool, noFetch bool) *StatusRow {
-	targetDir := filepath.Join(baseDir, GetRepoDirName(repo))
-	repoName := GetRepoDirName(repo)
+func getRepoStatus(repo conf.Repository, baseDir, gitPath string, verbose bool, noFetch bool) *StatusRow {
+	targetDir := filepath.Join(baseDir, conf.GetRepoDirName(repo))
+	repoName := conf.GetRepoDirName(repo)
 
 	if _, err := os.Stat(targetDir); os.IsNotExist(err) {
 		return nil

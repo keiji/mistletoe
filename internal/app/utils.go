@@ -1,5 +1,6 @@
 package app
 
+
 import (
 	"fmt"
 	"io"
@@ -189,7 +190,7 @@ func ResolveCommonValues(fLong, fShort string, pVal, pValShort int, ignoreStdin 
 		return "", 0, nil, fmt.Errorf("Parallel must be at most %d.", MaxParallel)
 	}
 
-	// Config File
+	// conf.Config File
 	defaultConfig := DefaultConfigFile
 	var configFile string
 	var isDefault bool

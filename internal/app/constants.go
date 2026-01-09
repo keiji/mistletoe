@@ -1,5 +1,6 @@
 package app
 
+
 // Type represents the type of the application.
 type Type int
 

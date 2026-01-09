@@ -1,6 +1,10 @@
 package app
 
 import (
+	conf "mistletoe/internal/config"
+)
+
+import (
 	"encoding/json"
 	"fmt"
 	"os"
@@ -34,13 +38,13 @@ func TestHandleInitDepth(t *testing.T) {
 	// 2. Setup Remote Repo
 	repoURL, _ := setupRemoteAndContent(t, 5)
 
-	// 3. Setup Config
+	// 3. Setup conf.Config
 	// Use file:// protocol for --depth to work locally
 	repoID := "shallow-repo"
 	configFile := filepath.Join(t.TempDir(), "repos.json")
 	master := "master"
-	config := Config{
-		Repositories: &[]Repository{
+	config := conf.Config{
+		Repositories: &[]conf.Repository{
 			{URL: &repoURL, ID: &repoID, Branch: &master},
 		},
 	}

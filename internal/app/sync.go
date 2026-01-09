@@ -1,6 +1,10 @@
 package app
 
 import (
+	conf "mistletoe/internal/config"
+)
+
+import (
 	"bufio"
 	"flag"
 	"fmt"
@@ -38,11 +42,11 @@ func handleSync(args []string, opts GlobalOptions) {
 		parallel = 1
 	}
 
-	var config *Config
+	var config *conf.Config
 	if configFile != "" {
-		config, err = loadConfigFile(configFile)
+		config, err = conf.LoadConfigFile(configFile)
 	} else {
-		config, err = loadConfigData(configData)
+		config, err = conf.LoadConfigData(configData)
 	}
 
 	if err != nil {

@@ -1,6 +1,10 @@
 package app
 
 import (
+	conf "mistletoe/internal/config"
+)
+
+import (
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -129,7 +133,7 @@ func handlePrCheckout(args []string, opts GlobalOptions) {
 
 				if len(closedPRs) > 0 {
 					// Filter snapshot repositories
-					var newRepos []Repository
+					var newRepos []conf.Repository
 					for _, r := range *config.Repositories {
 						// We need to match Repo to PR URL.
 						// Heuristic: PR URL starts with Repo URL (minus .git)

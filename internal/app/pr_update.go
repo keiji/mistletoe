@@ -1,6 +1,10 @@
 package app
 
 import (
+	conf "mistletoe/internal/config"
+)
+
+import (
 	"flag"
 	"fmt"
 	"os"
@@ -58,12 +62,12 @@ func handlePrUpdate(args []string, opts GlobalOptions) {
 		os.Exit(1)
 	}
 
-	// 2. Load Config
-	var config *Config
+	// 2. Load conf.Config
+	var config *conf.Config
 	if configPath != "" {
-		config, err = loadConfigFile(configPath)
+		config, err = conf.LoadConfigFile(configPath)
 	} else {
-		config, err = loadConfigData(configData)
+		config, err = conf.LoadConfigData(configData)
 	}
 
 	if err != nil {
@@ -121,8 +125,8 @@ func handlePrUpdate(args []string, opts GlobalOptions) {
 	// We also need a map of ALL PRs for Related Links generation
 	allPrMap := make(map[string][]PrInfo)
 
-	var activeRepos []Repository
-	repoMap := make(map[string]Repository)
+	var activeRepos []conf.Repository
+	repoMap := make(map[string]conf.Repository)
 	for _, r := range *config.Repositories {
 		repoMap[getRepoName(r)] = r
 	}
@@ -155,7 +159,7 @@ func handlePrUpdate(args []string, opts GlobalOptions) {
 	}
 
 	// 7.5 Check for Push (Ahead)
-	var pushList []Repository
+	var pushList []conf.Repository
 	statusMap := make(map[string]StatusRow)
 	for _, r := range rows {
 		statusMap[r.Repo] = r
