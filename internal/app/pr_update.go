@@ -5,6 +5,7 @@ import (
 )
 
 import (
+	"bufio"
 	"flag"
 	"fmt"
 	"os"
@@ -156,6 +157,16 @@ func handlePrUpdate(args []string, opts GlobalOptions) {
 	if len(activeRepos) == 0 {
 		fmt.Println("No active Pull Requests found to update.")
 		return
+	}
+
+	// Prompt user for confirmation
+	fmt.Printf("Found %d active Pull Requests to update. Proceed? (yes/no): ", len(activeRepos))
+	reader := bufio.NewReader(Stdin)
+	input, _ := reader.ReadString('\n')
+	input = strings.TrimSpace(strings.ToLower(input))
+	if input != "y" && input != "yes" {
+		fmt.Println("Aborted.")
+		os.Exit(1)
 	}
 
 	// 7.5 Check for Push (Ahead)
