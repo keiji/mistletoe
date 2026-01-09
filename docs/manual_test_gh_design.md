@@ -33,17 +33,35 @@
     *   **アクション:** `mstl-gh pr create` を対話形式で実行します。
     *   **検証:** PR が作成され、正しい依存関係リンクが含まれているかをユーザーが確認します。
 
-### 2.3. レガシースクリプト
-*   `scripts/manual_test_gh.py`: 初期のモノリシックなテストスクリプトです。
-    *   **安全性:** 実行前にユーザーが "I AGREE" と入力する必要があります。
-    *   **スコープ:** すべてのテスト（`init`, `switch`, `status`, `pr create` など）を固定順序で実行します。
-
 ## 3. 使用方法
 
-### テストの実行
-```bash
-python3 scripts/manual_test_gh_pr_create.py [-o results.log]
-```
+### Docker を使用したテスト環境の構築と実行
+
+テスト環境を分離するため、提供されている `Dockerfile.manual_test` を使用して Docker コンテナ内でテストを実行することを推奨します。
+
+1.  **Docker イメージのビルド:**
+    ```bash
+    docker build -t mstl-gh-test -f Dockerfile.manual_test .
+    ```
+
+2.  **コンテナの起動:**
+    ```bash
+    docker run -it --rm -v $(pwd):/app mstl-gh-test /bin/bash
+    ```
+
+3.  **GitHub 認証 (コンテナ内):**
+    コンテナ内で `gh` コマンドを使用するために認証を行います。
+    ```bash
+    # ブラウザでの認証、またはトークンを使用
+    gh auth login
+    ```
+
+4.  **テストの実行 (コンテナ内):**
+    ```bash
+    python3 scripts/manual_test_gh_pr_create.py [-o results.log]
+    ```
+
+### ローカルでの実行
 
 ### 実行フロー
 1.  **セットアップ:** スクリプトが一時的なリポジトリを作成します（例: `mistletoe-test-1234-A`）。
