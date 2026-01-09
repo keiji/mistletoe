@@ -95,10 +95,10 @@ func TestRenderPrStatusTable(t *testing.T) {
 	}
 
 	assertContains(t, output, "repo1")
-	assertContains(t, output, "#1")
+	assertContains(t, output, "https://github.com/org/repo1/pull/1")
 	assertContains(t, output, "OPEN")
 	assertContains(t, output, "repo2")
-	assertContains(t, output, "N/A")
+	assertContains(t, output, "-")
 
 	// repo2 has Unpushed
 	assertContains(t, output, StatusSymbolUnpushed)
