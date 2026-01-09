@@ -115,7 +115,7 @@ func handlePrUpdate(args []string, opts GlobalOptions) {
 	// Collect PR Status
 	prRows := CollectPrStatus(rows, config, parallel, opts.GhPath, verbose, nil)
 	spinner.Stop()
-	RenderPrStatusTable(prRows)
+	RenderPrStatusTable(Stdout, prRows)
 
 	// 6. Check for Behind/Conflict/Detached
 	ValidateStatusForAction(rows, true)
@@ -215,7 +215,7 @@ func handlePrUpdate(args []string, opts GlobalOptions) {
 		}
 		displayRows = append(displayRows, row)
 	}
-	RenderPrStatusTable(displayRows)
+	RenderPrStatusTable(Stdout, displayRows)
 
 	fmt.Println("Done.")
 }

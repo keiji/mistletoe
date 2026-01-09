@@ -86,5 +86,5 @@ func handlePrStatus(args []string, opts GlobalOptions) {
 	spinner.Stop()
 
 	// 6. Render
-	RenderPrStatusTable(prRows)
+	RenderPrStatusTable(Stdout, prRows)
 }

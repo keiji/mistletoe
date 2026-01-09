@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 	"os/exec"
+	"bytes"
 )
 
 // We need to mock RunGit or the underlying exec.Command to test status logic without real git repos?
@@ -238,4 +239,82 @@ func TestValidateStatusForAction(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestRenderStatusTable(t *testing.T) {
+	rows := []StatusRow{
+		{
+			Repo:           "repo1",
+			ConfigRef:      "main",
+			LocalBranchRev: "main:1234567",
+			RemoteRev:      "main:1234567",
+			RemoteColor:    ColorNone,
+			HasUnpushed:    false,
+			IsPullable:     false,
+			HasConflict:    false,
+		},
+		{
+			Repo:           "repo2",
+			ConfigRef:      "dev",
+			LocalBranchRev: "dev:abcdef0",
+			RemoteRev:      "dev:abcdef0",
+			RemoteColor:    ColorNone,
+			HasUnpushed:    true,
+			IsPullable:     false,
+			HasConflict:    false,
+		},
+		{
+			Repo:           "repo3",
+			ConfigRef:      "feature",
+			LocalBranchRev: "feature:1111111",
+			RemoteRev:      "feature:2222222",
+			RemoteColor:    ColorYellow,
+			HasUnpushed:    false,
+			IsPullable:     true,
+			HasConflict:    false,
+		},
+		{
+			Repo:           "repo4",
+			ConfigRef:      "fix",
+			LocalBranchRev: "fix:aaaaaaa",
+			RemoteRev:      "fix:bbbbbbb",
+			RemoteColor:    ColorYellow,
+			HasUnpushed:    false,
+			IsPullable:     true,
+			HasConflict:    true,
+		},
+	}
+
+	var buf bytes.Buffer
+	RenderStatusTable(&buf, rows)
+
+	output := buf.String()
+
+	// Helper to check for content
+	assertContains := func(t *testing.T, out, substr string) {
+		t.Helper()
+		if !strings.Contains(out, substr) {
+			t.Errorf("Expected output to contain %q, but it didn't.", substr)
+		}
+	}
+
+	assertContains(t, output, "repo1")
+	assertContains(t, output, "repo2")
+	assertContains(t, output, "repo3")
+	assertContains(t, output, "repo4")
+
+	// Check for Symbols (including ANSI codes implicitly via the table rendering logic, though we might just check for raw symbols if ANSI is stripped or not)
+	// The implementation adds ANSI codes directly strings.
+
+	// repo2 has Unpushed (Green >)
+	assertContains(t, output, StatusSymbolUnpushed)
+
+	// repo3 has Pullable (Yellow <)
+	assertContains(t, output, StatusSymbolPullable)
+
+	// repo4 has Conflict (Yellow !) - Takes precedence over Pullable
+	assertContains(t, output, StatusSymbolConflict)
+
+	// Check Legend
+	assertContains(t, output, "Status Legend:")
 }

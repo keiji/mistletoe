@@ -6,6 +6,7 @@ import (
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -257,9 +258,9 @@ func getRepoStatus(repo conf.Repository, baseDir, gitPath string, verbose bool, 
 	}
 }
 
-// RenderStatusTable renders the status table to stdout.
-func RenderStatusTable(rows []StatusRow) {
-	table := tablewriter.NewTable(os.Stdout,
+// RenderStatusTable renders the status table to the provided writer (usually stdout).
+func RenderStatusTable(w io.Writer, rows []StatusRow) {
+	table := tablewriter.NewTable(w,
 		tablewriter.WithHeaderAutoFormat(tw.Off),
 		tablewriter.WithRowAutoWrap(tw.WrapNone),
 		tablewriter.WithRendition(tw.Rendition{
@@ -309,9 +310,9 @@ func RenderStatusTable(rows []StatusRow) {
 		_ = table.Append(row.Repo, row.ConfigRef, row.LocalBranchRev, remoteStr, statusStr)
 	}
 	if err := table.Render(); err != nil {
-		fmt.Printf("Error rendering table: %v\n", err)
+		fmt.Fprintf(w, "Error rendering table: %v\n", err)
 	}
-	fmt.Printf("Status Legend: %s Pullable, %s Unpushed, %s Conflict\n", StatusSymbolPullable, StatusSymbolUnpushed, StatusSymbolConflict)
+	fmt.Fprintf(w, "Status Legend: %s Pullable, %s Unpushed, %s Conflict\n", StatusSymbolPullable, StatusSymbolUnpushed, StatusSymbolConflict)
 }
 
 // ValidateStatusForAction checks if repositories are in a safe state for operations.
