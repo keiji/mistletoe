@@ -1,76 +1,77 @@
-# mstl-gh Manual Test Design
+# mstl-gh 手動テスト設計書
 
-This document describes the design of the manual testing scripts for `mstl-gh`, specifically focusing on the interactive testing scripts.
+本書は、`mstl-gh` の手動テストスクリプト（特に対話形式のテスト）の設計について記述します。
 
-## 1. Overview
+## 1. 概要
 
-The manual testing suite consists of interactive Python scripts that guide a human tester through various `mstl-gh` workflows (e.g., creating Pull Requests, updating them). Unlike fully automated tests, these scripts:
-1.  Set up a temporary environment (GitHub repositories).
-2.  Describe a test scenario and expected outcome to the user.
-3.  Prompt the user to execute the command (or verify execution).
-4.  Ask the user to verify the result manually (e.g., by checking a browser).
-5.  Clean up the environment.
+手動テストスイートは、テスターが `mstl-gh` の様々なワークフロー（Pull Request の作成や更新など）を確認するための対話式 Python スクリプト群で構成されます。完全自動化されたテストとは異なり、これらのスクリプトは以下の役割を担います。
 
-## 2. Scripts Structure
+1.  一時的な環境（GitHub リポジトリ）のセットアップ。
+2.  テストシナリオと期待される結果（Expected Outcome）の提示。
+3.  ユーザーへの実行指示（または実行確認のプロンプト表示）。
+4.  ユーザーによる手動検証の依頼（ブラウザでの確認など）。
+5.  環境のクリーンアップ。
 
-### 2.1. Shared Libraries
-*   `scripts/gh_test_env.py`: Handles the setup and teardown of the test environment.
-    *   Generates unique repository names (UUID-based).
-    *   Creates private repositories using `gh repo create`.
-    *   Builds the `mstl-gh` binary.
-    *   Generates configuration (`mistletoe.json`) and dependency graphs.
-    *   Cleans up (renames and deletes) repositories.
-*   `scripts/interactive_runner.py`: Manages the user interaction flow.
-    *   Parses arguments (e.g., `-o/--output`).
-    *   Displays test scenarios and expected results.
-    *   Prompts for confirmation (`yes/no`).
-    *   Logs results (PASS/FAIL/SKIP) to stdout and optionally to a file.
+## 2. スクリプト構成
 
-### 2.2. Test Scripts
-*   `scripts/manual_test_gh_pr_create.py`: Tests the "Create Pull Request" workflow.
-    *   **Scenario:** Creates 3 repositories with a dependency chain (A -> B -> C).
-    *   **Action:** Runs `mstl-gh pr create` interactively.
-    *   **Verification:** User checks if PRs are created with correct dependency links.
+### 2.1. 共通ライブラリ
+*   `scripts/gh_test_env.py`: テスト環境の構築と破棄を担当します。
+    *   一意なリポジトリ名の生成（UUID ベース）。
+    *   `gh repo create` を使用したプライベートリポジトリの作成。
+    *   `mstl-gh` バイナリのビルド。
+    *   設定ファイル (`mistletoe.json`) および依存関係グラフの生成。
+    *   リポジトリのクリーンアップ（リネーム後に削除）。
+*   `scripts/interactive_runner.py`: ユーザーとの対話フローを管理します。
+    *   引数の解析（例: `-o/--output`）。
+    *   テストシナリオと期待される結果の表示。
+    *   実行確認のプロンプト表示 (`yes/no`)。
+    *   結果（PASS/FAIL/SKIP）の標準出力およびファイルへのログ出力。
 
-### 2.3. Legacy Scripts
-*   `scripts/manual_test_gh.py`: The original monolithic test script.
-    *   **Safety:** Requires the user to type "I AGREE" to proceed.
-    *   **Scope:** Runs a fixed sequence of all tests (`init`, `switch`, `status`, `pr create`, etc.).
+### 2.2. テストスクリプト
+*   `scripts/manual_test_gh_pr_create.py`: 「Pull Request 作成」ワークフローをテストします。
+    *   **シナリオ:** 依存関係の連鎖を持つ3つのリポジトリ (A -> B -> C) を作成します。
+    *   **アクション:** `mstl-gh pr create` を対話形式で実行します。
+    *   **検証:** PR が作成され、正しい依存関係リンクが含まれているかをユーザーが確認します。
 
-## 3. Usage
+### 2.3. レガシースクリプト
+*   `scripts/manual_test_gh.py`: 初期のモノリシックなテストスクリプトです。
+    *   **安全性:** 実行前にユーザーが "I AGREE" と入力する必要があります。
+    *   **スコープ:** すべてのテスト（`init`, `switch`, `status`, `pr create` など）を固定順序で実行します。
 
-### Running a Test
+## 3. 使用方法
+
+### テストの実行
 ```bash
 python3 scripts/manual_test_gh_pr_create.py [-o results.log]
 ```
 
-### Flow
-1.  **Setup:** The script creates temporary repositories (e.g., `mistletoe-test-1234-A`).
-2.  **Prompt:** The script displays the expected result.
+### 実行フロー
+1.  **セットアップ:** スクリプトが一時的なリポジトリを作成します（例: `mistletoe-test-1234-A`）。
+2.  **プロンプト:** 期待される結果を表示し、実行の可否を尋ねます。
     ```
     [Expected Result]
     This test will create Pull Requests in...
     Do you want to execute the process? [Y/n]:
     ```
-3.  **Execution:** The script runs `mstl-gh` commands. The user may need to interact with the CLI (e.g., typing "yes").
-4.  **Verification:** The script asks if the result matches the expectation.
+3.  **実行:** `mstl-gh` コマンドを実行します。ユーザーは必要に応じて CLI を操作します（"yes" の入力など）。
+4.  **検証:** 動作が期待通りだったかを確認します。
     ```
     Process complete. Is the behavior as expected? [Y/n]:
     ```
-5.  **Logging:** The result is logged.
-6.  **Cleanup:** The script asks to delete the temporary repositories.
+5.  **ログ出力:** 結果が記録されます。
+6.  **クリーンアップ:** 一時リポジトリを削除するかを確認し、削除を実行します。
 
-## 4. Implementation Details
+## 4. 実装詳細
 
-*   **Language:** Python 3.
-*   **Dependencies:** `gh` CLI (authenticated), `git`, `go` (for building).
-*   **Output:** All user-facing messages are in English.
-*   **Safety:** Repositories are strictly namespaced with UUIDs. Cleanup handles renaming to `*-deleting` before deletion to prevent accidental data loss.
+*   **言語:** Python 3。
+*   **依存関係:** `gh` CLI（認証済み）、`git`、`go`（ビルド用）。
+*   **出力:** ユーザー向けのメッセージはすべて英語で実装されます。
+*   **安全性:** リポジトリ名は UUID を使用して厳密に区別されます。クリーンアップ時は、誤削除を防ぐため、削除前に `*-deleting` へリネームします。
 
-## 5. Future Extensions
+## 5. 今後の拡張
 
-To add a new test scenario:
-1.  Create a new script (e.g., `scripts/manual_test_gh_pr_sync.py`).
-2.  Import `GhTestEnv` and `InteractiveRunner`.
-3.  Define the scenario logic function.
-4.  Call `runner.execute_scenario()`.
+新しいテストシナリオを追加する場合の手順:
+1.  新しいスクリプトを作成します（例: `scripts/manual_test_gh_pr_sync.py`）。
+2.  `GhTestEnv` と `InteractiveRunner` をインポートします。
+3.  シナリオのロジック関数を定義します。
+4.  `runner.execute_scenario()` を呼び出します。
