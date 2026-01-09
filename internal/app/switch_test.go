@@ -1,6 +1,10 @@
 package app
 
 import (
+	conf "mistletoe/internal/config"
+)
+
+import (
 	"encoding/json"
 	"os"
 	"os/exec"
@@ -75,8 +79,8 @@ func TestHandleSwitch(t *testing.T) {
 	configPath := filepath.Join(tmpDir, "mstl.json")
 	repo1Rel := "repo1"
 	repo2Rel := "repo2"
-	config := Config{
-		Repositories: &[]Repository{
+	config := conf.Config{
+		Repositories: &[]conf.Repository{
 			{URL: strPtr("repo1"), ID: &repo1Rel},
 			{URL: strPtr("repo2"), ID: &repo2Rel},
 		},

@@ -1,6 +1,10 @@
 package app
 
 import (
+	conf "mistletoe/internal/config"
+)
+
+import (
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -19,12 +23,12 @@ func TestVerifyRevisionsUnchanged(t *testing.T) {
 	}
 	initialHead := strings.TrimSpace(string(out))
 
-	// Construct Config
+	// Construct conf.Config
 	repoID := filepath.Base(contentDir)
 	baseDir := filepath.Dir(contentDir)
 
-	config := &Config{
-		Repositories: &[]Repository{
+	config := &conf.Config{
+		Repositories: &[]conf.Repository{
 			{
 				ID:  strPtr(repoID),
 				URL: strPtr(remoteURL),

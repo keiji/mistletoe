@@ -1,6 +1,10 @@
 package app
 
 import (
+	conf "mistletoe/internal/config"
+)
+
+import (
 	"encoding/json"
 	"os"
 	"os/exec"
@@ -19,8 +23,8 @@ func TestPushCmd(t *testing.T) {
 		id1 := "repo1"
 		exec.Command("git", "clone", remote1, filepath.Join(workDir, id1)).Run()
 
-		config := Config{
-			Repositories: &[]Repository{
+		config := conf.Config{
+			Repositories: &[]conf.Repository{
 				{ID: &id1, URL: &remote1},
 			},
 		}
@@ -54,8 +58,8 @@ func TestPushCmd(t *testing.T) {
 		exec.Command("git", "-C", repoPath, "add", ".").Run()
 		exec.Command("git", "-C", repoPath, "commit", "-m", "unpushed").Run()
 
-		config := Config{
-			Repositories: &[]Repository{
+		config := conf.Config{
+			Repositories: &[]conf.Repository{
 				{ID: &id1, URL: &remote1},
 			},
 		}
@@ -113,8 +117,8 @@ func TestPushCmd(t *testing.T) {
 		outLocal, _ := cmdLocal.Output()
 		localSHA := strings.TrimSpace(string(outLocal))
 
-		config := Config{
-			Repositories: &[]Repository{
+		config := conf.Config{
+			Repositories: &[]conf.Repository{
 				{ID: &id1, URL: &remote1},
 			},
 		}

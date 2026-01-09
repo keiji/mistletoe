@@ -1,6 +1,7 @@
 package app
 
 import (
+	conf "mistletoe/internal/config"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -312,10 +313,10 @@ func EmbedMistletoeBody(originalBody, newBlock string) string {
 }
 
 // ParseMistletoeBlock extracts the JSON blocks from a Mistletoe-formatted body.
-// It returns the decoded snapshot (as a Config struct), raw Related PRs JSON, and true if Mistletoe block was found.
+// It returns the decoded snapshot (as a conf.Config struct), raw Related PRs JSON, and true if Mistletoe block was found.
 // If not found, returns nil, nil, false.
 // If found but data missing/invalid, returns error.
-func ParseMistletoeBlock(body string) (*Config, []byte, bool) {
+func ParseMistletoeBlock(body string) (*conf.Config, []byte, bool) {
 	lines := strings.Split(body, "\n")
 	startIdx := -1
 	endIdx := -1
@@ -352,14 +353,14 @@ func ParseMistletoeBlock(body string) (*Config, []byte, bool) {
 
 	blockContent := strings.Join(lines[startIdx:endIdx+1], "\n")
 
-	// 2. Extract Snapshot (Config)
+	// 2. Extract Snapshot (conf.Config)
 	// Look for snapshot filename (mistletoe-snapshot-...) in <summary>
 	// Then parse the JSON code block inside that details block.
 
 	detailsRe := regexp.MustCompile(`(?s)<details>(.*?)</details>`)
 	matches := detailsRe.FindAllStringSubmatch(blockContent, -1)
 
-	var snapshotConfig *Config
+	var snapshotConfig *conf.Config
 	var relatedPrJSON []byte
 
 	for _, m := range matches {
@@ -371,7 +372,7 @@ func ParseMistletoeBlock(body string) (*Config, []byte, bool) {
 			if len(jsonMatch) > 1 {
 				rawJSON := jsonMatch[1]
 				// Decode
-				if cfg, err := ParseConfig([]byte(rawJSON)); err == nil {
+				if cfg, err := conf.ParseConfig([]byte(rawJSON)); err == nil {
 					snapshotConfig = cfg
 				}
 			}

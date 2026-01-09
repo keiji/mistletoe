@@ -1,6 +1,10 @@
 package app
 
 import (
+	conf "mistletoe/internal/config"
+)
+
+import (
 	"encoding/json"
 	"os"
 	"os/exec"
@@ -25,9 +29,9 @@ func TestStatusCmd(t *testing.T) {
 		exec.Command("git", "-C", repoPath, "init").Run()
 		exec.Command("git", "-C", repoPath, "remote", "add", "origin", "https://example.com/wrong.git").Run()
 
-		// Config expects correct URL
-		config := Config{
-			Repositories: &[]Repository{
+		// conf.Config expects correct URL
+		config := conf.Config{
+			Repositories: &[]conf.Repository{
 				{ID: &repoID, URL: strPtr("https://example.com/correct.git")},
 			},
 		}
@@ -73,9 +77,9 @@ func TestStatusCmd(t *testing.T) {
 			t.Fatalf("failed to commit in repo2: %v", err)
 		}
 
-		// Config
-		config := Config{
-			Repositories: &[]Repository{
+		// conf.Config
+		config := conf.Config{
+			Repositories: &[]conf.Repository{
 				{ID: &id1, URL: &remote1},
 				{ID: &id2, URL: &remote2},
 			},
@@ -133,7 +137,7 @@ func TestStatusCmd(t *testing.T) {
 		}
 	})
 
-	t.Run("Status Success - Diverged (No Branch Config)", func(t *testing.T) {
+	t.Run("Status Success - Diverged (No Branch conf.Config)", func(t *testing.T) {
 		workDir := t.TempDir()
 		remoteDir, _ := setupRemoteAndContent(t, 1) // Remote has commit A
 
@@ -163,9 +167,9 @@ func TestStatusCmd(t *testing.T) {
 		// Important: Fetch so local has remote objects (B)
 		exec.Command("git", "-C", localRepoPath, "fetch").Run()
 
-		// Config (No Branch specified)
-		config := Config{
-			Repositories: &[]Repository{
+		// conf.Config (No Branch specified)
+		config := conf.Config{
+			Repositories: &[]conf.Repository{
 				{ID: &repoID, URL: &remoteDir},
 			},
 		}
@@ -209,8 +213,8 @@ func TestStatusCmd(t *testing.T) {
 		exec.Command("git", "-C", otherClone, "push").Run()
 
 		master := "master"
-		config := Config{
-			Repositories: &[]Repository{
+		config := conf.Config{
+			Repositories: &[]conf.Repository{
 				{ID: &repoID, URL: &remoteDir, Branch: &master},
 			},
 		}
@@ -233,7 +237,7 @@ func TestStatusCmd(t *testing.T) {
 		}
 	})
 
-	t.Run("Status Success - Diverged with Config", func(t *testing.T) {
+	t.Run("Status Success - Diverged with conf.Config", func(t *testing.T) {
 		workDir := t.TempDir()
 		remoteDir, _ := setupRemoteAndContent(t, 1) // Remote commit A
 
@@ -258,8 +262,8 @@ func TestStatusCmd(t *testing.T) {
 		exec.Command("git", "-C", localRepoPath, "fetch").Run()
 
 		master := "master"
-		config := Config{
-			Repositories: &[]Repository{
+		config := conf.Config{
+			Repositories: &[]conf.Repository{
 				{ID: &repoID, URL: &remoteDir, Branch: &master},
 			},
 		}
@@ -308,10 +312,10 @@ func TestStatusCmd(t *testing.T) {
 		os.WriteFile(fileLocal, []byte("Local Change"), 0644)
 		exec.Command("git", "-C", localRepoPath, "commit", "-am", "Local Change").Run()
 
-		// Config
+		// conf.Config
 		master := "master"
-		config := Config{
-			Repositories: &[]Repository{
+		config := conf.Config{
+			Repositories: &[]conf.Repository{
 				{ID: &repoID, URL: &remoteDir, Branch: &master},
 			},
 		}

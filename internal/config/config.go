@@ -1,4 +1,5 @@
-package app
+// Package config handles configuration loading and validation.
+package config
 
 import (
 	"encoding/json"
@@ -172,8 +173,8 @@ func (c *Config) GetRepoPath(repo Repository) string {
 	return filepath.Join(c.BaseDir, GetRepoDirName(repo))
 }
 
-// loadConfigData parses configuration from a byte slice.
-func loadConfigData(data []byte) (*Config, error) {
+// LoadConfigData parses configuration from a byte slice.
+func LoadConfigData(data []byte) (*Config, error) {
 	config, err := ParseConfig(data)
 	if err != nil {
 		return nil, err
@@ -186,8 +187,8 @@ func loadConfigData(data []byte) (*Config, error) {
 	return config, nil
 }
 
-// loadConfigFile reads a configuration file and returns a Config object.
-func loadConfigFile(configFile string) (*Config, error) {
+// LoadConfigFile reads a configuration file and returns a Config object.
+func LoadConfigFile(configFile string) (*Config, error) {
 	if configFile == "" {
 		return nil, errors.New("Error: Specify configuration file using --file or -f.")
 	}
@@ -205,7 +206,7 @@ func loadConfigFile(configFile string) (*Config, error) {
 		return nil, fmt.Errorf("Error reading file: %v.", err)
 	}
 
-	config, err := loadConfigData(data)
+	config, err := LoadConfigData(data)
 	if err != nil {
 		return nil, err
 	}

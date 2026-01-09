@@ -1,6 +1,10 @@
 package app
 
 import (
+	conf "mistletoe/internal/config"
+)
+
+import (
 	"bufio"
 	"errors"
 	"flag"
@@ -84,12 +88,12 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 		os.Exit(1)
 	}
 
-	// 2. Load Config
-	var config *Config
+	// 2. Load conf.Config
+	var config *conf.Config
 	if configPath != "" {
-		config, err = loadConfigFile(configPath)
+		config, err = conf.LoadConfigFile(configPath)
 	} else {
-		config, err = loadConfigData(configData)
+		config, err = conf.LoadConfigData(configData)
 	}
 
 	if err != nil {
@@ -145,12 +149,12 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 	// 6.5 Categorize Repositories
 	fmt.Println("Analyzing repository states...")
 
-	var pushList []Repository
-	var createList []Repository
-	var updateList []Repository
+	var pushList []conf.Repository
+	var createList []conf.Repository
+	var updateList []conf.Repository
 	var skippedRepos []string
 
-	repoMap := make(map[string]Repository)
+	repoMap := make(map[string]conf.Repository)
 	for _, r := range *config.Repositories {
 		repoMap[getRepoName(r)] = r
 	}
@@ -235,7 +239,7 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 	}
 
 	// Combine createList + updateList for "Active Repos" processing
-	var activeRepos []Repository
+	var activeRepos []conf.Repository
 	activeRepos = append(activeRepos, updateList...)
 	activeRepos = append(activeRepos, createList...)
 
@@ -401,7 +405,7 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 
 // executePrCreationOnly creates PRs for the given repositories.
 // Returns a map of RepoName -> PR URL.
-func executePrCreationOnly(repos []Repository, rows []StatusRow, parallel int, ghPath string, verbose bool, title, body string, draft bool) (map[string]string, error) {
+func executePrCreationOnly(repos []conf.Repository, rows []StatusRow, parallel int, ghPath string, verbose bool, title, body string, draft bool) (map[string]string, error) {
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, parallel)
@@ -415,7 +419,7 @@ func executePrCreationOnly(repos []Repository, rows []StatusRow, parallel int, g
 
 	for _, repo := range repos {
 		wg.Add(1)
-		go func(r Repository) {
+		go func(r conf.Repository) {
 			defer wg.Done()
 			sem <- struct{}{}
 			defer func() { <-sem }()

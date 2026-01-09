@@ -1,6 +1,10 @@
 package app
 
 import (
+	conf "mistletoe/internal/config"
+)
+
+import (
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -28,7 +32,7 @@ type PrInfo struct {
 	Author             Author     `json:"author"`
 	ViewerCanEditFiles bool       `json:"viewerCanEditFiles"`
 	Body               string     `json:"body"`
-	HeadRepository     Repository `json:"headRepository"`
+	HeadRepository     conf.Repository `json:"headRepository"`
 }
 
 // Author represents a GitHub user.
@@ -49,8 +53,8 @@ type PrStatusRow struct {
 
 // CollectPrStatus collects Pull Request status for the given repositories.
 // knownPRs is an optional map of [RepoID] -> []URL to skip querying existing PRs.
-func CollectPrStatus(statusRows []StatusRow, config *Config, parallel int, ghPath string, verbose bool, knownPRs map[string][]string) []PrStatusRow {
-	repoMap := make(map[string]Repository)
+func CollectPrStatus(statusRows []StatusRow, config *conf.Config, parallel int, ghPath string, verbose bool, knownPRs map[string][]string) []PrStatusRow {
+	repoMap := make(map[string]conf.Repository)
 	for _, r := range *config.Repositories {
 		repoMap[getRepoName(r)] = r
 	}
@@ -170,7 +174,7 @@ func CollectPrStatus(statusRows []StatusRow, config *Config, parallel int, ghPat
 							// Check for Open PRs
 							hasOpenPR := false
 							for _, pr := range prs {
-								// Filter by HeadRepository matching Config URL (canonical)
+								// Filter by HeadRepository matching conf.Config URL (canonical)
 								if isPrFromConfiguredRepo(pr, configCanonicalURL) {
 									if strings.EqualFold(pr.State, GitHubPrStateOpen) || (pr.IsDraft && strings.EqualFold(pr.State, GitHubPrStateOpen)) {
 										hasOpenPR = true
@@ -319,7 +323,7 @@ func RenderPrStatusTable(rows []PrStatusRow) {
 				WithBottomMid("-"),
 		}),
 	)
-	// Change Header Order: Repository, Base, Branch/Rev, Status, PR
+	// Change Header Order: conf.Repository, Base, Branch/Rev, Status, PR
 	table.Header("Repository", "Base", "Branch/Rev", "Status", "PR")
 
 	for _, row := range rows {
@@ -352,7 +356,7 @@ func RenderPrStatusTable(rows []PrStatusRow) {
 }
 
 // executePush pushes changes for the given repositories.
-func executePush(repos []Repository, baseDir string, rows []StatusRow, parallel int, gitPath string, verbose bool) error {
+func executePush(repos []conf.Repository, baseDir string, rows []StatusRow, parallel int, gitPath string, verbose bool) error {
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, parallel)
 	var mu sync.Mutex
@@ -365,12 +369,12 @@ func executePush(repos []Repository, baseDir string, rows []StatusRow, parallel 
 
 	for _, repo := range repos {
 		wg.Add(1)
-		go func(r Repository) {
+		go func(r conf.Repository) {
 			defer wg.Done()
 			sem <- struct{}{}
 			defer func() { <-sem }()
 
-			repoDir := filepath.Join(baseDir, GetRepoDirName(r))
+			repoDir := filepath.Join(baseDir, conf.GetRepoDirName(r))
 			repoName := getRepoName(r)
 
 			branchName := ""
@@ -565,12 +569,12 @@ func parsePrURL(url string) (owner, repo string, number int, err error) {
 	return owner, repo, number, nil
 }
 
-func getRepoName(r Repository) string {
+func getRepoName(r conf.Repository) string {
 	if r.ID != nil && *r.ID != "" {
 		return *r.ID
 	}
 	// Fallback to dir name
-	return GetRepoDirName(r)
+	return conf.GetRepoDirName(r)
 }
 
 // resolveRemoteBranchHash tries to resolve the remote branch hash locally first,
@@ -621,7 +625,7 @@ func checkGhAvailability(ghPath string, verbose bool) error {
 // verifyGithubRequirements checks GitHub URL, permissions, base branch existence, and existing PRs.
 // It returns a map of RepoName -> Existing PR URL.
 // Accepts knownPRs map[string][]string (ID -> []URL) to optimize existing PR check.
-func verifyGithubRequirements(repos []Repository, baseDir string, rows []StatusRow, parallel int, gitPath, ghPath string, verbose bool, knownPRs map[string][]string) (map[string]string, error) {
+func verifyGithubRequirements(repos []conf.Repository, baseDir string, rows []StatusRow, parallel int, gitPath, ghPath string, verbose bool, knownPRs map[string][]string) (map[string]string, error) {
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, parallel)
@@ -635,7 +639,7 @@ func verifyGithubRequirements(repos []Repository, baseDir string, rows []StatusR
 
 	for _, repo := range repos {
 		wg.Add(1)
-		go func(r Repository) {
+		go func(r conf.Repository) {
 			defer wg.Done()
 			sem <- struct{}{}
 			defer func() { <-sem }()
@@ -675,7 +679,7 @@ func verifyGithubRequirements(repos []Repository, baseDir string, rows []StatusR
 			}
 
 			if baseBranch != "" {
-				repoDir := filepath.Join(baseDir, GetRepoDirName(r))
+				repoDir := filepath.Join(baseDir, conf.GetRepoDirName(r))
 				remoteHash, err := resolveRemoteBranchHash(repoDir, gitPath, baseBranch, verbose)
 				if err != nil {
 					mu.Lock()
@@ -702,7 +706,7 @@ func verifyGithubRequirements(repos []Repository, baseDir string, rows []StatusR
 			}
 
 			// Fallback to query
-			repoDir := filepath.Join(baseDir, GetRepoDirName(r))
+			repoDir := filepath.Join(baseDir, conf.GetRepoDirName(r))
 			branchName := ""
 
 			if row, ok := statusMap[repoName]; ok && row.BranchName != "" {

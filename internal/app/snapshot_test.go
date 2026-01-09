@@ -1,6 +1,10 @@
 package app
 
 import (
+	conf "mistletoe/internal/config"
+)
+
+import (
 	"fmt"
 	"os"
 	"os/exec"
@@ -118,7 +122,7 @@ func TestSnapshot(t *testing.T) {
 		t.Fatalf("failed to read output file: %v", err)
 	}
 
-	config, err := ParseConfig(data)
+	config, err := conf.ParseConfig(data)
 	if err != nil {
 		t.Fatalf("failed to parse output json: %v", err)
 	}
@@ -127,7 +131,7 @@ func TestSnapshot(t *testing.T) {
 		t.Errorf("expected 2 repos, got %d", len(*config.Repositories))
 	}
 
-	repoMap := make(map[string]Repository)
+	repoMap := make(map[string]conf.Repository)
 	for _, r := range *config.Repositories {
 		if r.ID == nil {
 			t.Error("repo ID is nil")

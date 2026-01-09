@@ -1,5 +1,6 @@
 package app
 
+
 import (
 	"fmt"
 	"io"
@@ -15,6 +16,9 @@ import (
 
 // ExecCommand is a variable that holds exec.Command to allow mocking in tests.
 var ExecCommand = exec.Command
+
+// Stdin is a variable that holds os.Stdin to allow mocking in tests.
+var Stdin io.Reader = os.Stdin
 
 // verboseLogMu ensures atomic execution and logging when verbose mode is enabled.
 var verboseLogMu sync.Mutex
@@ -186,7 +190,7 @@ func ResolveCommonValues(fLong, fShort string, pVal, pValShort int, ignoreStdin 
 		return "", 0, nil, fmt.Errorf("Parallel must be at most %d.", MaxParallel)
 	}
 
-	// Config File
+	// conf.Config File
 	defaultConfig := DefaultConfigFile
 	var configFile string
 	var isDefault bool
@@ -221,8 +225,18 @@ func ResolveCommonValues(fLong, fShort string, pVal, pValShort int, ignoreStdin 
 	stdinAvailable := false
 
 	if !ignoreStdin {
-		stat, _ := os.Stdin.Stat()
-		if (stat.Mode() & os.ModeCharDevice) == 0 {
+		// If Stdin is os.Stdin, we can check Stat to see if it's a pipe.
+		// If it's mocked, we assume it's available if it has data (handled by ReadAll later usually,
+		// but for the logic "is data being piped?", we might need to rely on the type).
+		// For consistency in tests, we rely on the fact that if Stdin is NOT a terminal, it's available.
+
+		if f, ok := Stdin.(*os.File); ok {
+			stat, _ := f.Stat()
+			if (stat.Mode() & os.ModeCharDevice) == 0 {
+				stdinAvailable = true
+			}
+		} else {
+			// If not *os.File (e.g. bytes.Buffer in test), assume available
 			stdinAvailable = true
 		}
 
@@ -245,7 +259,7 @@ func ResolveCommonValues(fLong, fShort string, pVal, pValShort int, ignoreStdin 
 	if checkStdin {
 		if stdinAvailable {
 			// Data is being piped to stdin
-			inputData, err := io.ReadAll(os.Stdin)
+			inputData, err := io.ReadAll(Stdin)
 			if err != nil {
 				return "", 0, nil, fmt.Errorf("failed to read from stdin: %w", err)
 			}

@@ -1,6 +1,10 @@
 package app
 
 import (
+	conf "mistletoe/internal/config"
+)
+
+import (
 	"encoding/json"
 	"fmt"
 	"os"
@@ -31,12 +35,12 @@ func TestHandleSync(t *testing.T) {
 	exec.Command("git", "clone", remoteURL, repo2).Run()
 	configureGitUser(t, repo2)
 
-	// Config
+	// conf.Config
 	master := "master"
 	repo1Rel := "repo1"
 	repo2Rel := "repo2"
-	config := Config{
-		Repositories: &[]Repository{
+	config := conf.Config{
+		Repositories: &[]conf.Repository{
 			{URL: strPtr(remoteURL), ID: &repo1Rel, Branch: &master},
 			{URL: strPtr(remoteURL), ID: &repo2Rel, Branch: &master},
 		},
@@ -202,10 +206,10 @@ func TestSync_SkipMissingRemoteBranch(t *testing.T) {
 		t.Fatalf("failed to checkout new branch: %v", err)
 	}
 
-	// 4. Create Config
+	// 4. Create conf.Config
 	configFile := filepath.Join(rootDir, "repos.json")
-	config := Config{
-		Repositories: &[]Repository{
+	config := conf.Config{
+		Repositories: &[]conf.Repository{
 			{
 				URL: strPtr(remoteURL), // mstl verifies origin URL
 				ID:  strPtr("repo1"),

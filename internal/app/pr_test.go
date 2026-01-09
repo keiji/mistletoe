@@ -1,6 +1,10 @@
 package app
 
 import (
+	conf "mistletoe/internal/config"
+)
+
+import (
 	"fmt"
 	"os"
 	"os/exec"
@@ -203,8 +207,8 @@ func TestVerifyGithubRequirements_Success(t *testing.T) {
 	id := "."
 	url := "https://github.com/user/repo.git"
 
-	repo := Repository{ID: &id, URL: &url}
-	repos := []Repository{repo}
+	repo := conf.Repository{ID: &id, URL: &url}
+	repos := []conf.Repository{repo}
 
 	// Mock gh to return success
 	existing, err := verifyGithubRequirements(repos, "", nil, 1, "git", "gh", false, nil)
@@ -224,8 +228,8 @@ func TestVerifyGithubRequirements_ExistingPR(t *testing.T) {
 	id := "."
 	url := "https://github.com/user/repo.git"
 
-	repo := Repository{ID: &id, URL: &url}
-	repos := []Repository{repo}
+	repo := conf.Repository{ID: &id, URL: &url}
+	repos := []conf.Repository{repo}
 
 	// Set env to mock existing PR
 	os.Setenv("MOCK_PR_EXISTS", "1")
@@ -248,8 +252,8 @@ func TestVerifyGithubRequirements_MissingBaseBranch(t *testing.T) {
 	id := "."
 	url := "https://github.com/user/repo.git"
 	branch := "missing-branch"
-	repo := Repository{ID: &id, URL: &url, Branch: &branch}
-	repos := []Repository{repo}
+	repo := conf.Repository{ID: &id, URL: &url, Branch: &branch}
+	repos := []conf.Repository{repo}
 
 	// Set env to mock missing base branch for ls-remote
 	os.Setenv("MOCK_GIT_LS_REMOTE_MISSING", "1")
@@ -271,8 +275,8 @@ func TestExecutePrCreation_NoCommitsError(t *testing.T) {
 
 	id := "."
 	url := "https://github.com/user/repo.git"
-	repo := Repository{ID: &id, URL: &url}
-	repos := []Repository{repo}
+	repo := conf.Repository{ID: &id, URL: &url}
+	repos := []conf.Repository{repo}
 
 	// Dummy StatusRow needed for branch name resolution
 	row := StatusRow{Repo: id, BranchName: "feature-branch"}

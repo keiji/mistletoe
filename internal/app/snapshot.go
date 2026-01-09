@@ -1,6 +1,10 @@
 package app
 
 import (
+	conf "mistletoe/internal/config"
+)
+
+import (
 	"encoding/json"
 	"flag"
 	"crypto/sha256"
@@ -45,8 +49,8 @@ func handleSnapshot(args []string, opts GlobalOptions) {
 		outputFile = oShort
 	}
 
-	// Load Config (Optional) to resolve base branches
-	var config *Config
+	// Load conf.Config (Optional) to resolve base branches
+	var config *conf.Config
 	configPath, parallel, configData, err := ResolveCommonValues(fLong, fShort, pVal, pValShort, ignoreStdin)
 	if err != nil {
 		fmt.Println(err)
@@ -56,9 +60,9 @@ func handleSnapshot(args []string, opts GlobalOptions) {
 
 	if configPath != "" || len(configData) > 0 {
 		if configPath != "" {
-			config, err = loadConfigFile(configPath)
+			config, err = conf.LoadConfigFile(configPath)
 		} else {
-			config, err = loadConfigData(configData)
+			config, err = conf.LoadConfigData(configData)
 		}
 		if err != nil {
 			fmt.Println(err)
@@ -84,7 +88,7 @@ func handleSnapshot(args []string, opts GlobalOptions) {
 		}
 	}
 
-	var repos []Repository
+	var repos []conf.Repository
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, parallel)
@@ -137,11 +141,11 @@ func handleSnapshot(args []string, opts GlobalOptions) {
 			}
 			urlPtr := &url
 
-			// Resolve BaseBranch from Config
+			// Resolve BaseBranch from conf.Config
 			var baseBranchPtr *string
 			if config != nil && config.Repositories != nil {
 				for _, confRepo := range *config.Repositories {
-					confID := GetRepoDirName(confRepo)
+					confID := conf.GetRepoDirName(confRepo)
 					if confID == dirName {
 						if confRepo.BaseBranch != nil && *confRepo.BaseBranch != "" {
 							baseBranchPtr = confRepo.BaseBranch
@@ -153,7 +157,7 @@ func handleSnapshot(args []string, opts GlobalOptions) {
 				}
 			}
 
-			repo := Repository{
+			repo := conf.Repository{
 				ID:         &id,
 				URL:        urlPtr,
 				Branch:     branchPtr,
@@ -180,12 +184,12 @@ func handleSnapshot(args []string, opts GlobalOptions) {
 	}
 
 	// Sort Repos to match order of CalculateSnapshotIdentifier (and general neatness)
-	// Note: CalculateSnapshotIdentifier also sorts, but we sort here for the Config struct output
+	// Note: CalculateSnapshotIdentifier also sorts, but we sort here for the conf.Config struct output
 	sort.Slice(repos, func(i, j int) bool {
 		return *repos[i].ID < *repos[j].ID
 	})
 
-	outputConfig := Config{
+	outputConfig := conf.Config{
 		Repositories: &repos,
 	}
 
@@ -206,7 +210,7 @@ func handleSnapshot(args []string, opts GlobalOptions) {
 // GenerateSnapshot creates a snapshot JSON of the current state of repositories defined in config
 // that also exist on disk.
 // It returns the JSON content and a unique identifier based on the revisions.
-func GenerateSnapshot(config *Config, gitPath string) ([]byte, string, error) {
+func GenerateSnapshot(config *conf.Config, gitPath string) ([]byte, string, error) {
 	// GenerateSnapshot is usually called by pr create, which doesn't expose a verbose flag to GenerateSnapshot yet
 	// But `pr create` has verbose. We should add verbose to GenerateSnapshot signature if we want logs inside it.
 	// Currently it calls RunGit. Let's default false unless we update signature.
@@ -214,13 +218,13 @@ func GenerateSnapshot(config *Config, gitPath string) ([]byte, string, error) {
 	// But GenerateSnapshot is exported. I need to check callers.
 	// Caller: `pr create` (handlePrCreate in pr.go)
 
-	// I'll update signature to `GenerateSnapshot(config *Config, gitPath string, verbose bool)`
+	// I'll update signature to `GenerateSnapshot(config *conf.Config, gitPath string, verbose bool)`
 	return GenerateSnapshotVerbose(config, gitPath, false)
 }
 
 // GenerateSnapshotVerbose creates a snapshot JSON with verbosity control.
-func GenerateSnapshotVerbose(config *Config, gitPath string, verbose bool) ([]byte, string, error) {
-	var currentRepos []Repository
+func GenerateSnapshotVerbose(config *conf.Config, gitPath string, verbose bool) ([]byte, string, error) {
+	var currentRepos []conf.Repository
 
 	// Iterate config repos and check if they exist on disk.
 	for _, repo := range *config.Repositories {
@@ -282,7 +286,7 @@ func GenerateSnapshotVerbose(config *Config, gitPath string, verbose bool) ([]by
 			baseBranchPtr = repo.Branch
 		}
 
-		currentRepos = append(currentRepos, Repository{
+		currentRepos = append(currentRepos, conf.Repository{
 			ID:         &id,
 			URL:        urlPtr,
 			Branch:     branchPtr,
@@ -294,7 +298,7 @@ func GenerateSnapshotVerbose(config *Config, gitPath string, verbose bool) ([]by
 	identifier := CalculateSnapshotIdentifier(currentRepos)
 
 	// Create JSON
-	snapshotConfig := Config{
+	snapshotConfig := conf.Config{
 		Repositories: &currentRepos,
 	}
 	data, err := json.MarshalIndent(snapshotConfig, "", "  ")
@@ -306,15 +310,15 @@ func GenerateSnapshotVerbose(config *Config, gitPath string, verbose bool) ([]by
 }
 
 // GenerateSnapshotFromStatus creates a snapshot JSON using cached status rows.
-func GenerateSnapshotFromStatus(config *Config, statusRows []StatusRow) ([]byte, string, error) {
-	var currentRepos []Repository
+func GenerateSnapshotFromStatus(config *conf.Config, statusRows []StatusRow) ([]byte, string, error) {
+	var currentRepos []conf.Repository
 	statusMap := make(map[string]StatusRow)
 	for _, row := range statusRows {
 		statusMap[row.Repo] = row
 	}
 
 	for _, repo := range *config.Repositories {
-		repoName := GetRepoDirName(repo)
+		repoName := conf.GetRepoDirName(repo)
 		if repo.ID != nil && *repo.ID != "" {
 			repoName = *repo.ID
 		}
@@ -326,7 +330,7 @@ func GenerateSnapshotFromStatus(config *Config, statusRows []StatusRow) ([]byte,
 		}
 
 		// Use cached data
-		// URL: we don't store URL in StatusRow, but we have it in Config.
+		// URL: we don't store URL in StatusRow, but we have it in conf.Config.
 		// However, GenerateSnapshot checked `git config --get remote.origin.url`.
 		// StatusRow validation ensures URL matches config. So we can use config URL safely.
 		url := ""
@@ -365,7 +369,7 @@ func GenerateSnapshotFromStatus(config *Config, statusRows []StatusRow) ([]byte,
 			baseBranchPtr = repo.Branch
 		}
 
-		currentRepos = append(currentRepos, Repository{
+		currentRepos = append(currentRepos, conf.Repository{
 			ID:         &id,
 			URL:        urlPtr,
 			Branch:     branchPtr,
@@ -376,7 +380,7 @@ func GenerateSnapshotFromStatus(config *Config, statusRows []StatusRow) ([]byte,
 
 	identifier := CalculateSnapshotIdentifier(currentRepos)
 
-	snapshotConfig := Config{
+	snapshotConfig := conf.Config{
 		Repositories: &currentRepos,
 	}
 	data, err := json.MarshalIndent(snapshotConfig, "", "  ")
@@ -389,7 +393,7 @@ func GenerateSnapshotFromStatus(config *Config, statusRows []StatusRow) ([]byte,
 
 // CalculateSnapshotIdentifier calculates the unique identifier for a list of repositories.
 // It sorts the repositories by ID to ensure a deterministic hash.
-func CalculateSnapshotIdentifier(repos []Repository) string {
+func CalculateSnapshotIdentifier(repos []conf.Repository) string {
 	// Sort by ID
 	sort.Slice(repos, func(i, j int) bool {
 		return *repos[i].ID < *repos[j].ID
