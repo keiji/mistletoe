@@ -72,6 +72,3 @@
     *   JSON ファイル (例: `mistletoe-snapshot-*.json`) が作成されること。
     *   内容に `repo1` と `repo2` が含まれ、それぞれの現在のブランチ/リビジョンが記録されていること。
 
-## 4. 実装について
-
-実装の詳細なガイドラインについては、[manual_tests/index.md](../../manual_tests/index.md) を参照してください。
