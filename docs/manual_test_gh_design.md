@@ -15,20 +15,20 @@
 ## 2. スクリプト構成
 
 ### 2.1. 共通ライブラリ
-*   `scripts/gh_test_env.py`: テスト環境の構築と破棄を担当します。
+*   `manual_tests/gh_test_env.py`: テスト環境の構築と破棄を担当します。
     *   一意なリポジトリ名の生成（UUID ベース）。
     *   `gh repo create` を使用したプライベートリポジトリの作成。
     *   `mstl-gh` バイナリのビルド。
     *   設定ファイル (`mistletoe.json`) および依存関係グラフの生成。
     *   リポジトリのクリーンアップ（リネーム後に削除）。
-*   `scripts/interactive_runner.py`: ユーザーとの対話フローを管理します。
+*   `manual_tests/interactive_runner.py`: ユーザーとの対話フローを管理します。
     *   引数の解析（例: `-o/--output`）。
     *   テストシナリオと期待される結果の表示。
     *   実行確認のプロンプト表示 (`yes/no`)。
     *   結果（PASS/FAIL/SKIP）の標準出力およびファイルへのログ出力。
 
 ### 2.2. テストスクリプト
-*   `scripts/manual_test_gh_pr_create.py`: 「Pull Request 作成」ワークフローをテストします。
+*   `manual_tests/manual_test_gh_pr_create.py`: 「Pull Request 作成」ワークフローをテストします。
     *   **シナリオ:** 依存関係の連鎖を持つ3つのリポジトリ (A -> B -> C) を作成します。
     *   **アクション:** `mstl-gh pr create` を対話形式で実行します。
     *   **検証:** PR が作成され、正しい依存関係リンクが含まれているかをユーザーが確認します。
@@ -37,11 +37,11 @@
 
 ### Docker を使用したテスト環境の構築と実行
 
-テスト環境を分離するため、提供されている `Dockerfile.manual_test` を使用して Docker コンテナ内でテストを実行することを推奨します。
+テスト環境を分離するため、提供されている `manual_tests/Dockerfile.manual_test` を使用して Docker コンテナ内でテストを実行することを推奨します。
 
 1.  **Docker イメージのビルド:**
     ```bash
-    docker build -t mstl-gh-test -f Dockerfile.manual_test .
+    docker build -t mstl-gh-test -f manual_tests/Dockerfile.manual_test .
     ```
 
 2.  **コンテナの起動:**
@@ -58,7 +58,7 @@
 
 4.  **テストの実行 (コンテナ内):**
     ```bash
-    python3 scripts/manual_test_gh_pr_create.py [-o results.log]
+    python3 manual_tests/manual_test_gh_pr_create.py [-o results.log]
     ```
 
 ### ローカルでの実行
@@ -89,7 +89,7 @@
 ## 5. 今後の拡張
 
 新しいテストシナリオを追加する場合の手順:
-1.  新しいスクリプトを作成します（例: `scripts/manual_test_gh_pr_sync.py`）。
+1.  新しいスクリプトを作成します（例: `manual_tests/manual_test_gh_pr_sync.py`）。
 2.  `GhTestEnv` と `InteractiveRunner` をインポートします。
 3.  シナリオのロジック関数を定義します。
 4.  `runner.execute_scenario()` を呼び出します。

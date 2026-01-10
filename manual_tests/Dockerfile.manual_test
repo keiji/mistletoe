@@ -22,8 +22,8 @@ COPY . .
 RUN go build -o /usr/local/bin/mstl-gh ./cmd/mstl-gh
 
 # Instructions for running:
-# 1. Build: docker build -t mstl-gh-test -f Dockerfile.manual_test .
+# 1. Build: docker build -t mstl-gh-test -f manual_tests/Dockerfile.manual_test .
 # 2. Run: docker run -it --rm -v $(pwd):/app mstl-gh-test /bin/bash
 # 3. Inside container:
 #    gh auth login --with-token < token.txt (or interactive)
-#    python3 scripts/manual_test_gh_pr_create.py
+#    python3 manual_tests/manual_test_gh_pr_create.py
