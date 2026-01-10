@@ -20,7 +20,7 @@ class GhTestEnv:
 
         self.test_dir = os.path.join(self.cwd, f"test_workspace_{self.uuid}")
         self.config_file = os.path.join(self.test_dir, "mistletoe.json")
-        self.dependency_file = os.path.join(self.test_dir, "dependencies.mmd")
+        self.dependency_file = os.path.join(self.test_dir, "dependencies.md")
 
         # Repository info placeholders
         self.repo_names = []
@@ -125,9 +125,11 @@ class GhTestEnv:
             json.dump(config, f, indent=2)
 
         with open(self.dependency_file, "w") as f:
+            f.write("```mermaid\n")
             f.write("graph TD\n")
             f.write(f'    "{a}" --> "{b}"\n')
             f.write(f'    "{b}" --> "{c}"\n')
+            f.write("```\n")
 
     def cleanup(self):
         print_green("[-] Cleaning up workspace...")
