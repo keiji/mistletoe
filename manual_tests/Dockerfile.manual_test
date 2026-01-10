@@ -18,7 +18,14 @@ RUN curl -fsSL https://github.com/cli/cli/releases/download/v2.83.2/gh_2.83.2_li
 # Configure GitHub Token if provided
 ARG GITHUB_TOKEN
 RUN if [ -n "$GITHUB_TOKEN" ]; then \
-    echo "$GITHUB_TOKEN" | GITHUB_TOKEN= gh auth login --with-token; \
+    mkdir -p /root/.ssh && \
+    chmod 700 /root/.ssh && \
+    ssh-keyscan github.com >> /root/.ssh/known_hosts && \
+    chmod 644 /root/.ssh/known_hosts && \
+    ssh-keygen -t ed25519 -C "mstl-docker-test" -f /root/.ssh/id_ed25519 -N "" && \
+    echo "$GITHUB_TOKEN" | GITHUB_TOKEN= gh auth login --with-token && \
+    gh ssh-key add /root/.ssh/id_ed25519.pub --title "mstl-docker-test-$(date +%s)" && \
+    gh config set git_protocol ssh; \
     fi
 
 WORKDIR /app
