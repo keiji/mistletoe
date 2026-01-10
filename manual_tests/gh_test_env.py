@@ -111,11 +111,11 @@ class GhTestEnv:
         os.makedirs(self.test_dir, exist_ok=True)
 
         # Assuming 3 repos A, B, C for standard graph
-        if len(self.repo_names) < 3:
-             raise Exception("Need at least 3 repos for standard graph")
+        if len(self.repo_names) < 4:
+             raise Exception("Need at least 4 repos for standard graph")
 
         a, b, c = self.repo_names[0], self.repo_names[1], self.repo_names[2]
-        d = self.repo_names[3] if len(self.repo_names) > 3 else None
+        d = self.repo_names[3]
 
         config = {
             "repositories": [
@@ -130,8 +130,7 @@ class GhTestEnv:
             f.write("graph TD\n")
             f.write(f'    {a} --> {b}\n')
             f.write(f'    {b} --> {c}\n')
-            if d:
-                f.write(f'    {d}\n')
+            f.write(f'    {d}\n')
             f.write("```\n")
 
     def cleanup(self):
