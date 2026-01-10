@@ -30,7 +30,9 @@ func buildBinaryForTest(t *testing.T, cmdName string) string {
 		t.Fatalf("source for %s not found at %s", cmdName, cmdSrcPath)
 	}
 
-	cmd := exec.Command("go", "build", "-o", binPath, cmdSrcPath)
+	// Inject a version so we can test the output format "mstl v..."
+	ldflags := "-X main.appVersion=v0.0.0-test"
+	cmd := exec.Command("go", "build", "-ldflags", ldflags, "-o", binPath, cmdSrcPath)
 	// Inherit env to ensure we have cache etc.
 	cmd.Env = os.Environ()
 
@@ -52,7 +54,7 @@ func TestMstlAndMstlGhCompatibility(t *testing.T) {
 		if err != nil {
 			t.Fatalf("mstl version failed: %v", err)
 		}
-		if !strings.Contains(string(outMstl), "mstl version") {
+		if !strings.Contains(string(outMstl), "mstl v") {
 			t.Errorf("mstl version output unexpected: %s", outMstl)
 		}
 
@@ -60,7 +62,7 @@ func TestMstlAndMstlGhCompatibility(t *testing.T) {
 		if err != nil {
 			t.Fatalf("mstl-gh version failed: %v", err)
 		}
-		if !strings.Contains(string(outMstlGh), "Mistletoe-gh version") {
+		if !strings.Contains(string(outMstlGh), "mstl-gh v") {
 			t.Errorf("mstl-gh version output unexpected: %s", outMstlGh)
 		}
 	})

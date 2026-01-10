@@ -15,7 +15,7 @@ const (
 	// AppNameMstl is the display name for mstl.
 	AppNameMstl = "mstl"
 	// AppNameMstlGh is the display name for mstl-gh.
-	AppNameMstlGh = "Mistletoe-gh"
+	AppNameMstlGh = "mstl-gh"
 )
 
 // Subcommand constants
