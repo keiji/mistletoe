@@ -14,19 +14,13 @@ def main():
     env = GhTestEnv()
 
     # 1. Setup Phase (Automated)
-    print_green("[-] Setting up test environment (Creating repos, config, building binary)...")
+    print_green("[-] Setting up test environment (Building binary, generating names)...")
     try:
         env.generate_repo_names(3)
-        # Check for existing repos and warn (simple check, full check is in manual_test_gh.py but we do a basic one here)
-        # Assuming generate_repo_names handles uniqueness.
-
         env.build_mstl_gh()
-        env.setup_repos()
-        env.create_config_and_graph()
     except Exception as e:
         print_green(f"[FATAL] Setup failed: {e}")
         runner.log("Setup failed", status="FAILED")
-        runner.run_cleanup(env.cleanup)
         sys.exit(1)
 
     repo_a = env.repo_names[0]
@@ -34,6 +28,11 @@ def main():
 
     # Define the scenario logic
     def scenario_logic():
+        # Create Repositories (Deferred until user confirmation)
+        print_green(f"[-] Creating temporary repositories: {', '.join(env.repo_names)}...")
+        env.setup_repos()
+        env.create_config_and_graph()
+
         # Initialize
         print_green(f"[-] Initializing in {env.test_dir}...")
         env.run_mstl_cmd(["init", "-f", "mistletoe.json", "--verbose"])

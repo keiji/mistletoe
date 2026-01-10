@@ -78,7 +78,7 @@ class GhTestEnv:
         if not self.repo_names:
             self.generate_repo_names()
 
-        print_green(f"[-] Creating temporary repositories: {', '.join(self.repo_names)}...")
+        # Repositories are created here
         for repo in self.repo_names:
             subprocess.run(["gh", "repo", "create", repo, "--private"], check=True)
 
