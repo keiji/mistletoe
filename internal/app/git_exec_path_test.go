@@ -42,8 +42,8 @@ func TestGitExecPath(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to run version with valid GIT_EXEC_PATH: %v, out: %s", err, out)
 		}
-		if !bytes.Contains(out, []byte("mstl version")) {
-			t.Errorf("Expected output to contain 'mstl version', got: %s", out)
+		if !bytes.Contains(out, []byte("mstl v")) {
+			t.Errorf("Expected output to contain 'mstl v', got: %s", out)
 		}
 		// The output should show the path we resolved.
 		// Since we used real git, it should work.

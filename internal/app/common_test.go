@@ -29,7 +29,8 @@ func buildMstl(t *testing.T) string {
 		t.Fatalf("failed to get root dir: %v", err)
 	}
 	cmdPath := filepath.Join(rootDir, "cmd", "mstl")
-	buildCmd := exec.Command("go", "build", "-o", binPath, cmdPath)
+	ldflags := "-X main.appVersion=v0.0.0-test"
+	buildCmd := exec.Command("go", "build", "-ldflags", ldflags, "-o", binPath, cmdPath)
 	if err := buildCmd.Run(); err != nil {
 		t.Fatalf("failed to build mstl: %v", err)
 	}
