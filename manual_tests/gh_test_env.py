@@ -153,7 +153,7 @@ class GhTestEnv:
         cmd = [self.mstl_bin] + args
         try:
             return subprocess.run(
-                cmd, cwd=cwd, input=input_str.encode() if input_str else None,
+                cmd, cwd=cwd, input=input_str,
                 check=True, text=True
             )
         except subprocess.CalledProcessError as e:
