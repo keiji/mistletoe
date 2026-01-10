@@ -313,10 +313,10 @@ func EmbedMistletoeBody(originalBody, newBlock string) string {
 }
 
 // ParseMistletoeBlock extracts the JSON blocks from a Mistletoe-formatted body.
-// It returns the decoded snapshot (as a conf.Config struct), raw Related PRs JSON, and true if Mistletoe block was found.
-// If not found, returns nil, nil, false.
+// It returns the decoded snapshot (as a conf.Config struct), raw Related PRs JSON, the raw dependency graph content, and true if Mistletoe block was found.
+// If not found, returns nil, nil, "", false.
 // If found but data missing/invalid, returns error.
-func ParseMistletoeBlock(body string) (*conf.Config, []byte, bool) {
+func ParseMistletoeBlock(body string) (*conf.Config, []byte, string, bool) {
 	lines := strings.Split(body, "\n")
 	startIdx := -1
 	endIdx := -1
@@ -348,7 +348,7 @@ func ParseMistletoeBlock(body string) (*conf.Config, []byte, bool) {
 	}
 
 	if startIdx == -1 || endIdx == -1 {
-		return nil, nil, false
+		return nil, nil, "", false
 	}
 
 	blockContent := strings.Join(lines[startIdx:endIdx+1], "\n")
@@ -362,6 +362,7 @@ func ParseMistletoeBlock(body string) (*conf.Config, []byte, bool) {
 
 	var snapshotConfig *conf.Config
 	var relatedPrJSON []byte
+	var dependencyContent string
 
 	for _, m := range matches {
 		content := m[1]
@@ -385,11 +386,21 @@ func ParseMistletoeBlock(body string) (*conf.Config, []byte, bool) {
 				relatedPrJSON = []byte(jsonMatch[1])
 			}
 		}
+		if strings.Contains(content, "mistletoe-dependencies-") {
+			// Extract Mermaid
+			// Look for ```mermaid ... ```
+			// Or just the content if no language specified? But Generate uses ```mermaid.
+			codeRe := regexp.MustCompile(`(?s)\x60\x60\x60(?:mermaid)?\s*(.*?)\s*\x60\x60\x60`)
+			codeMatch := codeRe.FindStringSubmatch(content)
+			if len(codeMatch) > 1 {
+				dependencyContent = codeMatch[1]
+			}
+		}
 	}
 
 	// Even if data is missing, we found the block structure.
 	// But the caller logic uses `found` to mean "safe to overwrite".
 	// If it's a mangled block, we should probably still consider it "found" (so we can repair it).
 	// So return true.
-	return snapshotConfig, relatedPrJSON, true
+	return snapshotConfig, relatedPrJSON, dependencyContent, true
 }

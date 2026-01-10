@@ -32,7 +32,11 @@ mstl-gh pr checkout -u [PRのURL] [-p parallel] [options]
 4.  **初期化・同期 (Init)**:
     *   フィルタリング済みのスナップショット情報を設定ファイル（Config）とみなします。
     *   `init` コマンド相当のロジックを実行し、リポジトリのクローンおよび指定されたリビジョン/ブランチへのチェックアウトを行います。
-4.  **ステータス表示**:
+5.  **設定ファイル保存**:
+    *   同期完了後、以下のファイルを `.mstl` ディレクトリに保存します。
+        *   `config.json`: 使用したスナップショット情報（フィルタリング後）。
+        *   `dependencies.md`: Mistletoeブロックに依存関係グラフ（Mermaid）が含まれている場合、その内容。
+6.  **ステータス表示**:
     *   同期完了後、`pr status` コマンド相当のロジックを実行し、現在のリポジトリ状態とPRの対応状況を表形式で表示します。
 
 ### エラーハンドリング
@@ -59,7 +63,8 @@ flowchart TD
     ExtractRel --> CheckRelStatus["関連PRステータス確認"]
     CheckRelStatus --> FilterConfig["Configオブジェクト生成 (Closed除外)"]
     FilterConfig --> ExecInit["Init処理実行 (並列)"]
-    ExecInit --> CollectStatus["PR Status収集"]
+    ExecInit --> SaveConfig["設定ファイル保存 (.mstl/config.json, dependencies.md)"]
+    SaveConfig --> CollectStatus["PR Status収集"]
     CollectStatus --> ShowResult["結果表示"]
     ShowResult --> End["終了"]
 ```
