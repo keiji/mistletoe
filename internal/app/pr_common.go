@@ -18,7 +18,7 @@ import (
 	"sync"
 
 	"github.com/olekukonko/tablewriter"
-	"github.com/olekukonko/tablewriter/tw"
+	"github.com/olekukonko/tablewriter/renderer"
 )
 
 // PrInfo holds information about a Pull Request.
@@ -313,23 +313,8 @@ func SortPrs(prs []PrInfo) {
 // RenderPrStatusTable renders the PR status table.
 func RenderPrStatusTable(w io.Writer, rows []PrStatusRow) {
 	table := tablewriter.NewTable(w,
-		tablewriter.WithHeaderAutoFormat(tw.Off),
-		tablewriter.WithRowAutoWrap(tw.WrapNone),
-		tablewriter.WithRendition(tw.Rendition{
-			Borders: tw.Border{Left: tw.On, Top: tw.Off, Right: tw.On, Bottom: tw.Off},
-			Settings: tw.Settings{
-				Separators: tw.Separators{BetweenColumns: tw.On, BetweenRows: tw.Off},
-			},
-			Symbols: tw.NewSymbolCustom("v0.0.5-like").
-				WithColumn("|").
-				WithRow("-").
-				WithCenter("|").
-				WithHeaderMid("-").
-				WithTopMid("-").
-				WithBottomMid("-"),
-		}),
+		tablewriter.WithRenderer(renderer.NewMarkdown()),
 	)
-	// Change Header Order: conf.Repository, Base, Branch/Rev, Status, PR
 	table.Header("Repository", "Base", "Branch/Rev", "Status", "PR")
 
 	for _, row := range rows {
