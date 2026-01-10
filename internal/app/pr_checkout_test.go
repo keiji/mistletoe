@@ -206,3 +206,42 @@ Some description...
 		t.Errorf("Invalid related JSON")
 	}
 }
+
+func TestWriteDependencyFile(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "mstl_test_dep")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	content := "A --> B\nB --> C"
+
+	// Create a dummy mstl dir
+	mstlDir := filepath.Join(tempDir, ".mstl")
+	if err := os.Mkdir(mstlDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := writeDependencyFile(mstlDir, content); err != nil {
+		t.Fatalf("writeDependencyFile failed: %v", err)
+	}
+
+	depFile := filepath.Join(mstlDir, "dependencies.md")
+	data, err := os.ReadFile(depFile)
+	if err != nil {
+		t.Fatalf("Failed to read file: %v", err)
+	}
+
+	writtenContent := string(data)
+	expectedPrefix := "```mermaid\n"
+
+	if !strings.HasPrefix(writtenContent, expectedPrefix) {
+		t.Errorf("Content should start with mermaid block. Got:\n%q", writtenContent)
+	}
+	if !strings.Contains(writtenContent, content) {
+		t.Errorf("Content should contain original graph. Got:\n%q", writtenContent)
+	}
+	if !strings.HasSuffix(strings.TrimSpace(writtenContent), "```") {
+		t.Errorf("Content should end with mermaid block. Got:\n%q", writtenContent)
+	}
+}

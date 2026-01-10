@@ -12,6 +12,7 @@ mstl-gh pr checkout -u [PRのURL] [-p parallel] [options]
 
 *   **オプション**:
     *   `-u`, `--url`: **必須**。対象となるGitHub Pull RequestのURL。
+    *   `--dest`: 展開先のディレクトリパス（デフォルトはカレントディレクトリ）。`init` コマンドと同等の挙動（ディレクトリの作成や移動）を行います。
     *   `-p`, `--parallel`: 並列実行数（デフォルトは設定または1）。
     *   `-v`, `--verbose`: デバッグ用の詳細ログを出力（実行された git/gh コマンドを表示）
 
