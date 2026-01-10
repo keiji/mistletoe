@@ -52,8 +52,8 @@ type PrStatusRow struct {
 }
 
 // CollectPrStatus collects Pull Request status for the given repositories.
-// knownPRs is an optional map of [RepoID] -> []URL to skip querying existing PRs.
-func CollectPrStatus(statusRows []StatusRow, config *conf.Config, parallel int, ghPath string, verbose bool, knownPRs map[string][]string) []PrStatusRow {
+// knownPRs is an optional map of [RepoID] -> []PrInfo to skip querying existing PRs.
+func CollectPrStatus(statusRows []StatusRow, config *conf.Config, parallel int, ghPath string, verbose bool, knownPRs map[string][]PrInfo) []PrStatusRow {
 	repoMap := make(map[string]conf.Repository)
 	for _, r := range *config.Repositories {
 		repoMap[getRepoName(r)] = r
@@ -75,50 +75,56 @@ func CollectPrStatus(statusRows []StatusRow, config *conf.Config, parallel int, 
 
 			isKnown := false
 			if knownPRs != nil {
-				if urls, ok := knownPRs[r.Repo]; ok && len(urls) > 0 {
+				if items, ok := knownPRs[r.Repo]; ok && len(items) > 0 {
 					isKnown = true
-					// Pick the first as representative for singular fields (Top)
-					url := urls[0]
-					prRow.PrURL = url
+					// Use known items directly without network call
+					// Assuming items are already sorted by relevance if coming from pr_create
+					// However, if coming from partial data (like just created), we need to handle that.
 
-					var items []PrInfo
+					// We'll trust the items provided.
+					// If they are missing fields (like Number), we try to parse from URL.
+
+					var validItems []PrInfo
 					var displays []string
 
-					for _, u := range urls {
-						args := []string{"pr", "view", u, "--json", "number,state,isDraft,baseRefName,headRefOid,author,viewerCanEditFiles,body"}
-						out, err := RunGh(ghPath, verbose, args...)
-						if err == nil {
-							var pr PrInfo
-							if err := json.Unmarshal([]byte(out), &pr); err == nil {
-								pr.URL = u
-								items = append(items, pr)
-
-								displayState := getPrDisplayState(pr)
-								line := fmt.Sprintf("%s [%s]", pr.URL, displayState)
-								if displayState == DisplayPrStateMerged || displayState == DisplayPrStateClosed {
-									line = AnsiFgGray + line + AnsiReset
-								}
-								displays = append(displays, line)
+					for _, pr := range items {
+						// Fill missing Number if 0 but URL exists
+						if pr.Number == 0 && pr.URL != "" {
+							if _, _, num, err := parsePrURL(pr.URL); err == nil {
+								pr.Number = num
 							}
 						}
+						// Default State if missing
+						if pr.State == "" {
+							pr.State = GitHubPrStateOpen
+						}
+
+						validItems = append(validItems, pr)
+
+						displayState := getPrDisplayState(pr)
+						line := fmt.Sprintf("%s [%s]", pr.URL, displayState)
+						if displayState == DisplayPrStateMerged || displayState == DisplayPrStateClosed {
+							line = AnsiFgGray + line + AnsiReset
+						}
+						displays = append(displays, line)
 					}
 
-					prRow.PrItems = items
+					prRow.PrItems = validItems
 					prRow.PrDisplay = strings.Join(displays, "\n")
 
-					if len(items) > 0 {
+					if len(validItems) > 0 {
 						// Set Top fields based on first
-						topPr := items[0]
-						prRow.PrNumber = fmt.Sprintf("#%d", topPr.Number)
+						topPr := validItems[0]
+						prRow.PrURL = topPr.URL
+						if topPr.Number != 0 {
+							prRow.PrNumber = fmt.Sprintf("#%d", topPr.Number)
+						} else {
+							prRow.PrNumber = "N/A"
+						}
 						prRow.PrState = topPr.State
 						if topPr.BaseRefName != "" {
 							prRow.Base = topPr.BaseRefName
 						}
-					} else {
-						// Fallback if all lookups failed
-						prRow.PrDisplay = fmt.Sprintf("%s [Error]", url) // Show first url
-						prRow.PrState = "Error"
-						prRow.PrNumber = "N/A"
 					}
 				}
 			}
@@ -746,44 +752,4 @@ func verifyGithubRequirements(repos []conf.Repository, baseDir string, rows []St
 		return nil, fmt.Errorf("GitHub validation failed:\n%s", strings.Join(errs, "\n"))
 	}
 	return existingPRs, nil
-}
-
-// GetGhUser returns the current authenticated GitHub user's login.
-func GetGhUser(ghPath string, verbose bool) (string, error) {
-	out, err := RunGh(ghPath, verbose, "api", "user", "--jq", ".login")
-	if err != nil {
-		return "", fmt.Errorf("failed to get GitHub user: %w", err)
-	}
-	return strings.TrimSpace(out), nil
-}
-
-// ValidatePrPermissionAndOverwrite checks if we can overwrite an existing PR.
-// It returns nil if allowed, or an error if permission denied or overwrite flag required.
-func ValidatePrPermissionAndOverwrite(repoID string, pr PrInfo, currentUser string, overwrite bool) error {
-	// 1. Permission Check
-	if !pr.ViewerCanEditFiles {
-		return fmt.Errorf("permission denied: you do not have edit permission for PR %s (Repo: %s)", pr.URL, repoID)
-	}
-
-	// 2. Overwrite Logic
-	// Check for Mistletoe block
-	_, _, _, found := ParseMistletoeBlock(pr.Body)
-	if found {
-		// Existing block found -> Safe to overwrite
-		return nil
-	}
-
-	// No Mistletoe block
-	if strings.EqualFold(pr.Author.Login, currentUser) {
-		// Creator is me -> Safe to overwrite (append)
-		return nil
-	}
-
-	// Creator is NOT me
-	if overwrite {
-		// Overwrite flag set -> Safe
-		return nil
-	}
-
-	return fmt.Errorf("PR %s (Repo: %s) was created by %s and does not have a Mistletoe block. Use --overwrite (-w) to force update", pr.URL, repoID, pr.Author.Login)
 }

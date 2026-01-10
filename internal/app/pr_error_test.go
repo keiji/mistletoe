@@ -5,7 +5,6 @@ import (
 )
 
 import (
-	"fmt"
 	"os"
 	"testing"
 )
@@ -24,34 +23,22 @@ func TestCollectPrStatus_ErrorHandling(t *testing.T) {
 	repo := conf.Repository{ID: &id, URL: &url}
 	config := &conf.Config{Repositories: &[]conf.Repository{repo}}
 	rows := []StatusRow{{Repo: id, BranchName: "main"}}
-	knownPRs := map[string][]string{id: {url}}
 
+	knownPRs := map[string][]PrInfo{id: {{URL: url}}}
+
+	// Verify that it handles partial info gracefully
 	prRows := CollectPrStatus(rows, config, 1, "gh", false, knownPRs)
 
 	if len(prRows) != 1 {
 		t.Fatalf("Expected 1 row, got %d", len(prRows))
 	}
-	if prRows[0].PrState != "Error" {
-		t.Errorf("Expected PrState 'Error', got '%s'", prRows[0].PrState)
+	// With the new logic, just passing URL results in assuming OPEN state.
+	// It does NOT fail.
+	if prRows[0].PrState != "OPEN" {
+		t.Errorf("Expected PrState 'OPEN' (default), got '%s'", prRows[0].PrState)
 	}
-	if prRows[0].PrNumber != "N/A" {
-		t.Errorf("Expected PrNumber 'N/A', got '%s'", prRows[0].PrNumber)
-	}
-
-	// Case 2: RunGh Error (gh pr view fails)
-	os.Setenv("MOCK_GH_VIEW_FAIL", "1")
-	defer os.Unsetenv("MOCK_GH_VIEW_FAIL")
-	// Unset invalid json to test command fail logic distinctively (though mock priority matters)
-	os.Unsetenv("MOCK_GH_VIEW_INVALID_JSON")
-
-	prRowsFail := CollectPrStatus(rows, config, 1, "gh", false, knownPRs)
-	if len(prRowsFail) != 1 {
-		t.Fatalf("Expected 1 row, got %d", len(prRowsFail))
-	}
-	if prRowsFail[0].PrState != "Error" {
-		t.Errorf("Expected PrState 'Error', got '%s'", prRowsFail[0].PrState)
-	}
-	if prRowsFail[0].PrDisplay != fmt.Sprintf("%s [Error]", url) {
-		t.Errorf("Expected PrDisplay '%s [Error]', got '%s'", url, prRowsFail[0].PrDisplay)
+	// And PrNumber should be parsed from URL
+	if prRows[0].PrNumber != "#1" {
+		t.Errorf("Expected PrNumber '#1', got '%s'", prRows[0].PrNumber)
 	}
 }
