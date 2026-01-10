@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"testing"
+	"encoding/json"
 )
 
 var binaryPath string
@@ -242,5 +243,64 @@ func TestSnapshot_FileExists(t *testing.T) {
 	// Expect failure
 	if err == nil {
 		t.Errorf("expected command to fail when file exists, but it succeeded. Output: %s", out)
+	}
+}
+
+// TestGenerateSnapshot_ExcludesParallel verifies that the generated snapshot JSON does not contain the "parallel" field.
+func TestGenerateSnapshot_ExcludesParallel(t *testing.T) {
+	// 1. Create a dummy config with parallel set (this simulates loading a config that has it)
+	// Although GenerateSnapshot creates a NEW config, passing a config to it is used for BaseBranch resolution.
+	// But the Parallel field in the input config doesn't matter for the output structure directly,
+	// UNLESS GenerateSnapshot mistakenly copies it.
+
+	// However, GenerateSnapshot constructs a fresh conf.Config struct.
+	// The Parallel field in conf.Config is a pointer (*int). If it is nil, json omitempty hides it.
+	// If GenerateSnapshot doesn't set it, it is nil.
+
+	// We will call GenerateSnapshotVerbose directly to verify the output bytes.
+
+	// Create a dummy repo so we have something to snapshot
+	tmpDir, err := os.MkdirTemp("", "mstl-gen-snapshot-test")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	repoDir := filepath.Join(tmpDir, "repo1")
+	repoURL := "https://github.com/example/repo1.git"
+	repoBranch := "main"
+	setupDummyRepo(t, repoDir, repoURL, repoBranch)
+
+	// Input config
+	repoID := "repo1"
+	repoURLPtr := &repoURL
+	parallelVal := 5
+
+	inputConfig := &conf.Config{
+		Parallel: &parallelVal,
+		Repositories: &[]conf.Repository{
+			{
+				ID: &repoID,
+				URL: repoURLPtr,
+			},
+		},
+		BaseDir: tmpDir, // Ensure it looks in tmpDir
+	}
+
+	// Call GenerateSnapshotVerbose
+	jsonBytes, _, err := GenerateSnapshotVerbose(inputConfig, "git", false)
+	if err != nil {
+		t.Fatalf("GenerateSnapshotVerbose failed: %v", err)
+	}
+
+	// Verify "parallel" key is NOT present in jsonBytes
+	// We can decode into a map[string]interface{}
+	var result map[string]interface{}
+	if err := json.Unmarshal(jsonBytes, &result); err != nil {
+		t.Fatalf("failed to unmarshal generated json: %v", err)
+	}
+
+	if _, ok := result["parallel"]; ok {
+		t.Errorf("generated snapshot contains 'parallel' key, but it should be excluded")
 	}
 }
