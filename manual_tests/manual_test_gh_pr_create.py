@@ -69,7 +69,7 @@ def main():
 
         # Execute pr create interactively
         # We allow stdin to pass through to the user
-        cmd = [env.mstl_bin, "pr", "create", "-t", "Interactive Test PR", "-b", "Testing interactive script", "-d", "dependencies.mmd"]
+        cmd = [env.mstl_bin, "pr", "create", "-t", "Interactive Test PR", "-b", "Testing interactive script", "--dependencies", "dependencies.mmd"]
         import subprocess
         subprocess.run(cmd, cwd=env.test_dir)
 
