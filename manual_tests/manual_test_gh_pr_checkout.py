@@ -57,7 +57,7 @@ def main():
 
         print_green("[-] Running 'pr create' to setup PRs...")
         # Automate yes input for creation
-        env.run_mstl_cmd(["pr", "create", "-t", "Checkout Test PR", "-b", "Body", "--dependencies", "dependencies.md"], input_str="yes\n")
+        env.run_mstl_cmd(["pr", "create", "-t", "Checkout Test PR", "-b", "Body", "--dependencies", "dependencies.md", "--ignore-stdin"], input_str="yes\n")
 
         # Retrieve PR URL for Repo A
         print_green(f"[-] retrieving PR URL for {repo_a}...")
