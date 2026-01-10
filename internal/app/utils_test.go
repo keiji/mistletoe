@@ -172,8 +172,10 @@ func TestResolveCommonValues(t *testing.T) {
 			name:      "Defaults",
 			fLong:     DefaultConfigFile,
 			fShort:    DefaultConfigFile,
+			pVal:      -1, // Simulating unset
+			pValShort: -1, // Simulating unset
 			wantFile:  "", // With strings.Reader(""), logic assumes Stdin is piped but empty, so clears configFile
-			wantP:     1,
+			wantP:     -1, // Should return unset
 			wantData:  "",
 			stdinData: "",
 		},
@@ -181,24 +183,28 @@ func TestResolveCommonValues(t *testing.T) {
 			name:        "Explicit File Long",
 			fLong:       "custom.json",
 			fShort:      DefaultConfigFile,
+			pVal:      -1,
+			pValShort: -1,
 			ignoreStdin: true, // Simulate TTY/No pipe
 			wantFile:    "custom.json",
-			wantP:       1,
+			wantP:       -1,
 		},
 		{
 			name:        "Explicit File Short",
 			fLong:       DefaultConfigFile,
 			fShort:      "short.json",
+			pVal:      -1,
+			pValShort: -1,
 			ignoreStdin: true, // Simulate TTY/No pipe
 			wantFile:    "short.json",
-			wantP:       1,
+			wantP:       -1,
 		},
 		{
 			name:        "Parallel Long",
 			fLong:       DefaultConfigFile,
 			fShort:      DefaultConfigFile,
 			pVal:        4,
-			pValShort:   0,
+			pValShort:   -1,
 			ignoreStdin: true, // Simulate TTY/No pipe
 			wantFile:    DefaultConfigFile,
 			wantP:       4,
@@ -207,45 +213,54 @@ func TestResolveCommonValues(t *testing.T) {
 			name:        "Parallel Short",
 			fLong:       DefaultConfigFile,
 			fShort:      DefaultConfigFile,
-			pVal:        0,
+			pVal:        -1,
 			pValShort:   8,
 			ignoreStdin: true, // Simulate TTY/No pipe
 			wantFile:    DefaultConfigFile,
 			wantP:       8,
 		},
+		// Validation tests: ResolveCommonValues only validates if parallel IS SET (!= -1)
 		{
 			name:      "Parallel Invalid Low",
-			pVal:      -1,
+			pVal:      0, // 0 < MinParallel (1)
+			pValShort: -1,
 			wantErr:   true,
 		},
 		{
 			name:      "Parallel Invalid High",
-			pVal:      200,
+			pVal:      200, // 200 > MaxParallel (128)
+			pValShort: -1,
 			wantErr:   true,
 		},
 		{
 			name:      "Stdin used when default file and stdin available",
 			fLong:     DefaultConfigFile,
 			fShort:    DefaultConfigFile,
+			pVal:      -1,
+			pValShort: -1,
 			stdinData: `{"repositories": []}`,
 			wantFile:  "", // Cleared when using stdin
 			wantData:  `{"repositories": []}`,
-			wantP:     1,
+			wantP:     -1,
 		},
 		{
 			name:      "Stdin ignored when ignoreStdin true",
 			fLong:     DefaultConfigFile,
 			fShort:    DefaultConfigFile,
+			pVal:      -1,
+			pValShort: -1,
 			ignoreStdin: true,
 			stdinData: `{"repositories": []}`,
 			wantFile:  DefaultConfigFile, // Uses default file
 			wantData:  "",
-			wantP:     1,
+			wantP:     -1,
 		},
 		{
 			name:      "Conflict: Custom file and Stdin",
 			fLong:     "custom.json",
 			fShort:    DefaultConfigFile,
+			pVal:      -1,
+			pValShort: -1,
 			stdinData: `{"repositories": []}`,
 			wantErr:   true,
 		},
@@ -253,10 +268,12 @@ func TestResolveCommonValues(t *testing.T) {
 			name:      "Explicit empty file forces Stdin",
 			fLong:     "",
 			fShort:    DefaultConfigFile, // fLong takes precedence as empty
+			pVal:      -1,
+			pValShort: -1,
 			stdinData: `{"repositories": []}`,
 			wantFile:  "",
 			wantData:  `{"repositories": []}`,
-			wantP:     1,
+			wantP:     -1,
 		},
 	}
 

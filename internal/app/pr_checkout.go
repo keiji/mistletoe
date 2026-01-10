@@ -28,8 +28,8 @@ func handlePrCheckout(args []string, opts GlobalOptions) {
 	fs.StringVar(&uLong, "url", "", "Pull Request URL")
 	fs.StringVar(&uShort, "u", "", "Pull Request URL (shorthand)")
 	fs.StringVar(&dLong, "dest", "", "Destination directory")
-	fs.IntVar(&pVal, "parallel", DefaultParallel, "Number of parallel processes")
-	fs.IntVar(&pValShort, "p", DefaultParallel, "Number of parallel processes (shorthand)")
+	fs.IntVar(&pVal, "parallel", -1, "Number of parallel processes")
+	fs.IntVar(&pValShort, "p", -1, "Number of parallel processes (shorthand)")
 	fs.BoolVar(&vLong, "verbose", false, "Enable verbose output")
 	fs.BoolVar(&vShort, "v", false, "Enable verbose output (shorthand)")
 
@@ -53,10 +53,21 @@ func handlePrCheckout(args []string, opts GlobalOptions) {
 		os.Exit(1)
 	}
 
-	parallel := pVal
-	if pValShort != DefaultParallel {
+	// Resolve Parallel - pr_checkout is unique, it doesn't utilize ResolveCommonValues for config loading initially
+	// because it doesn't take a config file argument (config comes from snapshot inside PR).
+	// However, it does take parallel flags.
+	// Since we don't have a config file to fallback to for 'parallel', we just use the flag or default.
+	// Wait, if config is inside snapshot, can we use parallel from snapshot config?
+	// The snapshot config struct has "Repositories". It's the same Config struct.
+	// So yes, if the snapshot JSON has "parallel", we could respect it.
+
+	parallel := -1
+	if pVal != -1 {
+		parallel = pVal
+	} else if pValShort != -1 {
 		parallel = pValShort
 	}
+
 	verbose := vLong || vShort
 
 	// 1. Check gh availability
@@ -83,6 +94,33 @@ func handlePrCheckout(args []string, opts GlobalOptions) {
 	}
 	if config == nil {
 		fmt.Println("Error: Snapshot data missing in Mistletoe block")
+		os.Exit(1)
+	}
+
+	// Resolve Parallel (Config fallback from Snapshot)
+	if parallel == -1 {
+		if config.Parallel != nil {
+			parallel = *config.Parallel
+		} else {
+			parallel = DefaultParallel
+		}
+	}
+
+	// Verbose Override
+	if verbose {
+		if parallel > 1 {
+			fmt.Println("Verbose is specified, so parallel is treated as 1.")
+		}
+		parallel = 1
+	}
+
+	// Final Validation
+	if parallel < MinParallel {
+		fmt.Printf("Error: Parallel must be at least %d.\n", MinParallel)
+		os.Exit(1)
+	}
+	if parallel > MaxParallel {
+		fmt.Printf("Error: Parallel must be at most %d.\n", MaxParallel)
 		os.Exit(1)
 	}
 

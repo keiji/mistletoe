@@ -49,6 +49,8 @@ type Repository struct {
 // Config represents the top-level configuration structure.
 type Config struct {
 	Repositories *[]Repository `json:"repositories"`
+	// Parallel is the default number of parallel processes to use.
+	Parallel *int `json:"parallel,omitempty"`
 	// BaseDir is the directory where the configuration file is located.
 	// It is used to resolve relative paths for repositories.
 	// This field is not serialized.
