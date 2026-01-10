@@ -12,6 +12,10 @@ import tempfile
 import sys
 import json
 
+# Add current directory to sys.path to import interactive_runner
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+from interactive_runner import print_green
+
 # Define colors for output
 class Colors:
     HEADER = '\033[95m'
@@ -22,10 +26,10 @@ class Colors:
     ENDC = '\033[0m'
 
 def log_header(msg):
-    print(f"{Colors.HEADER}=== {msg} ==={Colors.ENDC}")
+    print_green(f"=== {msg} ===")
 
 def log_pass(msg):
-    print(f"{Colors.OKGREEN}[PASS] {msg}{Colors.ENDC}")
+    print_green(f"[PASS] {msg}")
 
 def log_fail(msg):
     print(f"{Colors.FAIL}[FAIL] {msg}{Colors.ENDC}")

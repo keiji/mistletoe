@@ -6,6 +6,10 @@ import subprocess
 import json
 import atexit
 
+# Add current directory to sys.path to import interactive_runner
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+from interactive_runner import print_green
+
 # Colors
 GREEN = '\033[0;32m'
 RED = '\033[0;31m'
@@ -13,7 +17,7 @@ YELLOW = '\033[1;33m'
 NC = '\033[0m'
 
 def log(msg):
-    print(f"{GREEN}[TEST]{NC} {msg}")
+    print_green(f"[TEST] {msg}")
 
 def fail(msg):
     print(f"{RED}[FAIL]{NC} {msg}")
