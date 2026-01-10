@@ -11,19 +11,15 @@ import subprocess
 import tempfile
 import sys
 import json
+import atexit
 
 # Add current directory to sys.path to import interactive_runner
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-from interactive_runner import print_green
+from interactive_runner import InteractiveRunner, print_green
 
-# Define colors for output
-class Colors:
-    HEADER = '\033[95m'
-    OKBLUE = '\033[94m'
-    OKGREEN = '\033[92m'
-    WARNING = '\033[93m'
-    FAIL = '\033[91m'
-    ENDC = '\033[0m'
+# Use ANSI codes for fail since interactive_runner doesn't export red
+FAIL_COLOR = '\033[91m'
+ENDC = '\033[0m'
 
 def log_header(msg):
     print_green(f"=== {msg} ===")
@@ -32,7 +28,8 @@ def log_pass(msg):
     print_green(f"[PASS] {msg}")
 
 def log_fail(msg):
-    print(f"{Colors.FAIL}[FAIL] {msg}{Colors.ENDC}")
+    print(f"{FAIL_COLOR}[FAIL] {msg}{ENDC}")
+    sys.exit(1)
 
 def run_command(cmd, cwd=None, expect_error=False):
     """Runs a shell command and returns the exit code and output."""
@@ -57,7 +54,6 @@ def build_mstl(output_path):
     code, out, err = run_command(cmd)
     if code != 0:
         log_fail(f"Build failed:\n{out}\n{err}")
-        sys.exit(1)
     log_pass("Build successful")
 
 def create_bare_repo(path):
@@ -67,18 +63,33 @@ def create_bare_repo(path):
     # Set default branch to main to avoid confusion
     subprocess.run(["git", "-C", path, "symbolic-ref", "HEAD", "refs/heads/main"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
 
-def main():
-    # Setup temporary directory
-    root_dir = tempfile.mkdtemp(prefix="mstl_manual_test_")
-    mstl_bin = os.path.join(root_dir, "mstl")
+class InitDestTest:
+    def __init__(self):
+        self.root_dir = None
 
-    try:
+    def cleanup(self):
+        if self.root_dir and os.path.exists(self.root_dir):
+            print_green("Cleaning up temporary directory...")
+            try:
+                shutil.rmtree(self.root_dir)
+            except Exception as e:
+                print(f"Cleanup failed: {e}")
+
+    def run(self):
+        # Setup temporary directory
+        self.root_dir = tempfile.mkdtemp(prefix="mstl_manual_test_")
+
+        # Ensure cleanup runs even if we exit early via sys.exit(1)
+        atexit.register(self.cleanup)
+
+        mstl_bin = os.path.join(self.root_dir, "mstl")
+
         # Build mstl
         build_mstl(mstl_bin)
 
         # Setup config file
         # We need a dummy repo to refer to in the config
-        repo_dir = os.path.join(root_dir, "upstream_repo.git")
+        repo_dir = os.path.join(self.root_dir, "upstream_repo.git")
         create_bare_repo(repo_dir)
 
         # Create a valid config
@@ -91,17 +102,17 @@ def main():
             ]
         }
         # Place config file in root_dir
-        config_file = os.path.join(root_dir, "config.json")
+        config_file = os.path.join(self.root_dir, "config.json")
         with open(config_file, "w") as f:
             json.dump(config_data, f)
 
         # Test Case 1: Destination exists and is a file -> Fail
         log_header("Test Case 1: Destination is a file")
-        dest_file = os.path.join(root_dir, "file_dest")
+        dest_file = os.path.join(self.root_dir, "file_dest")
         with open(dest_file, "w") as f:
             f.write("I am a file")
 
-        code, out, err = run_command([mstl_bin, "init", "-f", config_file, "--dest", dest_file, "--ignore-stdin"], cwd=root_dir)
+        code, out, err = run_command([mstl_bin, "init", "-f", config_file, "--dest", dest_file, "--ignore-stdin"], cwd=self.root_dir)
         if code != 0 and "specified path is a file" in out + err: # checking combined output just in case
             log_pass("Correctly failed when dest is a file")
         else:
@@ -109,8 +120,8 @@ def main():
 
         # Test Case 2: Destination does not exist, parent does not exist -> Fail
         log_header("Test Case 2: Parent directory missing")
-        dest_deep = os.path.join(root_dir, "missing_parent", "target")
-        code, out, err = run_command([mstl_bin, "init", "-f", config_file, "--dest", dest_deep, "--ignore-stdin"], cwd=root_dir)
+        dest_deep = os.path.join(self.root_dir, "missing_parent", "target")
+        code, out, err = run_command([mstl_bin, "init", "-f", config_file, "--dest", dest_deep, "--ignore-stdin"], cwd=self.root_dir)
         if code != 0 and "does not exist" in out + err:
             log_pass("Correctly failed when parent directory is missing")
         else:
@@ -118,7 +129,7 @@ def main():
 
         # Test Case 3: Destination exists, not empty (Global check removed, but repo check strict)
         log_header("Test Case 3: Destination not empty (with conflict)")
-        dest_not_empty = os.path.join(root_dir, "not_empty_dir")
+        dest_not_empty = os.path.join(self.root_dir, "not_empty_dir")
         os.makedirs(dest_not_empty)
         # Create a conflicting repo directory that is not empty and not a git repo
         conflict_repo = os.path.join(dest_not_empty, "myrepo")
@@ -126,7 +137,7 @@ def main():
         with open(os.path.join(conflict_repo, "junk.txt"), "w") as f:
             f.write("junk")
 
-        code, out, err = run_command([mstl_bin, "init", "-f", config_file, "--dest", dest_not_empty, "--ignore-stdin"], cwd=root_dir)
+        code, out, err = run_command([mstl_bin, "init", "-f", config_file, "--dest", dest_not_empty, "--ignore-stdin"], cwd=self.root_dir)
         if code != 0 and "directory myrepo exists, is not empty" in out + err:
             log_pass("Correctly failed when repo target is not empty and ineligible")
         else:
@@ -134,10 +145,10 @@ def main():
 
         # Test Case 4: Destination exists, empty -> Success
         log_header("Test Case 4: Destination empty")
-        dest_empty = os.path.join(root_dir, "empty_dir")
+        dest_empty = os.path.join(self.root_dir, "empty_dir")
         os.makedirs(dest_empty)
 
-        code, out, err = run_command([mstl_bin, "init", "-f", config_file, "--dest", dest_empty, "--ignore-stdin"], cwd=root_dir)
+        code, out, err = run_command([mstl_bin, "init", "-f", config_file, "--dest", dest_empty, "--ignore-stdin"], cwd=self.root_dir)
         if code == 0:
             if os.path.exists(os.path.join(dest_empty, "myrepo", ".git")):
                 log_pass("Success: Repository cloned into empty destination")
@@ -148,9 +159,9 @@ def main():
 
         # Test Case 5: Destination does not exist, parent exists -> Success (Create)
         log_header("Test Case 5: Create new destination")
-        dest_new = os.path.join(root_dir, "new_dest")
+        dest_new = os.path.join(self.root_dir, "new_dest")
 
-        code, out, err = run_command([mstl_bin, "init", "-f", config_file, "--dest", dest_new, "--ignore-stdin"], cwd=root_dir)
+        code, out, err = run_command([mstl_bin, "init", "-f", config_file, "--dest", dest_new, "--ignore-stdin"], cwd=self.root_dir)
         if code == 0:
             if os.path.isdir(dest_new) and os.path.exists(os.path.join(dest_new, "myrepo", ".git")):
                 log_pass("Success: Directory created and repository cloned")
@@ -162,7 +173,7 @@ def main():
         # Test Case 6: Default destination (current dir)
         log_header("Test Case 6: Default destination (.)")
         # We need a clean subdir to run this in, so we don't mess up the root
-        run_subdir = os.path.join(root_dir, "run_subdir")
+        run_subdir = os.path.join(self.root_dir, "run_subdir")
         os.makedirs(run_subdir)
 
         code, out, err = run_command([mstl_bin, "init", "-f", config_file, "--ignore-stdin"], cwd=run_subdir)
@@ -174,9 +185,29 @@ def main():
         else:
             log_fail(f"Expected success for default dest. Code: {code}, Output: {out}, Error: {err}")
 
-    finally:
-        # Cleanup
-        shutil.rmtree(root_dir)
+        print_green("All tests passed.")
+
+def main():
+    runner = InteractiveRunner("Init Destination Test")
+    test = InitDestTest()
+
+    description = (
+        "This test verifies 'mstl init' with various destination scenarios:\n"
+        "- Destination is a file (Should Fail)\n"
+        "- Parent directory missing (Should Fail)\n"
+        "- Destination not empty & conflict (Should Fail)\n"
+        "- Destination empty (Should Success)\n"
+        "- Destination new (Should Success)\n"
+        "- Default destination (Should Success)"
+    )
+
+    runner.execute_scenario(
+        "Destination Logic Check",
+        description,
+        test.run
+    )
+
+    runner.run_cleanup(test.cleanup)
 
 if __name__ == "__main__":
     main()
