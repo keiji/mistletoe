@@ -4,6 +4,10 @@ import time
 import shutil
 import json
 import sys
+import pty
+import select
+import termios
+import tty
 
 # Add current directory to sys.path to import interactive_runner
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -12,6 +16,7 @@ from interactive_runner import InteractiveRunner, print_green
 def run_command(cmd, cwd=None, env=None):
     """Run a shell command and check for errors."""
     try:
+        # Use simple subprocess for setup commands
         subprocess.run(cmd, check=True, cwd=cwd, env=env, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
     except subprocess.CalledProcessError as e:
         print_green(f"Error running command: {cmd}")
@@ -94,6 +99,7 @@ def main():
         gh_script_content = """#!/usr/bin/env python3
 import sys
 import json
+import time
 
 args = sys.argv[1:]
 
@@ -106,6 +112,8 @@ if "--version" in args:
     sys.exit(0)
 
 if "pr" in args and "list" in args:
+    # Simulate network delay slightly to ensure table renders first
+    time.sleep(0.5)
     print("[]")
     sys.exit(0)
 
@@ -146,77 +154,88 @@ sys.exit(0)
         with open(config_path, "w") as f:
             json.dump(config, f)
 
-        # Run mstl-gh pr create
-        print_green("Running mstl-gh pr create...")
+        # Run mstl-gh pr create with PTY
+        print_green("Running mstl-gh pr create (--verbose)...")
+        print_green("The tool will prompt 'Proceed with Push?'.")
+        print_green("Wait for the script to detect this prompt and inject a change.")
 
-        log_file_path = os.path.join(test_dir, "output.log")
-        log_file = open(log_file_path, "w")
+        cmd = [mstl_gh_bin, "pr", "create", "-f", config_path, "--title", "Test PR", "--body", "Body", "--verbose"]
 
-        proc = subprocess.Popen(
-            [mstl_gh_bin, "pr", "create", "-f", config_path, "--title", "Test PR", "--body", "Body"],
-            stdin=subprocess.PIPE,
-            stdout=log_file,
-            stderr=log_file,
+        # Fork PTY
+        master_fd, slave_fd = pty.openpty()
+
+        process = subprocess.Popen(
+            cmd,
+            stdin=slave_fd,
+            stdout=slave_fd,
+            stderr=slave_fd,
             cwd=test_dir,
             env=env,
-            text=True
+            close_fds=True
         )
+        os.close(slave_fd) # Close slave in parent
 
-        # Monitor Log for Prompt
-        print_green("Waiting for prompt...")
-        found_prompt = False
-        for i in range(20): # Wait up to 20s
-            time.sleep(1)
-            log_file.flush()
-            with open(log_file_path, "r") as f:
-                content = f.read()
-                if "Proceed with Push" in content:
-                    found_prompt = True
-                    break
+        injected = False
+        output_buffer = ""
+        prompt_detected = False
 
-        if not found_prompt:
-            print_green("Timeout waiting for prompt.")
-            with open(log_file_path, "r") as f:
-                print_green(f.read())
-            proc.kill()
-            sys.exit(1)
+        try:
+            while process.poll() is None:
+                # Select on master_fd and sys.stdin
+                r, w, e = select.select([master_fd, sys.stdin], [], [], 0.1)
 
-        # Inject Change! (Commit 3)
-        print_green("Injecting change to repo-a...")
-        with open(os.path.join(repo_a_dir, "file2.txt"), "w") as f:
-            f.write("content 3")
-        run_command("git add .", cwd=repo_a_dir)
-        run_command("git commit -m 'commit 3'", cwd=repo_a_dir)
+                if master_fd in r:
+                    try:
+                        data = os.read(master_fd, 1024)
+                        if data:
+                            # Forward output to user's stdout
+                            os.write(sys.stdout.fileno(), data)
+                            output_buffer += data.decode('utf-8', errors='replace')
 
-        # Send "yes"
-        print_green("Sending 'yes' to mstl-gh...")
-        proc.stdin.write("yes\n")
-        proc.stdin.flush()
+                            # Check for Prompt
+                            if not injected and "Proceed with Push" in output_buffer:
+                                if not prompt_detected:
+                                    prompt_detected = True
+                                    print_green("\n[TEST] Prompt detected! Injecting race condition (new commit)...")
 
-        proc.wait()
-        log_file.close()
+                                    # Inject Change! (Commit 3)
+                                    with open(os.path.join(repo_a_dir, "file2.txt"), "w") as f:
+                                        f.write("content 3")
+                                    run_command("git add .", cwd=repo_a_dir)
+                                    run_command("git commit -m 'commit 3'", cwd=repo_a_dir)
 
-        with open(log_file_path, "r") as f:
-            out = f.read()
+                                    print_green("[TEST] Change injected. PLEASE TYPE 'yes' TO CONTINUE.")
+                                    injected = True
 
-        print_green("--- OUTPUT ---")
-        print(out)
+                    except OSError:
+                        break # Process closed
 
-        # Check for specific error message
+                if sys.stdin in r:
+                    # Forward user input to process (PTY)
+                    d = os.read(sys.stdin.fileno(), 1024)
+                    os.write(master_fd, d)
+
+        except OSError:
+            pass
+        finally:
+            os.close(master_fd)
+            process.wait()
+
+        # Check Result in Buffer
+        print_green("\n--- Final Check ---")
+
         expected_error = "has changed since status collection"
-        if expected_error in out:
-            print_green("\nSUCCESS: Safety check triggered correctly.")
+        if expected_error in output_buffer:
+            print_green("SUCCESS: Safety check triggered correctly.")
         else:
-            print_green("\nFAILURE: Safety check did NOT trigger.")
-            # We don't exit(1) here, we let the runner handle status,
-            # but raising exception or exit(1) is how we tell runner it failed if we don't return.
-            # But execute_scenario captures exceptions? No, it just runs.
+            print_green("FAILURE: Safety check did NOT trigger or message not found.")
             sys.exit(1)
 
     description = (
         "This test verifies that 'pr create' aborts if the repository state changes "
         "between status collection and push (race condition).\n"
-        "It uses a mock 'gh' and local git repositories."
+        "It uses a mock 'gh' and local git repositories.\n"
+        "You will interactively confirm the prompt after the script injects a change."
     )
 
     runner.execute_scenario(
