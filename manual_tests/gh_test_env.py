@@ -78,6 +78,9 @@ class GhTestEnv:
                 r_dir = os.path.join(tmp_setup, repo)
                 os.makedirs(r_dir)
                 subprocess.run(["git", "init"], cwd=r_dir, check=True, stdout=subprocess.DEVNULL)
+                # Configure dummy user for committing
+                subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=r_dir, check=True, stdout=subprocess.DEVNULL)
+                subprocess.run(["git", "config", "user.name", "Test User"], cwd=r_dir, check=True, stdout=subprocess.DEVNULL)
                 subprocess.run(["git", "remote", "add", "origin", f"https://github.com/{self.user}/{repo}.git"], cwd=r_dir, check=True, stdout=subprocess.DEVNULL)
 
                 readme_path = os.path.join(r_dir, "README.md")

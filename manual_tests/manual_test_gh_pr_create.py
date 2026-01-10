@@ -26,6 +26,7 @@ def main():
     except Exception as e:
         print(f"[FATAL] Setup failed: {e}")
         runner.log("Setup failed", status="FAILED")
+        runner.run_cleanup(env.cleanup)
         sys.exit(1)
 
     repo_a = env.repo_names[0]
