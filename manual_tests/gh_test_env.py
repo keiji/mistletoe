@@ -5,6 +5,7 @@ import json
 import shutil
 import subprocess
 import signal
+from interactive_runner import print_green
 
 class GhTestEnv:
     def __init__(self, root_dir=None):
@@ -44,7 +45,7 @@ class GhTestEnv:
             )
             return res.stdout.strip()
         except subprocess.CalledProcessError:
-            print("[ERROR] Failed to get GitHub user. Is 'gh' installed and authenticated?")
+            print_green("[ERROR] Failed to get GitHub user. Is 'gh' installed and authenticated?")
             sys.exit(1)
 
     def generate_repo_names(self, count=3):
@@ -67,7 +68,7 @@ class GhTestEnv:
             return False
 
     def build_mstl_gh(self):
-        print(f"[-] Building mstl-gh...")
+        print_green(f"[-] Building mstl-gh...")
         subprocess.run(
             ["go", "build", "-o", self.mstl_bin, "cmd/mstl-gh/main.go"],
             cwd=self.cwd, check=True
@@ -77,7 +78,7 @@ class GhTestEnv:
         if not self.repo_names:
             self.generate_repo_names()
 
-        print(f"[-] Creating temporary repositories: {', '.join(self.repo_names)}...")
+        print_green(f"[-] Creating temporary repositories: {', '.join(self.repo_names)}...")
         for repo in self.repo_names:
             subprocess.run(["gh", "repo", "create", repo, "--private"], check=True)
 
@@ -129,19 +130,19 @@ class GhTestEnv:
             f.write(f'    "{b}" --> "{c}"\n')
 
     def cleanup(self):
-        print("[-] Cleaning up workspace...")
+        print_green("[-] Cleaning up workspace...")
         if os.path.exists(self.test_dir):
             shutil.rmtree(self.test_dir, ignore_errors=True)
 
-        print("[-] Deleting remote repositories...")
+        print_green("[-] Deleting remote repositories...")
         for repo in self.repo_names:
             try:
                 new_name = f"{repo}-deleting"
                 subprocess.run(["gh", "repo", "rename", new_name, "--repo", f"{self.user}/{repo}", "--yes"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 subprocess.run(["gh", "repo", "delete", f"{self.user}/{new_name}", "--yes"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                print(f"    Deleted {repo}")
+                print_green(f"    Deleted {repo}")
             except Exception as e:
-                print(f"    Failed to delete {repo}: {e}")
+                print_green(f"    Failed to delete {repo}: {e}")
 
     def run_mstl_cmd(self, args, cwd=None, input_str=None):
         if cwd is None:

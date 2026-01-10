@@ -5,7 +5,7 @@ import sys
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from gh_test_env import GhTestEnv
-from interactive_runner import InteractiveRunner
+from interactive_runner import InteractiveRunner, print_green
 
 def main():
     runner = InteractiveRunner("Multi-Repo Pull Request Creation Test")
@@ -14,7 +14,7 @@ def main():
     env = GhTestEnv()
 
     # 1. Setup Phase (Automated)
-    print("[-] Setting up test environment (Creating repos, config, building binary)...")
+    print_green("[-] Setting up test environment (Creating repos, config, building binary)...")
     try:
         env.generate_repo_names(3)
         # Check for existing repos and warn (simple check, full check is in manual_test_gh.py but we do a basic one here)
@@ -24,7 +24,7 @@ def main():
         env.setup_repos()
         env.create_config_and_graph()
     except Exception as e:
-        print(f"[FATAL] Setup failed: {e}")
+        print_green(f"[FATAL] Setup failed: {e}")
         runner.log("Setup failed", status="FAILED")
         runner.run_cleanup(env.cleanup)
         sys.exit(1)
@@ -35,11 +35,11 @@ def main():
     # Define the scenario logic
     def scenario_logic():
         # Initialize
-        print(f"[-] Initializing in {env.test_dir}...")
-        env.run_mstl_cmd(["init", "-f", "mistletoe.json"])
+        print_green(f"[-] Initializing in {env.test_dir}...")
+        env.run_mstl_cmd(["init", "-f", "mistletoe.json", "--verbose"])
 
         # Configure git user for the cloned repos (required for subsequent commits)
-        print("[-] Configuring dummy git user for cloned repositories...")
+        print_green("[-] Configuring dummy git user for cloned repositories...")
         import subprocess
         for repo in env.repo_names:
              r_dir = os.path.join(env.test_dir, repo)
@@ -47,11 +47,11 @@ def main():
              subprocess.run(["git", "config", "user.name", "Test User"], cwd=r_dir, check=True, stdout=subprocess.DEVNULL)
 
         # Switch branch
-        print("[-] Switching to feature/interactive-test...")
-        env.run_mstl_cmd(["switch", "-c", "feature/interactive-test"])
+        print_green("[-] Switching to feature/interactive-test...")
+        env.run_mstl_cmd(["switch", "-c", "feature/interactive-test", "--verbose"])
 
         # Make changes
-        print("[-] Making commits to repositories...")
+        print_green("[-] Making commits to repositories...")
         for repo in env.repo_names:
             r_dir = os.path.join(env.test_dir, repo)
             with open(os.path.join(r_dir, "test.txt"), "w") as f:
@@ -64,12 +64,12 @@ def main():
             # But wait, pr create also prompts.
             # We will run pr create directly, which handles push if ahead.
 
-        print("[-] Running 'pr create'...")
-        print("    (Please type 'yes' when prompted by the tool to create PRs)")
+        print_green("[-] Running 'pr create'...")
+        print_green("    (Please type 'yes' when prompted by the tool to create PRs)")
 
         # Execute pr create interactively
         # We allow stdin to pass through to the user
-        cmd = [env.mstl_bin, "pr", "create", "-t", "Interactive Test PR", "-b", "Testing interactive script", "--dependencies", "dependencies.mmd"]
+        cmd = [env.mstl_bin, "pr", "create", "-t", "Interactive Test PR", "-b", "Testing interactive script", "--dependencies", "dependencies.mmd", "--verbose"]
         import subprocess
         subprocess.run(cmd, cwd=env.test_dir)
 

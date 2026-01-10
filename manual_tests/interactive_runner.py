@@ -3,6 +3,12 @@ import argparse
 import datetime
 import traceback
 
+GREEN = '\033[92m'
+RESET = '\033[0m'
+
+def print_green(text):
+    print(f"{GREEN}{text}{RESET}")
+
 class InteractiveRunner:
     def __init__(self, description):
         self.parser = argparse.ArgumentParser(description=description)
@@ -22,15 +28,15 @@ class InteractiveRunner:
         if status:
             line += f" - {status}"
 
-        print(line)
+        print_green(line)
         if self.log_file:
             with open(self.log_file, "a") as f:
                 f.write(line + "\n")
 
     def print_section(self, title):
-        print("\n" + "="*60)
-        print(title)
-        print("="*60)
+        print_green("\n" + "="*60)
+        print_green(title)
+        print_green("="*60)
 
     def ask_yes_no(self, question, default="yes"):
         valid = {"yes": True, "y": True, "ye": True, "no": False, "n": False}
