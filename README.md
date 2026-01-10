@@ -287,6 +287,46 @@ mstl-gh pr status -f <config_file> [options]
 *   `-p, --parallel <int>`: Number of parallel processes to use (default: 1).
 *   `-v, --verbose`: Enable verbose output.
 
+## Manual Tests
+
+This project includes a suite of interactive manual tests for verifying functionality, especially GitHub integration (`mstl-gh`), in a safe, isolated environment.
+
+These tests are located in the `manual_tests/` directory.
+
+### Running Manual Tests via Docker
+
+We highly recommend running manual tests inside a Docker container to ensure environment consistency and prevent interference with your local setup.
+
+**Prerequisites:**
+*   Docker
+*   GitHub Account (for `gh` authentication)
+
+**Steps:**
+
+1.  **Build the Test Image:**
+    ```bash
+    docker build -t mstl-gh-test -f manual_tests/Dockerfile.manual_test .
+    ```
+
+2.  **Run the Container:**
+    ```bash
+    docker run -it --rm -v $(pwd):/app mstl-gh-test /bin/bash
+    ```
+
+3.  **Authenticate (Inside Container):**
+    Authenticate with GitHub to allow the test scripts to create temporary repositories.
+    ```bash
+    gh auth login
+    ```
+
+4.  **Execute a Test Scenario:**
+    Run one of the available test scripts. For example, to test Pull Request creation:
+    ```bash
+    python3 manual_tests/manual_test_gh_pr_create.py
+    ```
+
+    Follow the on-screen prompts to execute the test steps and verify the results.
+
 ## License
 
 ```
