@@ -20,7 +20,7 @@
     *   Design code to be testable. Use dependency injection or mockable variables (like `ExecCommand`) for external interactions (Git, filesystem, etc.).
     *   Ensure tests cover edge cases and error conditions.
 *   **Manual Tests**:
-    *   Refer to `docs/manual_tests/manual_test_design.md` for manual test implementation guidelines.
+    *   Refer to `manual_tests/index.md` for manual test implementation guidelines.
 
 # Pull Request Guidelines
 
