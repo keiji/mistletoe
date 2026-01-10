@@ -19,14 +19,12 @@ You can build the image in two ways:
 
 #### Option A: Build with Pre-Authentication (Recommended)
 
-Pass your GitHub token as a build argument. This creates an image where `gh` is already logged in, so you don't need to authenticate every time you run the container.
+Pass your GitHub token as a secret. This creates an image where `gh` is already logged in, so you don't need to authenticate every time you run the container.
 
 ```bash
-# Replace <YOUR_GITHUB_TOKEN> with your actual token
-docker build --build-arg GITHUB_TOKEN=<YOUR_GITHUB_TOKEN> -t mstl-gh-test -f manual_tests/Dockerfile.manual_test .
+# Assumes GITHUB_TOKEN is set in your environment
+docker build --secret id=github_token,env=GITHUB_TOKEN -t mstl-gh-test -f manual_tests/Dockerfile.manual_test .
 ```
-
-> **Note:** Be careful with your shell history when passing tokens on the command line.
 
 #### Option B: Standard Build
 
