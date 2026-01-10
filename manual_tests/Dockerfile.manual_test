@@ -15,15 +15,16 @@ RUN curl -fsSL https://github.com/cli/cli/releases/download/v2.83.2/gh_2.83.2_li
     mv gh_2.83.2_linux_amd64/bin/gh /usr/local/bin/gh && \
     rm -rf gh.tar.gz gh_2.83.2_linux_amd64
 
-# Configure GitHub Token if provided
-ARG GITHUB_TOKEN
-RUN if [ -n "$GITHUB_TOKEN" ]; then \
+# Configure GitHub Token if provided via secrets
+# To build with secret: docker build --secret id=mistletoe_manual_test_github_token,env=GITHUB_TOKEN ...
+RUN --mount=type=secret,id=mistletoe_manual_test_github_token \
+    if [ -f /run/secrets/mistletoe_manual_test_github_token ]; then \
     mkdir -p /root/.ssh && \
     chmod 700 /root/.ssh && \
     ssh-keyscan github.com >> /root/.ssh/known_hosts && \
     chmod 644 /root/.ssh/known_hosts && \
     ssh-keygen -t ed25519 -C "mstl-docker-test" -f /root/.ssh/id_ed25519 -N "" && \
-    echo "$GITHUB_TOKEN" | GITHUB_TOKEN= gh auth login --with-token && \
+    cat /run/secrets/mistletoe_manual_test_github_token | gh auth login --with-token && \
     gh ssh-key add /root/.ssh/id_ed25519.pub --title "mstl-docker-test-$(date +%s)" && \
     gh config set git_protocol ssh; \
     fi
@@ -35,7 +36,7 @@ COPY . .
 RUN go build -o /usr/local/bin/mstl-gh ./cmd/mstl-gh
 
 # Instructions for running:
-# 1. Build: docker build --build-arg GITHUB_TOKEN=$GITHUB_TOKEN -t mstl-gh-test -f manual_tests/Dockerfile.manual_test .
+# 1. Build: docker build --secret id=mistletoe_manual_test_github_token,env=GITHUB_TOKEN -t mstl-gh-test -f manual_tests/Dockerfile.manual_test .
 # 2. Run: docker run -it --rm -v $(pwd):/app mstl-gh-test /bin/bash
 # 3. Inside container:
 #    python3 manual_tests/manual_test_gh_pr_create.py
