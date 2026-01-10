@@ -89,6 +89,8 @@ class GhTestEnv:
 
                 subprocess.run(["git", "add", "."], cwd=r_dir, check=True, stdout=subprocess.DEVNULL)
                 subprocess.run(["git", "commit", "-m", "Initial commit"], cwd=r_dir, check=True, stdout=subprocess.DEVNULL)
+                # Ensure the branch is named 'main' before pushing
+                subprocess.run(["git", "branch", "-M", "main"], cwd=r_dir, check=True, stdout=subprocess.DEVNULL)
                 subprocess.run(["git", "push", "-u", "origin", "main"], cwd=r_dir, check=True, stdout=subprocess.DEVNULL)
         finally:
             shutil.rmtree(tmp_setup, ignore_errors=True)
