@@ -18,6 +18,7 @@ func handlePrCheckout(args []string, opts GlobalOptions) {
 	var (
 		uLong     string
 		uShort    string
+		dLong     string
 		pVal      int
 		pValShort int
 		vLong     bool
@@ -26,6 +27,7 @@ func handlePrCheckout(args []string, opts GlobalOptions) {
 
 	fs.StringVar(&uLong, "url", "", "Pull Request URL")
 	fs.StringVar(&uShort, "u", "", "Pull Request URL (shorthand)")
+	fs.StringVar(&dLong, "dest", "", "Destination directory")
 	fs.IntVar(&pVal, "parallel", DefaultParallel, "Number of parallel processes")
 	fs.IntVar(&pValShort, "p", DefaultParallel, "Number of parallel processes (shorthand)")
 	fs.BoolVar(&vLong, "verbose", false, "Enable verbose output")
@@ -34,6 +36,11 @@ func handlePrCheckout(args []string, opts GlobalOptions) {
 	if err := ParseFlagsFlexible(fs, args); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
+	}
+
+	dest := dLong
+	if dest == "" {
+		dest = "."
 	}
 
 	prURL := uLong
@@ -180,6 +187,11 @@ func handlePrCheckout(args []string, opts GlobalOptions) {
 		return
 	}
 
+	if err := validateAndPrepareInitDest(dest); err != nil {
+		fmt.Printf("Error preparing destination: %v\n", err)
+		os.Exit(1)
+	}
+
 	fmt.Println("Initializing repositories based on snapshot...")
 	// The snapshot contains the target state. We treat it as the config.
 	// PerformInit handles validation, cloning, and checking out.
@@ -208,11 +220,10 @@ func handlePrCheckout(args []string, opts GlobalOptions) {
 
 		// Save dependencies.md if exists
 		if dependencyContent != "" {
-			depFile := filepath.Join(mstlDir, "dependencies.md")
-			if err := os.WriteFile(depFile, []byte(dependencyContent), 0644); err != nil {
-				fmt.Printf("Warning: Failed to write %s: %v\n", depFile, err)
+			if err := writeDependencyFile(mstlDir, dependencyContent); err != nil {
+				fmt.Printf("Warning: Failed to write dependencies.md: %v\n", err)
 			} else {
-				fmt.Printf("Saved dependency graph to %s\n", depFile)
+				fmt.Printf("Saved dependency graph to %s\n", filepath.Join(mstlDir, "dependencies.md"))
 			}
 		}
 	}
@@ -226,4 +237,22 @@ func handlePrCheckout(args []string, opts GlobalOptions) {
 	spinner.Stop()
 
 	RenderPrStatusTable(Stdout, prRows)
+}
+
+func writeDependencyFile(dir, content string) error {
+	trimmed := strings.TrimSpace(content)
+	finalContent := content
+	if !strings.HasPrefix(trimmed, "```mermaid") {
+		var sb strings.Builder
+		sb.WriteString("```mermaid\n")
+		sb.WriteString(content)
+		if !strings.HasSuffix(content, "\n") {
+			sb.WriteString("\n")
+		}
+		sb.WriteString("```\n")
+		finalContent = sb.String()
+	}
+
+	depFile := filepath.Join(dir, "dependencies.md")
+	return os.WriteFile(depFile, []byte(finalContent), 0644)
 }

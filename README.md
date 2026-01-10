@@ -271,6 +271,7 @@ mstl-gh pr checkout -u <PR_URL> [options]
 
 **Options:**
 *   `-u, --url <string>`: The URL of the Pull Request containing the snapshot (Required).
+*   `--dest <path>`: Destination directory (default: current directory).
 *   `-p, --parallel <int>`: Number of parallel processes to use (default: 1).
 *   `-v, --verbose`: Enable verbose output.
 
