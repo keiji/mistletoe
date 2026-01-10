@@ -127,8 +127,8 @@ class GhTestEnv:
         with open(self.dependency_file, "w") as f:
             f.write("```mermaid\n")
             f.write("graph TD\n")
-            f.write(f'    "{a}" --> "{b}"\n')
-            f.write(f'    "{b}" --> "{c}"\n')
+            f.write(f'    {a} --> {b}\n')
+            f.write(f'    {b} --> {c}\n')
             f.write("```\n")
 
     def cleanup(self):
