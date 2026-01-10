@@ -1,0 +1,29 @@
+FROM golang:1.25-alpine
+
+# Install dependencies
+RUN apk add --no-cache \
+    git \
+    python3 \
+    curl \
+    openssh-client \
+    bash
+
+# Install GitHub CLI
+RUN type -p curl >/dev/null || (apk add --no-cache curl)
+RUN curl -fsSL https://github.com/cli/cli/releases/download/v2.83.2/gh_2.83.2_linux_amd64.tar.gz -o gh.tar.gz && \
+    tar -xzf gh.tar.gz && \
+    mv gh_2.83.2_linux_amd64/bin/gh /usr/local/bin/gh && \
+    rm -rf gh.tar.gz gh_2.83.2_linux_amd64
+
+WORKDIR /app
+COPY . .
+
+# Build mstl-gh
+RUN go build -o /usr/local/bin/mstl-gh ./cmd/mstl-gh
+
+# Instructions for running:
+# 1. Build: docker build -t mstl-gh-test -f manual_tests/Dockerfile.manual_test .
+# 2. Run: docker run -it --rm -v $(pwd):/app mstl-gh-test /bin/bash
+# 3. Inside container:
+#    gh auth login --with-token < token.txt (or interactive)
+#    python3 manual_tests/manual_test_gh_pr_create.py
