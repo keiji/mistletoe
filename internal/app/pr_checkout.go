@@ -9,6 +9,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -68,7 +69,7 @@ func handlePrCheckout(args []string, opts GlobalOptions) {
 
 	// 3. Parse Mistletoe Block
 	fmt.Println("Parsing Mistletoe block...")
-	config, relatedJSON, found := ParseMistletoeBlock(prBody)
+	config, relatedJSON, dependencyContent, found := ParseMistletoeBlock(prBody)
 	if !found {
 		fmt.Println("Error: Mistletoe block not found in PR body")
 		os.Exit(1)
@@ -187,6 +188,33 @@ func handlePrCheckout(args []string, opts GlobalOptions) {
 		// We continue to status even if some failed? Or exit?
 		// Usually Init failure is critical.
 		os.Exit(1)
+	}
+
+	// Save config and dependency
+	mstlDir := ".mstl"
+	if err := os.MkdirAll(mstlDir, 0755); err != nil {
+		fmt.Printf("Warning: Failed to create .mstl directory: %v\n", err)
+	} else {
+		// Save config.json
+		configFile := filepath.Join(mstlDir, "config.json")
+		configBytes, err := json.MarshalIndent(config, "", "  ")
+		if err == nil {
+			if err := os.WriteFile(configFile, configBytes, 0644); err != nil {
+				fmt.Printf("Warning: Failed to write %s: %v\n", configFile, err)
+			} else {
+				fmt.Printf("Saved configuration to %s\n", configFile)
+			}
+		}
+
+		// Save dependencies.md if exists
+		if dependencyContent != "" {
+			depFile := filepath.Join(mstlDir, "dependencies.md")
+			if err := os.WriteFile(depFile, []byte(dependencyContent), 0644); err != nil {
+				fmt.Printf("Warning: Failed to write %s: %v\n", depFile, err)
+			} else {
+				fmt.Printf("Saved dependency graph to %s\n", depFile)
+			}
+		}
 	}
 
 	// 5. Status

@@ -144,7 +144,7 @@ Some description...
 
 ------------------
 `
-	config, _, found := ParseMistletoeBlock(body)
+	config, _, _, found := ParseMistletoeBlock(body)
 	if !found {
 		t.Fatalf("ParseMistletoeBlock failed: not found")
 	}
@@ -191,7 +191,7 @@ Some description...
 
 ------------------
 `
-	config2, related, found2 := ParseMistletoeBlock(bodyRelated)
+	config2, related, _, found2 := ParseMistletoeBlock(bodyRelated)
 	if !found2 {
 		t.Fatalf("ParseMistletoeBlock failed: not found")
 	}

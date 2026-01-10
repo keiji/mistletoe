@@ -767,7 +767,7 @@ func ValidatePrPermissionAndOverwrite(repoID string, pr PrInfo, currentUser stri
 
 	// 2. Overwrite Logic
 	// Check for Mistletoe block
-	_, _, found := ParseMistletoeBlock(pr.Body)
+	_, _, _, found := ParseMistletoeBlock(pr.Body)
 	if found {
 		// Existing block found -> Safe to overwrite
 		return nil
