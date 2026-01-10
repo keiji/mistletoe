@@ -38,6 +38,14 @@ def main():
         print(f"[-] Initializing in {env.test_dir}...")
         env.run_mstl_cmd(["init", "-f", "mistletoe.json"])
 
+        # Configure git user for the cloned repos (required for subsequent commits)
+        print("[-] Configuring dummy git user for cloned repositories...")
+        import subprocess
+        for repo in env.repo_names:
+             r_dir = os.path.join(env.test_dir, repo)
+             subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=r_dir, check=True, stdout=subprocess.DEVNULL)
+             subprocess.run(["git", "config", "user.name", "Test User"], cwd=r_dir, check=True, stdout=subprocess.DEVNULL)
+
         # Switch branch
         print("[-] Switching to feature/interactive-test...")
         env.run_mstl_cmd(["switch", "-c", "feature/interactive-test"])
