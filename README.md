@@ -21,12 +21,13 @@ This will produce the `mstl` and `mstl-gh` binaries in the `cmd/mstl` and `cmd/m
 
 ## Configuration File Format
 
-The core of Mistletoe is the configuration file (usually `repos.json`) containing a list of repositories.
+The core of Mistletoe is the configuration file (usually `config.json`) containing a list of repositories.
 
-**Example `repos.json`:**
+**Example `config.json`:**
 
 ```json
 {
+  "parallel": 4,
   "repositories": [
     {
       "url": "https://github.com/example/repo1.git",
@@ -43,6 +44,7 @@ The core of Mistletoe is the configuration file (usually `repos.json`) containin
 }
 ```
 
+*   **parallel** (Optional): The default number of parallel processes to use.
 *   **url** (Required): The remote URL of the Git repository.
 *   **id** (Optional): The directory name to clone into. If omitted, the name is derived from the URL.
 *   **branch** (Optional): The branch to checkout or switch to.
@@ -59,15 +61,15 @@ mstl-gh <command> [options] [arguments]
 ```
 
 Global options for most commands:
-*   `-f, --file <path>`: Path to the configuration file (e.g., `repos.json`).
-*   `-p, --parallel <int>`: Number of parallel processes to use (default: 1).
+*   `-f, --file <path>`: Path to the configuration file (e.g., `config.json`).
+*   `-p, --parallel <int>`: Number of parallel processes to use (default: 1, or value from config).
 *   `-v, --verbose`: Enable verbose output (shows executed git/gh commands).
 
 If the `-f` flag is omitted, `mstl` will attempt to read the configuration from **standard input (stdin)**.
 
 Example using pipe:
 ```bash
-cat repos.json | mstl init
+cat config.json | mstl init
 ```
 
 If you have Base64 encoded input, decode it before piping:

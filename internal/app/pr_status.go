@@ -75,10 +75,8 @@ func handlePrStatus(args []string, opts GlobalOptions) {
 	}
 
 	// Verbose Override
-	if verbose {
-		if parallel > 1 {
-			fmt.Println("Verbose is specified, so parallel is treated as 1.")
-		}
+	if verbose && parallel > 1 {
+		fmt.Println("Verbose is specified, so parallel is treated as 1.")
 		parallel = 1
 	}
 
