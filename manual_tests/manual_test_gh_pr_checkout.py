@@ -56,8 +56,8 @@ def main():
             subprocess.run(["git", "commit", "-m", "Add test.txt"], cwd=r_dir, check=True, stdout=subprocess.DEVNULL)
 
         print_green("[-] Running 'pr create' to setup PRs...")
-        # Automate yes input for creation
-        env.run_mstl_cmd(["pr", "create", "-t", "Checkout Test PR", "-b", "Body", "--dependencies", "dependencies.md"], input_str="yes\n")
+        # Manual input for creation
+        env.run_mstl_cmd(["pr", "create", "-t", "Checkout Test PR", "-b", "Body", "--dependencies", "dependencies.md"])
 
         # Retrieve PR URL for Repo A
         print_green(f"[-] retrieving PR URL for {repo_a}...")

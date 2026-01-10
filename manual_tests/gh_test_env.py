@@ -146,14 +146,14 @@ class GhTestEnv:
             except Exception as e:
                 print_green(f"    Failed to delete {repo}: {e}")
 
-    def run_mstl_cmd(self, args, cwd=None, input_str=None):
+    def run_mstl_cmd(self, args, cwd=None):
         if cwd is None:
             cwd = self.test_dir
 
         cmd = [self.mstl_bin] + args
         try:
             return subprocess.run(
-                cmd, cwd=cwd, input=input_str,
+                cmd, cwd=cwd,
                 check=True, text=True
             )
         except subprocess.CalledProcessError as e:
