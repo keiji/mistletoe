@@ -8,24 +8,31 @@ import atexit
 
 # Add current directory to sys.path to import interactive_runner
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-from interactive_runner import print_green
+from interactive_runner import InteractiveRunner, print_green
 
-# Colors
-GREEN = '\033[0;32m'
-RED = '\033[0;31m'
-YELLOW = '\033[1;33m'
-NC = '\033[0m'
+# Colors - Use interactive_runner's where possible, but keep local for helpers if needed
+# Actually, interactive_runner doesn't export colors, only print_green.
+# We will rely on print_green for logs.
 
 def log(msg):
     print_green(f"[TEST] {msg}")
 
 def fail(msg):
-    print(f"{RED}[FAIL]{NC} {msg}")
+    # Use ANSI codes for red directly since interactive_runner doesn't export print_red
+    print(f"\033[0;31m[FAIL]\033[0m {msg}")
     sys.exit(1)
 
 class MstlManualTestSyncConflict:
     def __init__(self):
         self.root_dir = os.getcwd()
+        self.test_dir = None # Created in setup
+        self.bin_path = None
+        self.repos_dir = None
+        self.remote_dir = None
+        self.config_file = None
+        self.seed_dir = None
+
+    def setup(self):
         self.test_dir = tempfile.mkdtemp(prefix="mstl_test_sync_")
         self.bin_path = os.path.join(self.test_dir, "bin", "mstl")
         self.repos_dir = os.path.join(self.test_dir, "repos")
@@ -33,6 +40,8 @@ class MstlManualTestSyncConflict:
         self.config_file = os.path.join(self.test_dir, "mstl_config.json")
         self.seed_dir = os.path.join(self.test_dir, "seed")
 
+        # We can register cleanup here, but InteractiveRunner also handles it.
+        # Let's keep atexit as a fallback.
         atexit.register(self.cleanup)
 
         os.environ["GIT_AUTHOR_NAME"] = "Test User"
@@ -45,9 +54,12 @@ class MstlManualTestSyncConflict:
         log(f"Test Directory: {self.test_dir}")
 
     def cleanup(self):
-        if os.path.exists(self.test_dir):
+        if self.test_dir and os.path.exists(self.test_dir):
             log("Cleaning up temporary directory...")
-            shutil.rmtree(self.test_dir)
+            try:
+                shutil.rmtree(self.test_dir)
+            except Exception as e:
+                print(f"Cleanup failed: {e}")
 
     def run_cmd(self, cmd, cwd=None, check=True, input_str=None):
         try:
@@ -103,7 +115,8 @@ class MstlManualTestSyncConflict:
         with open(self.config_file, "w") as f:
             json.dump(config, f, indent=2)
 
-    def run_test(self):
+    def run_test_logic(self):
+        self.setup() # Initialize dirs
         self.build_mstl()
         self.setup_repo()
         self.create_config()
@@ -157,6 +170,25 @@ class MstlManualTestSyncConflict:
 
         log("Success: Sync correctly failed on conflict.")
 
-if __name__ == "__main__":
+def main():
+    runner = InteractiveRunner("mstl sync Conflict Test")
     test = MstlManualTestSyncConflict()
-    test.run_test()
+
+    description = (
+        "This test verifies that 'mstl sync' correctly aborts when a merge conflict occurs.\n"
+        "It will:\n"
+        "1. Create temporary local bare repositories.\n"
+        "2. Simulate a divergence between local and remote.\n"
+        "3. Run 'sync' and verify it fails safely."
+    )
+
+    runner.execute_scenario(
+        "Simulate Conflict",
+        description,
+        test.run_test_logic
+    )
+
+    runner.run_cleanup(test.cleanup)
+
+if __name__ == "__main__":
+    main()

@@ -8,12 +8,11 @@ import atexit
 
 # Add current directory to sys.path to import interactive_runner
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-from interactive_runner import print_green
+from interactive_runner import InteractiveRunner, print_green
 
 # Colors
 GREEN = '\033[0;32m'
 RED = '\033[0;31m'
-YELLOW = '\033[1;33m'
 NC = '\033[0m'
 
 def log(msg):
@@ -23,12 +22,17 @@ def fail(msg):
     print(f"{RED}[FAIL]{NC} {msg}")
     sys.exit(1)
 
-def warn(msg):
-    print(f"{YELLOW}[WARN]{NC} {msg}")
-
 class MstlManualTest:
     def __init__(self):
         self.root_dir = os.getcwd()
+        self.test_dir = None
+        self.bin_path = None
+        self.repos_dir = None
+        self.remote_dir = None
+        self.config_file = None
+        self.seed_dir = None
+
+    def setup(self):
         self.test_dir = tempfile.mkdtemp(prefix="mstl_test_")
         self.bin_path = os.path.join(self.test_dir, "bin", "mstl")
         self.repos_dir = os.path.join(self.test_dir, "repos")
@@ -36,7 +40,6 @@ class MstlManualTest:
         self.config_file = os.path.join(self.test_dir, "mstl_config.json")
         self.seed_dir = os.path.join(self.test_dir, "seed")
 
-        # Setup cleanup
         atexit.register(self.cleanup)
 
         # Setup git env
@@ -48,9 +51,12 @@ class MstlManualTest:
         log(f"Test Directory: {self.test_dir}")
 
     def cleanup(self):
-        if os.path.exists(self.test_dir):
+        if self.test_dir and os.path.exists(self.test_dir):
             log("Cleaning up temporary directory...")
-            shutil.rmtree(self.test_dir)
+            try:
+                shutil.rmtree(self.test_dir)
+            except Exception as e:
+                print(f"Cleanup failed: {e}")
 
     def run_cmd(self, cmd, cwd=None, check=True, input_str=None):
         try:
@@ -238,7 +244,8 @@ class MstlManualTest:
 
         log("Success: mstl snapshot")
 
-    def run(self):
+    def run_logic(self):
+        self.setup()
         self.build_mstl()
         self.setup_remotes()
         self.create_config()
@@ -250,6 +257,22 @@ class MstlManualTest:
         self.test_snapshot()
         log("All tests passed!")
 
-if __name__ == "__main__":
+def main():
+    runner = InteractiveRunner("mstl Core Functionality Test")
     test = MstlManualTest()
-    test.run()
+
+    description = (
+        "This test verifies the core functionality of 'mstl' (init, status, switch, push, sync, snapshot).\n"
+        "It will create temporary local bare repositories to simulate remotes."
+    )
+
+    runner.execute_scenario(
+        "Core Feature Check",
+        description,
+        test.run_logic
+    )
+
+    runner.run_cleanup(test.cleanup)
+
+if __name__ == "__main__":
+    main()
