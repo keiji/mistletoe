@@ -53,7 +53,7 @@ def main():
             subprocess.run(["git", "commit", "-m", "Add test.txt"], cwd=r_dir, check=True, stdout=subprocess.DEVNULL)
 
         print_green("[-] Running 'pr create'...")
-        env.run_mstl_cmd(["pr", "create", "-t", "Update Test PR", "-b", "Body", "--dependencies", "dependencies.md"], input_str="yes\n")
+        env.run_mstl_cmd(["pr", "create", "-t", "Update Test PR", "-b", "Body", "--dependencies", "dependencies.md"])
 
         print_green("[-] Modifying dependencies.md (Adding D --> A)...")
         # Read existing graph
