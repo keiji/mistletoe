@@ -150,9 +150,18 @@ class GhTestEnv:
             try:
                 new_name = f"{repo}-deleting"
                 subprocess.run(["gh", "repo", "rename", new_name, "--repo", f"{self.user}/{repo}", "--yes"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                time.sleep(2)
+
+                # Verify rename
+                res = subprocess.run(["gh", "repo", "list", self.user, "--json", "name", "--limit", "1000"], capture_output=True, text=True, check=True)
+                repos = json.loads(res.stdout)
+                names = [r["name"] for r in repos]
+                if new_name not in names:
+                    print_green(f"    [WARNING] Rename verification failed for {repo}")
+
+                time.sleep(2)
                 subprocess.run(["gh", "repo", "delete", f"{self.user}/{new_name}", "--yes"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 print_green(f"    Deleted {repo}")
-                time.sleep(2)
             except Exception as e:
                 print_green(f"    Failed to delete {repo}: {e}")
 
