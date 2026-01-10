@@ -146,20 +146,38 @@ class GhTestEnv:
             shutil.rmtree(self.test_dir, ignore_errors=True)
 
         print_green("[-] Deleting remote repositories...")
+
+        # 1. Rename all repositories
+        print_green("    Renaming repositories...")
         for repo in self.repo_names:
             try:
                 new_name = f"{repo}-deleting"
                 subprocess.run(["gh", "repo", "rename", new_name, "--repo", f"{self.user}/{repo}", "--yes"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                time.sleep(2)
+            except Exception as e:
+                print_green(f"    Failed to rename {repo}: {e}")
 
-                # Verify rename
-                res = subprocess.run(["gh", "repo", "list", self.user, "--json", "name", "--limit", "1000"], capture_output=True, text=True, check=True)
-                repos = json.loads(res.stdout)
-                names = [r["name"] for r in repos]
-                if new_name not in names:
+        time.sleep(2)
+
+        # 2. Verify renames
+        print_green("    Verifying renames...")
+        try:
+            res = subprocess.run(["gh", "repo", "list", self.user, "--json", "name", "--limit", "1000"], capture_output=True, text=True, check=True)
+            repos = json.loads(res.stdout)
+            current_names = [r["name"] for r in repos]
+            for repo in self.repo_names:
+                new_name = f"{repo}-deleting"
+                if new_name not in current_names:
                     print_green(f"    [WARNING] Rename verification failed for {repo}")
+        except Exception as e:
+            print_green(f"    Failed to verify renames: {e}")
 
-                time.sleep(2)
+        time.sleep(2)
+
+        # 3. Delete renamed repositories
+        print_green("    Deleting repositories...")
+        for repo in self.repo_names:
+            try:
+                new_name = f"{repo}-deleting"
                 subprocess.run(["gh", "repo", "delete", f"{self.user}/{new_name}", "--yes"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 print_green(f"    Deleted {repo}")
             except Exception as e:
