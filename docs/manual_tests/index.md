@@ -18,7 +18,7 @@ mistletoe の機能を手動で検証するためのテスト設計書をまと�
 
 | ID | テストケース名 | 説明 | 設計書 | スクリプト |
 | :--- | :--- | :--- | :--- | :--- |
-| `mstl_basic` | mstl 基本機能テスト | `mstl` の基本機能（init, status, switch, push, sync, snapshot）を検証します。 | [`docs/manual_test_design.md`](../manual_test_design.md) | `manual_tests/manual_test_mstl.py` |
+| `mstl_basic` | mstl 基本機能テスト | `mstl` の基本機能（init, status, switch, push, sync, snapshot）を検証します。 | [`docs/manual_tests/manual_test_design.md`](./manual_test_design.md) | `manual_tests/manual_test_mstl.py` |
 | `gh_pr_create` | GitHub PR 作成フロー | `mstl-gh pr create` コマンドによる依存関係を含む Pull Request の作成フローを検証します。 | [`docs/manual_tests/manual_test_gh_pr_create.md`](./manual_test_gh_pr_create.md) | `manual_tests/manual_test_gh_pr_create.py` |
-| `gh_safety` | PR作成競合安全性テスト | `pr create` 実行中の並列操作による競合状態の検知を検証します。 | [`docs/manual_test_gh_design.md`](../manual_test_gh_design.md) | `manual_tests/manual_test_gh_safety.py` |
+| `gh_safety` | PR作成競合安全性テスト | `pr create` 実行中の並列操作による競合状態の検知を検証します。 | [`docs/manual_tests/manual_test_gh_design.md`](./manual_test_gh_design.md) | `manual_tests/manual_test_gh_safety.py` |
 | `init_dest` | 初期化先ディレクトリ検証 | `init` コマンドの出力先ディレクトリに関する様々な条件（既存、空ではない、など）を検証します。 | [`docs/manual_tests/manual_test_init_dest.md`](./manual_test_init_dest.md) | `manual_tests/manual_test_init_dest.py` |
