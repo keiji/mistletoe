@@ -378,16 +378,8 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 	spinner.Start()
 	finalRows := CollectStatus(config, parallel, opts.GitPath, verbose, true)
 
-	knownPRsForStatus := make(map[string][]string)
-	for k, items := range finalPrMap {
-		var urls []string
-		for _, item := range items {
-			urls = append(urls, item.URL)
-		}
-		knownPRsForStatus[k] = urls
-	}
-
-	finalPrRows := CollectPrStatus(finalRows, config, parallel, opts.GhPath, verbose, knownPRsForStatus)
+	// Updated to pass finalPrMap directly
+	finalPrRows := CollectPrStatus(finalRows, config, parallel, opts.GhPath, verbose, finalPrMap)
 	spinner.Stop()
 
 	// Filter for Display (Open or Draft only)
