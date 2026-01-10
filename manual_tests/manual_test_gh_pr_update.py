@@ -2,6 +2,7 @@
 import os
 import sys
 import subprocess
+import json
 
 # Ensure manual_tests directory is in python path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -90,7 +91,29 @@ def main():
 
         # Display PR URLs for verification
         print_green(f"[-] Please verify the PR for Repo D ({repo_d}):")
-        subprocess.run(["gh", "pr", "list", "--repo", f"{env.user}/{repo_d}", "--head", "feature/update-test"], check=True)
+
+        cmd = [
+            "gh", "pr", "list",
+            "--repo", f"{env.user}/{repo_d}",
+            "--head", "feature/update-test",
+            "--json", "number,title,headRefName,createdAt"
+        ]
+
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        try:
+            prs = json.loads(result.stdout)
+        except json.JSONDecodeError:
+            print(f"Failed to parse gh output: {result.stdout}")
+            prs = []
+
+        if not prs:
+            print("No PRs found matching the criteria.")
+        else:
+            print(f"Showing {len(prs)} pull request in {env.user}/{repo_d} that matches your search\n")
+            print("| ID | TITLE | BRANCH | CREATED AT |")
+            print("| -- | ----- | ------ | ---------- |")
+            for pr in prs:
+                print(f"| #{pr['number']} | {pr['title']} | {pr['headRefName']} | {pr['createdAt']} |")
 
     expected = (
         f"1. PRs created for all 4 repos.\n"
