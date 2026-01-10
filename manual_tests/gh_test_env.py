@@ -25,6 +25,17 @@ class GhTestEnv:
         self.repo_names = []
         self.repo_urls = {}
 
+        # Configure git to use gh for credentials
+        self.setup_git_auth()
+
+    def setup_git_auth(self):
+        try:
+            subprocess.run(["gh", "auth", "setup-git"], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            # Suppress default branch hint
+            subprocess.run(["git", "config", "--global", "init.defaultBranch", "main"], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except Exception as e:
+            print(f"[WARNING] Failed to setup git auth via gh: {e}")
+
     def get_gh_user(self):
         try:
             res = subprocess.run(
