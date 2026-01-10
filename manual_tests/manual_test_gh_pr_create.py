@@ -16,7 +16,7 @@ def main():
     # 1. Setup Phase (Automated)
     print_green("[-] Setting up test environment (Building binary, generating names)...")
     try:
-        env.generate_repo_names(3)
+        env.generate_repo_names(4)
         env.build_mstl_gh()
     except Exception as e:
         print_green(f"[FATAL] Setup failed: {e}")
@@ -77,10 +77,11 @@ def main():
         f"This test will create Pull Requests in:\n"
         f"  - {repo_a}\n"
         f"  - {repo_b}\n"
-        f"  ... and others.\n\n"
+        f"  ... and others (Total 4).\n\n"
         f"The Pull Request bodies should contain a dependency graph where:\n"
         f"  - {repo_a} depends on {repo_b}\n"
-        f"  - {repo_b} depends on the third repo."
+        f"  - {repo_b} depends on the third repo.\n"
+        f"  - The fourth repo is isolated (no dependencies)."
     )
 
     # Run the interactive scenario
