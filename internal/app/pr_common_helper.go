@@ -3,7 +3,6 @@ package app
 
 import (
 	"strings"
-	"encoding/json"
 	"fmt"
 )
 
@@ -57,18 +56,4 @@ func isPrFromConfiguredRepo(pr PrInfo, configCanonicalURL string) bool {
 	}
 	// Fallback: If HeadRepository is missing from response, assume it's a match to be safe.
 	return true
-}
-
-// GetGhPrView retrieves full Pull Request details via `gh pr view`.
-func GetGhPrView(ghPath string, verbose bool, url string) (PrInfo, error) {
-	args := []string{"pr", "view", url, "--json", "number,state,isDraft,baseRefName,headRefOid,author,viewerCanEditFiles,body,headRepository"}
-	out, err := RunGh(ghPath, verbose, args...)
-	if err != nil {
-		return PrInfo{}, err
-	}
-	var pr PrInfo
-	if err := json.Unmarshal([]byte(out), &pr); err != nil {
-		return PrInfo{}, err
-	}
-	return pr, nil
 }
