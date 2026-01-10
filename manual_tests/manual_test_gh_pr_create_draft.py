@@ -31,7 +31,7 @@ def main():
         # Create Repositories (Deferred until user confirmation)
         print_green(f"[-] Creating temporary repositories: {', '.join(env.repo_names)}...")
         # Create PUBLIC repositories as requested
-        env.setup_repos(visibility="public")
+        env.setup_repos(visibility=GhTestEnv.VISIBILITY_PUBLIC)
         env.create_config_and_graph()
 
         # Initialize

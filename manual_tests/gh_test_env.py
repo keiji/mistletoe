@@ -9,6 +9,9 @@ import time
 from interactive_runner import print_green
 
 class GhTestEnv:
+    VISIBILITY_PRIVATE = "private"
+    VISIBILITY_PUBLIC = "public"
+
     def __init__(self, root_dir=None):
         self.cwd = root_dir if root_dir else os.getcwd()
         self.user = self.get_gh_user()
@@ -75,7 +78,10 @@ class GhTestEnv:
             cwd=self.cwd, check=True
         )
 
-    def setup_repos(self, visibility="private"):
+    def setup_repos(self, visibility=VISIBILITY_PRIVATE):
+        if visibility not in [self.VISIBILITY_PRIVATE, self.VISIBILITY_PUBLIC]:
+            raise ValueError(f"Invalid visibility: {visibility}")
+
         if not self.repo_names:
             self.generate_repo_names()
 
