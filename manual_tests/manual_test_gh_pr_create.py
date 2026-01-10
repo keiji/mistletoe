@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import os
 import sys
-# Ensure scripts directory is in python path
+# Ensure manual_tests directory is in python path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from gh_test_env import GhTestEnv
