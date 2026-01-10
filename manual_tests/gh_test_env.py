@@ -5,6 +5,7 @@ import json
 import shutil
 import subprocess
 import signal
+import time
 from interactive_runner import print_green
 
 class GhTestEnv:
@@ -74,13 +75,13 @@ class GhTestEnv:
             cwd=self.cwd, check=True
         )
 
-    def setup_repos(self):
+    def setup_repos(self, visibility="private"):
         if not self.repo_names:
             self.generate_repo_names()
 
         # Repositories are created here
         for repo in self.repo_names:
-            subprocess.run(["gh", "repo", "create", repo, "--private"], check=True)
+            subprocess.run(["gh", "repo", "create", repo, f"--{visibility}"], check=True)
 
         tmp_setup = os.path.join(self.cwd, f"setup_{self.uuid}")
         os.makedirs(tmp_setup, exist_ok=True)
@@ -145,6 +146,7 @@ class GhTestEnv:
                 subprocess.run(["gh", "repo", "rename", new_name, "--repo", f"{self.user}/{repo}", "--yes"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 subprocess.run(["gh", "repo", "delete", f"{self.user}/{new_name}", "--yes"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 print_green(f"    Deleted {repo}")
+                time.sleep(2)
             except Exception as e:
                 print_green(f"    Failed to delete {repo}: {e}")
 
