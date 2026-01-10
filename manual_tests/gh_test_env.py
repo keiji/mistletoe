@@ -53,7 +53,7 @@ class GhTestEnv:
             names = [f"mistletoe-test-{self.uuid}-{chr(65+i)}" for i in range(count)]
             if all(not self.repo_exists(n) for n in names):
                 self.repo_names = names
-                self.repo_urls = {n: f"https://github.com/{self.user}/{n}.git" for n in names}
+                self.repo_urls = {n: f"git@github.com:{self.user}/{n}.git" for n in names}
                 return
             self.uuid = str(uuid.uuid4())[:8]
 
@@ -93,7 +93,7 @@ class GhTestEnv:
                 # Configure dummy user for committing
                 subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=r_dir, check=True, stdout=subprocess.DEVNULL)
                 subprocess.run(["git", "config", "user.name", "Test User"], cwd=r_dir, check=True, stdout=subprocess.DEVNULL)
-                subprocess.run(["git", "remote", "add", "origin", f"https://github.com/{self.user}/{repo}.git"], cwd=r_dir, check=True, stdout=subprocess.DEVNULL)
+                subprocess.run(["git", "remote", "add", "origin", f"git@github.com:{self.user}/{repo}.git"], cwd=r_dir, check=True, stdout=subprocess.DEVNULL)
 
                 readme_path = os.path.join(r_dir, "README.md")
                 with open(readme_path, "w") as f:
