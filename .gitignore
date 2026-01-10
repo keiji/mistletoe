@@ -5,3 +5,6 @@
 
 # Coverage
 coverage.out
+
+# Python
+__pycache__/
