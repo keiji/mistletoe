@@ -98,3 +98,8 @@ If a test is interrupted and artifacts remain, you can run the cleanup script (r
 ```bash
 python3 manual_tests/temp_repos_cleanup.py
 ```
+
+## Implementation Guidelines
+
+*   **User Confirmation**: At the beginning of the manual test, present the test steps and the changes (such as repositories to be created) to the user, and ask for confirmation before proceeding.
+*   **Tables**: Output tables in Markdown format.
