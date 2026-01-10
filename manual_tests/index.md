@@ -1,22 +1,22 @@
-# Manual Test Implementation Policy
+# 手動テスト実装方針
 
-This document outlines the implementation guidelines for manual test scripts in the `manual_tests/` directory.
+このドキュメントは `manual_tests/` ディレクトリ内の手動テストスクリプトの実装ガイドラインについて説明します。
 
-## 1. Output Coloring
+## 1. 出力の色分け
 
-*   **Rule:** All instructional texts, status messages, and logs output by the test script must be displayed in **Green**.
-*   **Implementation:** Use the `print_green` function from `interactive_runner.py` or equivalent logic.
-*   **Reason:** To distinguish script output from the output of the tools being tested (e.g., `git`, `mstl`).
+*   **ルール:** テストスクリプトが出力する指示テキスト、ステータスメッセージ、ログはすべて **緑色** で表示する必要があります。
+*   **実装:** `interactive_runner.py` の `print_green` 関数または同等のロジックを使用してください。
+*   **理由:** スクリプトの出力とテスト対象ツール（`git`, `mstl` など）の出力を区別するため。
 
-## 2. GitHub Repository Creation
+## 2. GitHubリポジトリの作成
 
-*   **Rule:** When a test script requires creating repositories on GitHub (real, not mocked):
-    1.  The script must first generate or determine the list of repositories/directories to be created.
-    2.  Display this list to the user.
-    3.  Explicitly ask for user confirmation (e.g., "Do you want to create these repositories and run the test? [Y/n]") before proceeding with creation.
-*   **Implementation:** See `manual_test_gh_pr_create.py` as a reference implementation.
+*   **ルール:** テストスクリプトが GitHub 上に（モックではなく実際の）リポジトリを作成する必要がある場合:
+    1.  スクリプトはまず、作成されるリポジトリ/ディレクトリのリストを生成または決定する必要があります。
+    2.  このリストをユーザーに表示します。
+    3.  作成に進む前に、明示的にユーザーの確認（例：「これらのリポジトリを作成してテストを実行しますか？ [Y/n]」）を求めてください。
+*   **実装:** リファレンス実装として `manual_test_gh_pr_create.py` を参照してください。
 
-## 3. Consistency
+## 3. 一貫性
 
-*   Use `interactive_runner.py` where applicable to standardize the "Setup -> Execute -> Verify -> Cleanup" workflow.
-*   Ensure temporary directories and repositories are cleaned up (or the user is prompted to clean them up) after execution.
+*   可能な限り `interactive_runner.py` を使用して、「セットアップ -> 実行 -> 検証 -> クリーンアップ」のワークフローを標準化してください。
+*   実行後に一時ディレクトリやリポジトリがクリーンアップされる（またはユーザーにクリーンアップを促す）ようにしてください。
