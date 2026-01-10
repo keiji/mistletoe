@@ -21,10 +21,29 @@ You can build the image in two ways:
 
 Pass your GitHub token as a secret. This creates an image where `gh` is already logged in, so you don't need to authenticate every time you run the container.
 
+**Setting the Secret:**
+
+To pass the secret, you generally use the `--secret` flag with `docker build`. You can source the secret from an environment variable or a file.
+
+**Method 1: Using an Environment Variable (Simplest)**
+
+Ensure you have your token in an environment variable (e.g., `GITHUB_TOKEN`).
+
 ```bash
-# Assumes GITHUB_TOKEN is set in your environment
-docker build --secret id=github_token,env=GITHUB_TOKEN -t mstl-gh-test -f manual_tests/Dockerfile.manual_test .
+export GITHUB_TOKEN="ghp_your_token_here"
+# The 'env=GITHUB_TOKEN' part tells Docker to read the value from your shell's environment variable
+docker build --secret id=mistletoe_manual_test_github_token,env=GITHUB_TOKEN -t mstl-gh-test -f manual_tests/Dockerfile.manual_test .
 ```
+
+**Method 2: Using a File**
+
+If you have your token in a file (e.g., `my_token.txt`):
+
+```bash
+docker build --secret id=mistletoe_manual_test_github_token,src=my_token.txt -t mstl-gh-test -f manual_tests/Dockerfile.manual_test .
+```
+
+> **Note:** The `id` must be exactly `mistletoe_manual_test_github_token` as expected by the Dockerfile.
 
 #### Option B: Standard Build
 
