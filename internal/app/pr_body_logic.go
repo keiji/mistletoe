@@ -185,7 +185,7 @@ func GenerateMistletoeBody(snapshotData string, snapshotFilename string, current
 		// Calculate filename: replace "snapshot" -> "dependencies" and extension .json -> .mmd
 		// snapshotFilename is like "mistletoe-snapshot-[identifier].json"
 		depFilename := strings.Replace(snapshotFilename, "snapshot", "dependencies", 1)
-		depFilename = strings.Replace(depFilename, ".json", ".mmd", 1)
+		depFilename = strings.Replace(depFilename, ".json", ".md", 1)
 
 		sb.WriteString("<details>\n")
 		sb.WriteString(fmt.Sprintf("<summary>%s</summary>\n\n", depFilename))

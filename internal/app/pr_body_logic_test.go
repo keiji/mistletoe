@@ -165,7 +165,7 @@ func TestGenerateMistletoeBody_WithDependencyContent(t *testing.T) {
 	depContent := "graph TD\nA-->B"
 	body := GenerateMistletoeBody(snapshot, filename, "A", nil, nil, depContent)
 
-	if !strings.Contains(body, "<summary>mistletoe-dependencies-test-id.mmd</summary>") {
+	if !strings.Contains(body, "<summary>mistletoe-dependencies-test-id.md</summary>") {
 		t.Error("Missing dependencies summary with correct format")
 	}
 	if !strings.Contains(body, "```mermaid\n"+depContent) {
@@ -179,7 +179,7 @@ func TestGenerateMistletoeBody_WithDependencyContent_AlreadyWrapped(t *testing.T
 	depContent := "```mermaid\ngraph TD\nA-->B\n```"
 	body := GenerateMistletoeBody(snapshot, filename, "A", nil, nil, depContent)
 
-	if !strings.Contains(body, "<summary>mistletoe-dependencies-test-id.mmd</summary>") {
+	if !strings.Contains(body, "<summary>mistletoe-dependencies-test-id.md</summary>") {
 		t.Error("Missing dependencies summary with correct format")
 	}
 	if !strings.Contains(body, depContent) {
