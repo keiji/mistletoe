@@ -118,7 +118,8 @@ func TestMstlAndMstlGhCompatibility(t *testing.T) {
 		}
 
 		// Verify mstl status
-		cmdStatus := exec.Command(binMstl, "status", "-f", configFileMstl)
+		// Note: passing --ignore-stdin to prevent CI environment issues
+		cmdStatus := exec.Command(binMstl, "status", "-f", configFileMstl, "--ignore-stdin")
 		cmdStatus.Dir = dirMstl
 		if out, err := cmdStatus.CombinedOutput(); err != nil {
 			t.Fatalf("mstl status failed: %v\n%s", err, out)
@@ -136,14 +137,14 @@ func TestMstlAndMstlGhCompatibility(t *testing.T) {
 			t.Fatalf("failed to write config: %v", err)
 		}
 
-		cmdGh := exec.Command(binMstlGh, "init", "-f", configFileMstlGh)
+		cmdGh := exec.Command(binMstlGh, "init", "-f", configFileMstlGh, "--ignore-stdin")
 		cmdGh.Dir = dirMstlGh
 		if out, err := cmdGh.CombinedOutput(); err != nil {
 			t.Fatalf("mstl-gh init failed: %v\n%s", err, out)
 		}
 
 		// Verify mstl-gh status
-		cmdStatusGh := exec.Command(binMstlGh, "status", "-f", configFileMstlGh)
+		cmdStatusGh := exec.Command(binMstlGh, "status", "-f", configFileMstlGh, "--ignore-stdin")
 		cmdStatusGh.Dir = dirMstlGh
 		if out, err := cmdStatusGh.CombinedOutput(); err != nil {
 			t.Fatalf("mstl-gh status failed: %v\n%s", err, out)

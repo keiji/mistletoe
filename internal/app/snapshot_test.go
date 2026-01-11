@@ -229,13 +229,15 @@ func TestSnapshot_FileExists(t *testing.T) {
 		t.Fatalf("failed to create existing output file: %v", err)
 	}
 
-	_, stderr, code := runHandleSnapshot(t, []string{"-o", outputFile}, tmpDir)
+	// Pass "-f", "" to skip config loading logic, ensuring we reach the file check.
+	// Also append --ignore-stdin is handled by runHandleSnapshot.
+	_, stderr, code := runHandleSnapshot(t, []string{"-o", outputFile, "-f", ""}, tmpDir)
 
 	if code != 1 {
 		t.Errorf("Expected exit code 1, got %d", code)
 	}
 	if !strings.Contains(stderr, "exists") {
-		t.Errorf("Expected exists error")
+		t.Errorf("Expected exists error, got: %s", stderr)
 	}
 }
 
