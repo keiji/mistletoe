@@ -37,8 +37,8 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 
 	fs.StringVar(&fLong, "file", DefaultConfigFile, "Configuration file path")
 	fs.StringVar(&fShort, "f", DefaultConfigFile, "Configuration file path (shorthand)")
-	fs.IntVar(&pVal, "parallel", DefaultParallel, "Number of parallel processes")
-	fs.IntVar(&pValShort, "p", DefaultParallel, "Number of parallel processes (shorthand)")
+	fs.IntVar(&pVal, "parallel", -1, "Number of parallel processes")
+	fs.IntVar(&pValShort, "p", -1, "Number of parallel processes (shorthand)")
 	fs.StringVar(&tLong, "title", "", "Pull Request title")
 	fs.StringVar(&tShort, "t", "", "Pull Request title (shorthand)")
 	fs.StringVar(&bLong, "body", "", "Pull Request body")
@@ -63,12 +63,6 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 		fmt.Println(err)
 		os.Exit(1)
 	}
-	verbose := vLong || vShort
-
-	// User requirement: When verbose is enabled, force parallel=1 to ensure clean log output.
-	if verbose {
-		parallel = 1
-	}
 
 	// Resolve title, body, dependency file
 	prTitle := tLong
@@ -81,6 +75,9 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 	}
 	depPath := dLong
 	overwrite := wLong || wShort
+
+	// Verbose Override (Forward declaration)
+	verbose := vLong || vShort
 
 	// 1. Check gh availability
 	if err := checkGhAvailability(opts.GhPath, verbose); err != nil {
@@ -98,6 +95,31 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 
 	if err != nil {
 		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	// Resolve Parallel (Config fallback)
+	if parallel == -1 {
+		if config.Parallel != nil {
+			parallel = *config.Parallel
+		} else {
+			parallel = DefaultParallel
+		}
+	}
+
+	// Verbose Override
+	if verbose && parallel > 1 {
+		fmt.Println("Verbose is specified, so parallel is treated as 1.")
+		parallel = 1
+	}
+
+	// Final Validation
+	if parallel < MinParallel {
+		fmt.Printf("Error: Parallel must be at least %d.\n", MinParallel)
+		os.Exit(1)
+	}
+	if parallel > MaxParallel {
+		fmt.Printf("Error: Parallel must be at most %d.\n", MaxParallel)
 		os.Exit(1)
 	}
 

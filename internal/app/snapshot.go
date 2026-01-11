@@ -32,8 +32,8 @@ func handleSnapshot(args []string, opts GlobalOptions) {
 	fs.StringVar(&oShort, "o", "", "output file path (shorthand)")
 	fs.StringVar(&fLong, "file", DefaultConfigFile, "configuration file")
 	fs.StringVar(&fShort, "f", DefaultConfigFile, "configuration file (shorthand)")
-	fs.IntVar(&pVal, "parallel", DefaultParallel, "number of parallel processes")
-	fs.IntVar(&pValShort, "p", DefaultParallel, "number of parallel processes (shorthand)")
+	fs.IntVar(&pVal, "parallel", -1, "number of parallel processes")
+	fs.IntVar(&pValShort, "p", -1, "number of parallel processes (shorthand)")
 	var ignoreStdin bool
 	fs.BoolVar(&ignoreStdin, "ignore-stdin", false, "Ignore standard input")
 	fs.BoolVar(&vLong, "verbose", false, "Enable verbose output")
@@ -56,7 +56,6 @@ func handleSnapshot(args []string, opts GlobalOptions) {
 		fmt.Println(err)
 		os.Exit(1)
 	}
-	verbose := vLong || vShort
 
 	if configPath != "" || len(configData) > 0 {
 		if configPath != "" {
@@ -68,6 +67,32 @@ func handleSnapshot(args []string, opts GlobalOptions) {
 			fmt.Println(err)
 			os.Exit(1)
 		}
+	}
+
+	// Resolve Parallel (Config fallback)
+	if parallel == -1 {
+		if config != nil && config.Parallel != nil {
+			parallel = *config.Parallel
+		} else {
+			parallel = DefaultParallel
+		}
+	}
+
+	// Verbose Override
+	verbose := vLong || vShort
+	if verbose && parallel > 1 {
+		fmt.Println("Verbose is specified, so parallel is treated as 1.")
+		parallel = 1
+	}
+
+	// Final Validation
+	if parallel < MinParallel {
+		fmt.Printf("Error: Parallel must be at least %d.\n", MinParallel)
+		os.Exit(1)
+	}
+	if parallel > MaxParallel {
+		fmt.Printf("Error: Parallel must be at most %d.\n", MaxParallel)
+		os.Exit(1)
 	}
 
 	entries, err := os.ReadDir(".")

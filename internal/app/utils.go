@@ -174,20 +174,25 @@ func RunEditor() (string, error) {
 // from the various flag inputs.
 // It also checks for stdin input if no config file is provided.
 // If ignoreStdin is true, standard input is never read.
+// For parallel flags, pass -1 to indicate they were not set.
 func ResolveCommonValues(fLong, fShort string, pVal, pValShort int, ignoreStdin bool) (string, int, []byte, error) {
 	// Parallel
-	parallel := DefaultParallel
-	if pVal != DefaultParallel && pVal != 0 {
+	// We use -1 to indicate "unset" (default)
+	parallel := -1
+	if pVal != -1 {
 		parallel = pVal
-	} else if pValShort != DefaultParallel && pValShort != 0 {
+	} else if pValShort != -1 {
 		parallel = pValShort
 	}
 
-	if parallel < MinParallel {
-		return "", 0, nil, fmt.Errorf("Parallel must be at least %d.", MinParallel)
-	}
-	if parallel > MaxParallel {
-		return "", 0, nil, fmt.Errorf("Parallel must be at most %d.", MaxParallel)
+	// Only validate if parallel was set.
+	if parallel != -1 {
+		if parallel < MinParallel {
+			return "", 0, nil, fmt.Errorf("Parallel must be at least %d.", MinParallel)
+		}
+		if parallel > MaxParallel {
+			return "", 0, nil, fmt.Errorf("Parallel must be at most %d.", MaxParallel)
+		}
 	}
 
 	// conf.Config File
