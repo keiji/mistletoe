@@ -49,9 +49,19 @@ func ParseDependencies(content string, validIDs []string) (*DependencyGraph, err
 	// 1. Simple arrows: -->, ---, -.->, ==>
 	// 2. Labeled arrows: -- text -->, == text ==>, -. text .->
 	// This regex is simplified to catch the arrow part.
-	// It looks for a sequence starting with <, -, or = and ending with >.
-	// It handles the "middle" part for labels.
-	arrowRe := regexp.MustCompile(`\s*<?(?:--|==|-\.)(?:.*?)>`)
+	// It looks for a sequence starting with <, -, or = and ending with >? (optional > for ---)
+	// Actually --- does not end with >.
+	// Let's broaden the regex to support ---
+	// \s*<?(?:--|==|-\.)(?:.*)(?:>|-)
+	// But simple --- is just ---.
+	// Original regex: `\s*<?(?:--|==|-\.)(?:.*?)>`
+	//
+	// New strategy: Match any sequence that looks like an arrow.
+	// Starts with <, -, =. Contains -, =, . Ends with >, -.
+	// Simplification: Just look for the connector patterns.
+	// -->, ---, -.->, ==>
+	// Use alternation to handle arrows ending in > (greedy priority) vs - (fallback).
+	arrowRe := regexp.MustCompile(`\s*(?:<?(?:--|==|-\.)(?:.*?)>|<?(?:--|==|-\.)(?:.*?)-)`)
 
 	// Regex to extract ID: start of string, take valid chars
 	// Valid mstl IDs: ^[a-zA-Z0-9._-]+$
@@ -152,7 +162,7 @@ func FilterDependencyContent(content string, validIDs []string) string {
 
 	// Regex matches simplified arrows: -->, ---, -.->, ==>
 	// It captures the arrow including potential text in the middle.
-	arrowRe := regexp.MustCompile(`\s*<?(?:--|==|-\.)(?:.*?)>`)
+	arrowRe := regexp.MustCompile(`\s*(?:<?(?:--|==|-\.)(?:.*?)>|<?(?:--|==|-\.)(?:.*?)-)`)
 	// Regex for valid IDs (matches what extractID uses)
 	idRe := regexp.MustCompile(`^([a-zA-Z0-9._-]+)`)
 
@@ -166,56 +176,32 @@ func FilterDependencyContent(content string, validIDs []string) string {
 			continue
 		}
 
-		// Find arrow location
-		loc := arrowRe.FindStringIndex(trimmed)
-		if loc == nil {
-			// No arrow. Check if it's a node definition (just an ID).
-			// If it matches ID format and is NOT in validIDs, we should filter it.
-			// Only filter if it looks like a clean ID.
+		// Split line by arrows to get all node parts
+		parts := arrowRe.Split(trimmed, -1)
 
-			// Try to extract ID from the beginning
-			potentialID := extractID(trimmed, idRe)
-			if potentialID != "" && potentialID == trimmed {
-				// The whole line is an ID
-				if validIDMap[potentialID] {
-					sb.WriteString(line + "\n")
+		allValid := true
+		for _, part := range parts {
+			part = strings.TrimSpace(part)
+			// Handle labels attached to the part (e.g., `|label| B` or `B`)
+			// If split results in part starting with label pipe, remove it.
+			if strings.HasPrefix(part, "|") {
+				pipeIdx := strings.Index(part[1:], "|")
+				if pipeIdx != -1 {
+					part = strings.TrimSpace(part[pipeIdx+2:])
 				}
-				// Else skip (private repo node definition)
-				continue
 			}
 
-			// If it's not just an ID (e.g. "subgraph X" or "A(Label)"), we are less sure.
-			// Ideally we parse node definitions properly.
-			// But for "init" output which is just "    RepoName", the above check covers it.
-
-			sb.WriteString(line + "\n")
-			continue
-		}
-
-		// Extract parts
-		leftRaw := strings.TrimSpace(trimmed[:loc[0]])
-		rightRaw := strings.TrimSpace(trimmed[loc[1]:])
-
-		// Handle labels attached to the right side (e.g., `-->|label| B`)
-		if strings.HasPrefix(rightRaw, "|") {
-			pipeIdx := strings.Index(rightRaw[1:], "|")
-			if pipeIdx != -1 {
-				endIdx := pipeIdx + 2
-				rightRaw = strings.TrimSpace(rightRaw[endIdx:])
+			id := extractID(part, idRe)
+			if id != "" {
+				// If we found an ID, it must be in the valid map.
+				if !validIDMap[id] {
+					allValid = false
+					break
+				}
 			}
 		}
 
-		leftID := extractID(leftRaw, idRe)
-		rightID := extractID(rightRaw, idRe)
-
-		// If we successfully extracted two IDs, check if they are valid.
-		if leftID != "" && rightID != "" {
-			if validIDMap[leftID] && validIDMap[rightID] {
-				sb.WriteString(line + "\n")
-			}
-			// If either is invalid (private), we skip the line.
-		} else {
-			// Could not parse IDs clearly, preserve the line to be safe
+		if allValid {
 			sb.WriteString(line + "\n")
 		}
 	}

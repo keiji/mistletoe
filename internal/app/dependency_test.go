@@ -3,6 +3,7 @@ package app
 import (
 	"os"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -108,4 +109,96 @@ func contains(slice []string, item string) bool {
 		}
 	}
 	return false
+}
+
+func TestFilterDependencyContent(t *testing.T) {
+	input := `
+graph TD
+    A --> B
+    B --> C
+    C --> D
+    D --> A
+    A --> P
+    P --> B
+    X --- Y
+    Y --- Z
+    Z --- P
+    P[Private Repo]
+    A[Public A]
+`
+	validIDs := []string{"A", "B", "C", "D", "X", "Y", "Z"} // P is private
+
+	got := FilterDependencyContent(input, validIDs)
+
+	// Verify P is completely removed
+	if strings.Contains(got, "P") {
+		// "P" might appear in "Public A" label? No "Public A" has P.
+		// "Private Repo" has P.
+		// We should be careful.
+		// "A --> P" contains P.
+		// "P --> B" contains P.
+		// "Z --- P" contains P.
+		// "P[Private Repo]" contains P.
+
+		// If implementation is correct, lines with ID "P" should be gone.
+		// However, "P" inside a label of another node (e.g. A[Project P]) is allowed.
+		// In this test case, no valid ID uses P in label except "Public A" which has P.
+		// "A[Public A]" line should remain.
+
+		// Let's check specific lines removal.
+	}
+
+	if !strings.Contains(got, "A --> B") {
+		t.Error("Missing A --> B")
+	}
+	if !strings.Contains(got, "X --- Y") {
+		t.Error("Missing X --- Y")
+	}
+	if strings.Contains(got, "A --> P") {
+		t.Error("Should not contain A --> P")
+	}
+	if strings.Contains(got, "P --> B") {
+		t.Error("Should not contain P --> B")
+	}
+	if strings.Contains(got, "Z --- P") {
+		t.Error("Should not contain Z --- P")
+	}
+	if strings.Contains(got, "P[Private Repo]") {
+		t.Error("Should not contain node definition for P")
+	}
+	if !strings.Contains(got, "A[Public A]") {
+		t.Error("Should contain node definition for A")
+	}
+}
+
+func TestFilterDependencyContent_Chained(t *testing.T) {
+	input := `
+graph TD
+    A --> B --> C
+    A --> P --> C
+`
+	validIDs := []string{"A", "B", "C"} // P is private
+
+	// Chained arrows are tricky.
+	// The current logic works line by line and extracts 2 IDs.
+	// If the line has more than 2 IDs, the current ParseDependencies/FilterDependencyContent logic
+	// (which finds ONE arrow match) might only see the first pair.
+	// E.g. "A --> B --> C". arrowRe finds "-->". Left is "A", Right is "B --> C".
+	// RightID extraction might extract "B".
+	// So it sees A -> B.
+	// It doesn't process B -> C.
+
+	// If the implementation is simplistic (just checks left and right of first arrow),
+	// "A --> P --> C" might be seen as A -> P. And thus filtered out.
+	// "A --> B --> C" might be seen as A -> B. And preserved.
+
+	// Let's verify what we get.
+	got := FilterDependencyContent(input, validIDs)
+
+	if !strings.Contains(got, "A --> B --> C") {
+		t.Error("Should preserve A --> B --> C")
+	}
+	if strings.Contains(got, "A --> P --> C") {
+		t.Error("Should filter A --> P --> C")
+	}
 }
