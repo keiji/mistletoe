@@ -61,11 +61,13 @@ jobs:
       with:
         script: |
           const fs = require('fs');
+          const path = require('path');
           const execSync = require('child_process').execSync;
+          const formatCoverageReport = require(path.join(process.env.GITHUB_WORKSPACE, '.github/scripts/format_coverage.js'));
 
           try {
             const output = execSync('go tool cover -func=coverage.out').toString();
-            const body = '## Test Coverage Report\n\n```\n' + output + '\n```';
+            const body = formatCoverageReport(output);
 
             github.rest.issues.createComment({
               issue_number: context.issue.number,
