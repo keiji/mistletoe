@@ -23,8 +23,9 @@ def fail(msg):
     sys.exit(1)
 
 class MstlManualTest:
-    def __init__(self):
+    def __init__(self, runner):
         self.root_dir = os.getcwd()
+        self.runner = runner
         self.test_dir = None
         self.bin_path = None
         self.repos_dir = None
@@ -57,11 +58,15 @@ class MstlManualTest:
 
     def cleanup(self):
         if self.test_dir and os.path.exists(self.test_dir):
-            log("Cleaning up temporary directory...")
-            try:
-                shutil.rmtree(self.test_dir)
-            except Exception as e:
-                print(f"Cleanup failed: {e}")
+            print(f"\n[INFO] Temporary directory: {self.test_dir}")
+            if self.runner.ask_yes_no("Delete temporary directory?", default="yes"):
+                log("Cleaning up temporary directory...")
+                try:
+                    shutil.rmtree(self.test_dir)
+                except Exception as e:
+                    print(f"Cleanup failed: {e}")
+            else:
+                log("Skipped cleanup.")
 
     def run_cmd(self, cmd, cwd=None, check=True, input_str=None):
         print_green(f"[CMD] {' '.join(cmd)}")
@@ -259,7 +264,7 @@ class MstlManualTest:
 def main():
     runner = InteractiveRunner("mstl Core Functionality Test")
     runner.parse_args()
-    test = MstlManualTest()
+    test = MstlManualTest(runner)
 
     description = (
         "This test verifies the core functionality of 'mstl' (init, status, switch, push, sync, snapshot).\n"
