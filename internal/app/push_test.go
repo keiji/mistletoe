@@ -26,9 +26,10 @@ func TestHandlePush(t *testing.T) {
 	configureGitUser(t, repoPath)
 
 	// Config
+	master := "master"
 	config := conf.Config{
 		Repositories: &[]conf.Repository{
-			{ID: &id1, URL: &remoteURL},
+			{ID: &id1, URL: &remoteURL, Branch: &master},
 		},
 	}
 	configPath := filepath.Join(tmpDir, "repos.json")
