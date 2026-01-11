@@ -44,7 +44,7 @@ The core of Mistletoe is the configuration file (usually `config.json`) containi
 }
 ```
 
-*   **parallel** (Optional): The default number of parallel processes to use.
+*   **jobs** (Optional): The default number of concurrent jobs to use.
 *   **url** (Required): The remote URL of the Git repository.
 *   **id** (Optional): The directory name to clone into. If omitted, the name is derived from the URL.
 *   **branch** (Optional): The branch to checkout or switch to.
@@ -62,7 +62,7 @@ mstl-gh <command> [options] [arguments]
 
 Global options for most commands:
 *   `-f, --file <path>`: Path to the configuration file (e.g., `config.json`).
-*   `-p, --parallel <int>`: Number of parallel processes to use (default: 1, or value from config).
+*   `-j, --jobs <int>`: Number of concurrent jobs to use (default: 1, or value from config).
 *   `-v, --verbose`: Enable verbose output (shows executed git/gh commands).
 
 If the `-f` flag is omitted, `mstl` will attempt to read the configuration from **standard input (stdin)**.
@@ -91,7 +91,7 @@ mstl init -f <config_file> [options]
 **Options:**
 *   `--dest <path>`: Destination directory (default: current directory).
 *   `--depth <int>`: Create a shallow clone with a history truncated to the specified number of commits.
-*   `-p, --parallel <int>`: Number of parallel processes to use (default: 1).
+*   `-j, --jobs <int>`: Number of concurrent jobs to use (default: 1).
 *   `-v, --verbose`: Enable verbose output.
 
 #### `status`
@@ -104,7 +104,7 @@ mstl status -f <config_file> [options]
 ```
 
 **Options:**
-*   `-p, --parallel <int>`: Number of parallel processes to use (default: 1).
+*   `-j, --jobs <int>`: Number of concurrent jobs to use (default: 1).
 *   `-v, --verbose`: Enable verbose output.
 
 **Status Indicators:**
@@ -123,7 +123,7 @@ mstl push -f <config_file> [options]
 ```
 
 **Options:**
-*   `-p, --parallel <int>`: Number of parallel processes to use (default: 1).
+*   `-j, --jobs <int>`: Number of concurrent jobs to use (default: 1).
 *   `-v, --verbose`: Enable verbose output.
 
 #### `sync`
@@ -138,7 +138,7 @@ mstl sync -f <config_file> [options]
 ```
 
 **Options:**
-*   `-p, --parallel <int>`: Number of parallel processes to use (default: 1).
+*   `-j, --jobs <int>`: Number of concurrent jobs to use (default: 1).
 *   `-v, --verbose`: Enable verbose output.
 
 #### `switch`
@@ -156,7 +156,7 @@ mstl switch -f <config_file> -c <branch_name>
 
 **Options:**
 *   `-c, --create <branch_name>`: Create a new branch with the specified name and switch to it.
-*   `-p, --parallel <int>`: Number of parallel processes to use (default: 1).
+*   `-j, --jobs <int>`: Number of concurrent jobs to use (default: 1).
 *   `-v, --verbose`: Enable verbose output.
 
 #### `snapshot`
@@ -171,7 +171,7 @@ mstl snapshot [options]
 **Options:**
 *   `-o, --output-file <path>`: Path for the output configuration file. (Default: `mistletoe-snapshot-[id].json`)
 *   `-f, --file <path>`: Optional configuration file path. Used to resolve the `base-branch` field in the generated snapshot.
-*   `-p, --parallel <int>`: Number of parallel processes to use (default: 1).
+*   `-j, --jobs <int>`: Number of concurrent jobs to use (default: 1).
 *   `-v, --verbose`: Enable verbose output.
 
 #### `version`
@@ -215,7 +215,7 @@ mstl-gh pr create -f <config_file> [options]
 *   `--dependencies <path>`: Path to a Markdown file containing a Mermaid dependency graph.
 *   `--draft`: Create the Pull Request as a draft if supported by the repository.
 *   `-w, --overwrite`: Overwrite existing Pull Request description if creator matches or forced.
-*   `-p, --parallel <int>`: Number of parallel processes to use (default: 1).
+*   `-j, --jobs <int>`: Number of concurrent jobs to use (default: 1).
 *   `-v, --verbose`: Enable verbose output.
 *   If title/body are omitted, the default editor is opened.
 
@@ -259,7 +259,7 @@ mstl-gh pr update -f <config_file> [options]
 **Options:**
 *   `--dependencies <path>`: Path to a Markdown file containing a Mermaid dependency graph.
 *   `-w, --overwrite`: Overwrite existing Pull Request description if creator matches or forced.
-*   `-p, --parallel <int>`: Number of parallel processes to use (default: 1).
+*   `-j, --jobs <int>`: Number of concurrent jobs to use (default: 1).
 *   `-v, --verbose`: Enable verbose output.
 
 #### `pr checkout`
@@ -274,7 +274,7 @@ mstl-gh pr checkout -u <PR_URL> [options]
 **Options:**
 *   `-u, --url <string>`: The URL of the Pull Request containing the snapshot (Required).
 *   `--dest <path>`: Destination directory (default: current directory).
-*   `-p, --parallel <int>`: Number of parallel processes to use (default: 1).
+*   `-j, --jobs <int>`: Number of concurrent jobs to use (default: 1).
 *   `-v, --verbose`: Enable verbose output.
 
 #### `pr status`
@@ -287,7 +287,7 @@ mstl-gh pr status -f <config_file> [options]
 ```
 
 **Options:**
-*   `-p, --parallel <int>`: Number of parallel processes to use (default: 1).
+*   `-j, --jobs <int>`: Number of concurrent jobs to use (default: 1).
 *   `-v, --verbose`: Enable verbose output.
 
 ## Manual Tests
