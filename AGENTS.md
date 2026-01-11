@@ -21,7 +21,6 @@
     *   Ensure tests cover edge cases and error conditions.
 *   **Manual Tests**:
     *   Refer to `manual_tests/index.md` for manual test implementation guidelines.
-    *   **Specification Integrity**: Changing the binary specification to accommodate test cases is strictly prohibited. Adjusting design for testability (e.g., dependency injection) is allowed, but modifying the core specification itself (e.g., changing configuration path resolution logic solely for tests) is not permitted.
 
 # Pull Request Guidelines
 
