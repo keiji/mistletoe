@@ -137,7 +137,8 @@ class MstlManualTest:
 
     def test_status_clean(self):
         log("Testing 'status' (Clean)...")
-        res = self.run_cmd([self.bin_path, "status", "-f", self.config_file, "--ignore-stdin"], cwd=self.repos_dir)
+        # After init, we should rely on the local .mstl/config.json
+        res = self.run_cmd([self.bin_path, "status", "--ignore-stdin"], cwd=self.repos_dir)
 
         # Filter out legend
         output_lines = [line for line in res.stdout.splitlines() if "Status Legend" not in line]
@@ -148,7 +149,7 @@ class MstlManualTest:
 
     def test_switch(self):
         log("Testing 'switch'...")
-        self.run_cmd([self.bin_path, "switch", "-f", self.config_file, "-c", "feature/test-branch", "--ignore-stdin"], cwd=self.repos_dir)
+        self.run_cmd([self.bin_path, "switch", "-c", "feature/test-branch", "--ignore-stdin"], cwd=self.repos_dir)
 
         # Verify
         res = self.run_cmd(["git", "symbolic-ref", "--short", "HEAD"], cwd=os.path.join(self.repos_dir, "repo1"))
@@ -166,12 +167,12 @@ class MstlManualTest:
         self.run_cmd(["git", "commit", "-m", "Update repo1"], cwd=repo1_path)
 
         # Verify status shows unpushed (>)
-        res = self.run_cmd([self.bin_path, "status", "-f", self.config_file, "--ignore-stdin"], cwd=self.repos_dir)
+        res = self.run_cmd([self.bin_path, "status", "--ignore-stdin"], cwd=self.repos_dir)
         if ">" not in res.stdout:
             fail("Status did not show unpushed commit (>)")
 
         log("Running push (with input 'yes')...")
-        self.run_cmd([self.bin_path, "push", "-f", self.config_file, "--ignore-stdin"], cwd=self.repos_dir, input_str="yes\n")
+        self.run_cmd([self.bin_path, "push", "--ignore-stdin"], cwd=self.repos_dir, input_str="yes\n")
 
         # Verify remote
         self.run_cmd(["git", "fetch", "origin"], cwd=os.path.join(self.seed_dir, "repo1")) # Use seed dir to check remote
@@ -184,7 +185,7 @@ class MstlManualTest:
         log("Testing 'sync'...")
         # Switch back to main
         log("Switching back to main for sync test...")
-        self.run_cmd([self.bin_path, "switch", "-f", self.config_file, "main", "--ignore-stdin"], cwd=self.repos_dir)
+        self.run_cmd([self.bin_path, "switch", "main", "--ignore-stdin"], cwd=self.repos_dir)
 
         # Update remote repo2
         repo2_seed = os.path.join(self.seed_dir, "repo2")
@@ -196,12 +197,12 @@ class MstlManualTest:
         self.run_cmd(["git", "push", "origin", "main"], cwd=repo2_seed)
 
         # Verify status shows pullable (<)
-        res = self.run_cmd([self.bin_path, "status", "-f", self.config_file, "--ignore-stdin"], cwd=self.repos_dir)
+        res = self.run_cmd([self.bin_path, "status", "--ignore-stdin"], cwd=self.repos_dir)
         if "<" not in res.stdout:
             fail("Status did not show pullable commit (<)")
 
         log("Running sync...")
-        self.run_cmd([self.bin_path, "sync", "-f", self.config_file, "--ignore-stdin"], cwd=self.repos_dir)
+        self.run_cmd([self.bin_path, "sync", "--ignore-stdin"], cwd=self.repos_dir)
 
         # Verify local repo2
         with open(os.path.join(self.repos_dir, "repo2", "README.md"), "r") as f:
