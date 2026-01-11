@@ -31,6 +31,7 @@ Before creating a Pull Request, ensure that you verify not only that the build s
     *   **Zero Tolerance**: All linting errors, including "unused" variables or functions, must be resolved before submission.
     *   Test files (`_test.go`) are excluded from linting.
 *   **Test Requirements**:
+    *   **Strict Rule: Commits are only allowed when ALL unit tests PASS. No commit is permitted if even one unit test fails. This is a top priority.**
     *   You **MUST** ensure that all tests pass before committing code.
     *   Run `go test -v ./...` to verify functionality locally.
 
