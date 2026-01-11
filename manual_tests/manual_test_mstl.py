@@ -23,8 +23,9 @@ def fail(msg):
     sys.exit(1)
 
 class MstlManualTest:
-    def __init__(self):
+    def __init__(self, runner):
         self.root_dir = os.getcwd()
+        self.runner = runner
         self.test_dir = None
         self.bin_path = None
         self.repos_dir = None
@@ -34,7 +35,12 @@ class MstlManualTest:
 
     def setup(self):
         self.test_dir = tempfile.mkdtemp(prefix="mstl_test_")
-        self.bin_path = os.path.join(self.test_dir, "bin", "mstl")
+        # Use pre-built binary relative to this script
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        self.bin_path = os.path.abspath(os.path.join(script_dir, "../bin/mstl"))
+        if sys.platform == "win32":
+            self.bin_path += ".exe"
+
         self.repos_dir = os.path.join(self.test_dir, "repos")
         self.remote_dir = os.path.join(self.test_dir, "remotes")
         self.config_file = os.path.join(self.test_dir, "mstl_config.json")
@@ -52,13 +58,18 @@ class MstlManualTest:
 
     def cleanup(self):
         if self.test_dir and os.path.exists(self.test_dir):
-            log("Cleaning up temporary directory...")
-            try:
-                shutil.rmtree(self.test_dir)
-            except Exception as e:
-                print(f"Cleanup failed: {e}")
+            print(f"\n[INFO] Temporary directory: {self.test_dir}")
+            if self.runner.ask_yes_no("Delete temporary directory?", default="yes"):
+                log("Cleaning up temporary directory...")
+                try:
+                    shutil.rmtree(self.test_dir)
+                except Exception as e:
+                    print(f"Cleanup failed: {e}")
+            else:
+                log("Skipped cleanup.")
 
     def run_cmd(self, cmd, cwd=None, check=True, input_str=None):
+        print_green(f"[CMD] {' '.join(cmd)}")
         try:
             result = subprocess.run(
                 cmd,
@@ -69,28 +80,14 @@ class MstlManualTest:
                 input=input_str,
                 env=os.environ
             )
+            print(result.stdout)
+            if result.stderr:
+                print(result.stderr)
             return result
         except subprocess.CalledProcessError as e:
             if check:
                 fail(f"Command failed: {' '.join(cmd)}\nStderr: {e.stderr}\nStdout: {e.stdout}")
             return e
-
-    def build_mstl(self):
-        log("Building mstl...")
-        os.makedirs(os.path.dirname(self.bin_path), exist_ok=True)
-        self.run_cmd(["go", "build", "-o", self.bin_path, "./cmd/mstl"], cwd=self.root_dir)
-
-        # Verify version
-        res = self.run_cmd([self.bin_path, "version"])
-        if "mstl version" not in res.stdout:
-            fail("mstl version command failed")
-
-        # Verify help
-        res = self.run_cmd([self.bin_path, "help"])
-        if "Usage:" not in res.stdout:
-            fail("mstl help command failed")
-
-        log("Build success")
 
     def setup_remotes(self):
         log("Setting up remote repositories...")
@@ -141,7 +138,14 @@ class MstlManualTest:
     def test_init(self):
         log("Testing 'init'...")
         os.makedirs(self.repos_dir, exist_ok=True)
-        self.run_cmd([self.bin_path, "init", "-f", self.config_file, "--ignore-stdin"], cwd=self.repos_dir)
+        self.run_cmd([self.bin_path, "init", "-f", self.config_file, "--verbose", "--ignore-stdin"], cwd=self.repos_dir)
+
+        print_green("[DEBUG] Listing files in repos_dir:")
+        for root, dirs, files in os.walk(self.repos_dir):
+            for name in dirs:
+                print(os.path.join(root, name))
+            for name in files:
+                print(os.path.join(root, name))
 
         if not os.path.isdir(os.path.join(self.repos_dir, "repo1")) or not os.path.isdir(os.path.join(self.repos_dir, "repo2")):
             fail("Repositories not cloned")
@@ -149,7 +153,8 @@ class MstlManualTest:
 
     def test_status_clean(self):
         log("Testing 'status' (Clean)...")
-        res = self.run_cmd([self.bin_path, "status", "-f", self.config_file, "--ignore-stdin"], cwd=self.repos_dir)
+        # After init, we should rely on the local .mstl/config.json
+        res = self.run_cmd([self.bin_path, "status", "--verbose", "--ignore-stdin"], cwd=self.repos_dir)
 
         # Filter out legend
         output_lines = [line for line in res.stdout.splitlines() if "Status Legend" not in line]
@@ -160,7 +165,7 @@ class MstlManualTest:
 
     def test_switch(self):
         log("Testing 'switch'...")
-        self.run_cmd([self.bin_path, "switch", "-f", self.config_file, "-c", "feature/test-branch", "--ignore-stdin"], cwd=self.repos_dir)
+        self.run_cmd([self.bin_path, "switch", "-c", "feature/test-branch", "--verbose", "--ignore-stdin"], cwd=self.repos_dir)
 
         # Verify
         res = self.run_cmd(["git", "symbolic-ref", "--short", "HEAD"], cwd=os.path.join(self.repos_dir, "repo1"))
@@ -178,12 +183,12 @@ class MstlManualTest:
         self.run_cmd(["git", "commit", "-m", "Update repo1"], cwd=repo1_path)
 
         # Verify status shows unpushed (>)
-        res = self.run_cmd([self.bin_path, "status", "-f", self.config_file, "--ignore-stdin"], cwd=self.repos_dir)
+        res = self.run_cmd([self.bin_path, "status", "--verbose", "--ignore-stdin"], cwd=self.repos_dir)
         if ">" not in res.stdout:
             fail("Status did not show unpushed commit (>)")
 
         log("Running push (with input 'yes')...")
-        self.run_cmd([self.bin_path, "push", "-f", self.config_file, "--ignore-stdin"], cwd=self.repos_dir, input_str="yes\n")
+        self.run_cmd([self.bin_path, "push", "--verbose", "--ignore-stdin"], cwd=self.repos_dir, input_str="yes\n")
 
         # Verify remote
         self.run_cmd(["git", "fetch", "origin"], cwd=os.path.join(self.seed_dir, "repo1")) # Use seed dir to check remote
@@ -196,7 +201,7 @@ class MstlManualTest:
         log("Testing 'sync'...")
         # Switch back to main
         log("Switching back to main for sync test...")
-        self.run_cmd([self.bin_path, "switch", "-f", self.config_file, "main", "--ignore-stdin"], cwd=self.repos_dir)
+        self.run_cmd([self.bin_path, "switch", "main", "--ignore-stdin"], cwd=self.repos_dir)
 
         # Update remote repo2
         repo2_seed = os.path.join(self.seed_dir, "repo2")
@@ -208,12 +213,12 @@ class MstlManualTest:
         self.run_cmd(["git", "push", "origin", "main"], cwd=repo2_seed)
 
         # Verify status shows pullable (<)
-        res = self.run_cmd([self.bin_path, "status", "-f", self.config_file, "--ignore-stdin"], cwd=self.repos_dir)
+        res = self.run_cmd([self.bin_path, "status", "--verbose", "--ignore-stdin"], cwd=self.repos_dir)
         if "<" not in res.stdout:
             fail("Status did not show pullable commit (<)")
 
         log("Running sync...")
-        self.run_cmd([self.bin_path, "sync", "-f", self.config_file, "--ignore-stdin"], cwd=self.repos_dir)
+        self.run_cmd([self.bin_path, "sync", "--verbose", "--ignore-stdin"], cwd=self.repos_dir)
 
         # Verify local repo2
         with open(os.path.join(self.repos_dir, "repo2", "README.md"), "r") as f:
@@ -246,7 +251,6 @@ class MstlManualTest:
 
     def run_logic(self):
         self.setup()
-        self.build_mstl()
         self.setup_remotes()
         self.create_config()
         self.test_init()
@@ -259,7 +263,8 @@ class MstlManualTest:
 
 def main():
     runner = InteractiveRunner("mstl Core Functionality Test")
-    test = MstlManualTest()
+    runner.parse_args()
+    test = MstlManualTest(runner)
 
     description = (
         "This test verifies the core functionality of 'mstl' (init, status, switch, push, sync, snapshot).\n"

@@ -18,7 +18,6 @@ def main():
     print_green("[-] Setting up test environment...")
     try:
         env.generate_repo_names(4)
-        env.build_mstl_gh()
     except Exception as e:
         print_green(f"[FATAL] Setup failed: {e}")
         runner.log("Setup failed", status="FAILED")

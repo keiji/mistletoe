@@ -25,6 +25,7 @@ def run_command(cmd, cwd=None, env=None):
 
 def main():
     runner = InteractiveRunner("'pr create' Safety Check Test")
+    runner.parse_args()
 
     # Define vars to be used in cleanup
     test_dir_ptr = {"path": None}
@@ -50,13 +51,17 @@ def main():
 
         print_green(f"Test directory: {test_dir}")
 
-        # Build mstl-gh
-        print_green("Building mstl-gh...")
-        mstl_gh_bin = os.path.join(test_dir, "mstl-gh")
+        # Use pre-built mstl-gh
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        mstl_gh_bin = os.path.abspath(os.path.join(script_dir, "../bin/mstl-gh"))
         if sys.platform == "win32":
             mstl_gh_bin += ".exe"
 
-        subprocess.run(f"go build -o {mstl_gh_bin} ./cmd/mstl-gh", shell=True, check=True)
+        if not os.path.exists(mstl_gh_bin):
+            print_green(f"[ERROR] mstl-gh binary not found at {mstl_gh_bin}. Please run build_all.sh first.")
+            sys.exit(1)
+
+        print_green(f"Using mstl-gh: {mstl_gh_bin}")
 
         # Create Bare Remote Repo
         remote_dir = os.path.join(test_dir, "remote-a.git")

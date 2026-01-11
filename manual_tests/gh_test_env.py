@@ -18,9 +18,15 @@ class GhTestEnv:
         self.uuid = str(uuid.uuid4())[:8]
 
         # Determine paths
-        self.mstl_bin = os.path.abspath(os.path.join(self.cwd, "mstl-gh"))
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        self.mstl_bin = os.path.abspath(os.path.join(script_dir, "../bin/mstl-gh"))
         if sys.platform == "win32":
             self.mstl_bin += ".exe"
+
+        if not os.path.exists(self.mstl_bin):
+            print_green(f"[ERROR] mstl-gh binary not found at {self.mstl_bin}. Please run build_all.sh first.")
+            # We don't exit here because generate_repo_names might be called before build in old logic, but now build is pre-req.
+            # However, existing scripts call build_mstl_gh explicitly. We should probably remove those calls or make them no-ops.
 
         self.test_dir = os.path.join(self.cwd, f"test_workspace_{self.uuid}")
         self.config_file = os.path.join(self.test_dir, "mistletoe.json")
@@ -70,13 +76,6 @@ class GhTestEnv:
             return True
         except subprocess.CalledProcessError:
             return False
-
-    def build_mstl_gh(self):
-        print_green(f"[-] Building mstl-gh...")
-        subprocess.run(
-            ["go", "build", "-o", self.mstl_bin, "cmd/mstl-gh/main.go"],
-            cwd=self.cwd, check=True
-        )
 
     def setup_repos(self, visibility=VISIBILITY_PRIVATE):
         if visibility not in [self.VISIBILITY_PRIVATE, self.VISIBILITY_PUBLIC]:
