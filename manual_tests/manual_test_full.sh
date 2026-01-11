@@ -36,4 +36,7 @@ python3 "$SCRIPT_DIR/manual_test_gh_pr_update.py" --output "$OUTPUT_FILE"
 echo "Running manual_test_gh_pr_checkout.py..."
 python3 "$SCRIPT_DIR/manual_test_gh_pr_checkout.py" --output "$OUTPUT_FILE"
 
+echo "Running temp_repos_cleanup.py..."
+python3 "$SCRIPT_DIR/temp_repos_cleanup.py"
+
 echo "Full Manual Test Completed."
