@@ -2,6 +2,7 @@
 /mstl
 /mistletoe
 /mstl-gh
+/bin/
 
 # Coverage
 coverage.out
