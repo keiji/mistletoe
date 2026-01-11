@@ -22,8 +22,8 @@ func handleSnapshot(args []string, opts GlobalOptions) {
 		oShort    string
 		fLong     string
 		fShort    string
-		pVal      int
-		pValShort int
+		jVal      int
+		jValShort int
 		vLong     bool
 		vShort    bool
 	)
@@ -32,8 +32,8 @@ func handleSnapshot(args []string, opts GlobalOptions) {
 	fs.StringVar(&oShort, "o", "", "output file path (shorthand)")
 	fs.StringVar(&fLong, "file", DefaultConfigFile, "configuration file")
 	fs.StringVar(&fShort, "f", DefaultConfigFile, "configuration file (shorthand)")
-	fs.IntVar(&pVal, "parallel", -1, "number of parallel processes")
-	fs.IntVar(&pValShort, "p", -1, "number of parallel processes (shorthand)")
+	fs.IntVar(&jVal, "jobs", -1, "number of concurrent jobs")
+	fs.IntVar(&jValShort, "j", -1, "number of concurrent jobs (shorthand)")
 	var ignoreStdin bool
 	fs.BoolVar(&ignoreStdin, "ignore-stdin", false, "Ignore standard input")
 	fs.BoolVar(&vLong, "verbose", false, "Enable verbose output")
@@ -51,7 +51,7 @@ func handleSnapshot(args []string, opts GlobalOptions) {
 
 	// Load conf.Config (Optional) to resolve base branches
 	var config *conf.Config
-	configPath, parallel, configData, err := ResolveCommonValues(fLong, fShort, pVal, pValShort, ignoreStdin)
+	configPath, jobs, configData, err := ResolveCommonValues(fLong, fShort, jVal, jValShort, ignoreStdin)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -69,29 +69,29 @@ func handleSnapshot(args []string, opts GlobalOptions) {
 		}
 	}
 
-	// Resolve Parallel (Config fallback)
-	if parallel == -1 {
-		if config != nil && config.Parallel != nil {
-			parallel = *config.Parallel
+	// Resolve Jobs (Config fallback)
+	if jobs == -1 {
+		if config != nil && config.Jobs != nil {
+			jobs = *config.Jobs
 		} else {
-			parallel = DefaultParallel
+			jobs = DefaultJobs
 		}
 	}
 
 	// Verbose Override
 	verbose := vLong || vShort
-	if verbose && parallel > 1 {
-		fmt.Println("Verbose is specified, so parallel is treated as 1.")
-		parallel = 1
+	if verbose && jobs > 1 {
+		fmt.Println("Verbose is specified, so jobs is treated as 1.")
+		jobs = 1
 	}
 
 	// Final Validation
-	if parallel < MinParallel {
-		fmt.Printf("Error: Parallel must be at least %d.\n", MinParallel)
+	if jobs < MinJobs {
+		fmt.Printf("Error: Jobs must be at least %d.\n", MinJobs)
 		os.Exit(1)
 	}
-	if parallel > MaxParallel {
-		fmt.Printf("Error: Parallel must be at most %d.\n", MaxParallel)
+	if jobs > MaxJobs {
+		fmt.Printf("Error: Jobs must be at most %d.\n", MaxJobs)
 		os.Exit(1)
 	}
 
@@ -116,7 +116,7 @@ func handleSnapshot(args []string, opts GlobalOptions) {
 	var repos []conf.Repository
 	var mu sync.Mutex
 	var wg sync.WaitGroup
-	sem := make(chan struct{}, parallel)
+	sem := make(chan struct{}, jobs)
 
 	for _, dirName := range validDirs {
 		wg.Add(1)

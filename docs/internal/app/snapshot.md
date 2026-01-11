@@ -16,7 +16,7 @@ mstl snapshot [options]
 | :--- | :--- | :--- | :--- |
 | `--output-file` | `-o` | 出力する設定ファイルのパス。 | `mistletoe-snapshot-[identifier].json` |
 | `--file` | `-f` | 参照元の設定ファイル（ベース情報の取得用）。標準入力を使用する場合、データは Base64 エンコードされている必要があります。 | `.mstl/config.json` |
-| `--parallel` | `-p` | 並列実行数。1から128の間で指定します。 | `1` |
+| `--jobs` | `-j` | 並列実行数。1から128の間で指定します。 | `1` |
 | `--ignore-stdin` | | 標準入力を無視する | false |
 | `--verbose` | `-v` | デバッグ用の詳細ログを出力（実行された git コマンドを表示） | false |
 

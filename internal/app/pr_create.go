@@ -21,8 +21,8 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 	var (
 		fLong      string
 		fShort     string
-		pVal       int
-		pValShort  int
+		jVal       int
+		jValShort  int
 		tLong      string
 		tShort     string
 		bLong      string
@@ -37,8 +37,8 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 
 	fs.StringVar(&fLong, "file", DefaultConfigFile, "Configuration file path")
 	fs.StringVar(&fShort, "f", DefaultConfigFile, "Configuration file path (shorthand)")
-	fs.IntVar(&pVal, "parallel", -1, "Number of parallel processes")
-	fs.IntVar(&pValShort, "p", -1, "Number of parallel processes (shorthand)")
+	fs.IntVar(&jVal, "jobs", -1, "Number of concurrent jobs")
+	fs.IntVar(&jValShort, "j", -1, "Number of concurrent jobs (shorthand)")
 	fs.StringVar(&tLong, "title", "", "Pull Request title")
 	fs.StringVar(&tShort, "t", "", "Pull Request title (shorthand)")
 	fs.StringVar(&bLong, "body", "", "Pull Request body")
@@ -58,7 +58,7 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 	}
 
 	// Resolve common values
-	configPath, parallel, configData, err := ResolveCommonValues(fLong, fShort, pVal, pValShort, ignoreStdin)
+	configPath, jobs, configData, err := ResolveCommonValues(fLong, fShort, jVal, jValShort, ignoreStdin)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -98,28 +98,28 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 		os.Exit(1)
 	}
 
-	// Resolve Parallel (Config fallback)
-	if parallel == -1 {
-		if config.Parallel != nil {
-			parallel = *config.Parallel
+	// Resolve Jobs (Config fallback)
+	if jobs == -1 {
+		if config.Jobs != nil {
+			jobs = *config.Jobs
 		} else {
-			parallel = DefaultParallel
+			jobs = DefaultJobs
 		}
 	}
 
 	// Verbose Override
-	if verbose && parallel > 1 {
-		fmt.Println("Verbose is specified, so parallel is treated as 1.")
-		parallel = 1
+	if verbose && jobs > 1 {
+		fmt.Println("Verbose is specified, so jobs is treated as 1.")
+		jobs = 1
 	}
 
 	// Final Validation
-	if parallel < MinParallel {
-		fmt.Printf("Error: Parallel must be at least %d.\n", MinParallel)
+	if jobs < MinJobs {
+		fmt.Printf("Error: Jobs must be at least %d.\n", MinJobs)
 		os.Exit(1)
 	}
-	if parallel > MaxParallel {
-		fmt.Printf("Error: Parallel must be at most %d.\n", MaxParallel)
+	if jobs > MaxJobs {
+		fmt.Printf("Error: Jobs must be at most %d.\n", MaxJobs)
 		os.Exit(1)
 	}
 
@@ -158,9 +158,9 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 	spinner := NewSpinner(verbose)
 	spinner.Start()
 	// Pass noFetch=true to CollectStatus. We rely on subsequent checks.
-	rows := CollectStatus(config, parallel, opts.GitPath, verbose, true)
+	rows := CollectStatus(config, jobs, opts.GitPath, verbose, true)
 	// Initial Check: No known PRs yet
-	prRows := CollectPrStatus(rows, config, parallel, opts.GhPath, verbose, nil)
+	prRows := CollectPrStatus(rows, config, jobs, opts.GhPath, verbose, nil)
 	spinner.Stop()
 	RenderPrStatusTable(Stdout, prRows)
 
@@ -325,7 +325,7 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 		prExistsMapURLs[k] = urls
 	}
 
-	_, err = verifyGithubRequirements(activeRepos, config.BaseDir, rows, parallel, opts.GitPath, opts.GhPath, verbose, prExistsMapURLs)
+	_, err = verifyGithubRequirements(activeRepos, config.BaseDir, rows, jobs, opts.GitPath, opts.GhPath, verbose, prExistsMapURLs)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -341,7 +341,7 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 
 	if len(pushList) > 0 {
 		fmt.Println("Pushing changes...")
-		if err := executePush(pushList, config.BaseDir, rows, parallel, opts.GitPath, verbose); err != nil {
+		if err := executePush(pushList, config.BaseDir, rows, jobs, opts.GitPath, verbose); err != nil {
 			fmt.Printf("error during push: %v\n", err)
 			os.Exit(1)
 		}
@@ -360,7 +360,7 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 		placeholderBlock := GeneratePlaceholderMistletoeBody()
 		prBodyWithPlaceholder := EmbedMistletoeBody(prBody, placeholderBlock)
 
-		createdMap, err := executePrCreationOnly(createList, rows, parallel, opts.GhPath, verbose, prTitle, prBodyWithPlaceholder, draft)
+		createdMap, err := executePrCreationOnly(createList, rows, jobs, opts.GhPath, verbose, prTitle, prBodyWithPlaceholder, draft)
 		if err != nil {
 			fmt.Printf("error during PR creation: %v\n", err)
 			os.Exit(1)
@@ -389,7 +389,7 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 	fmt.Println("Updating Pull Request descriptions...")
 	// We pass finalPrMap (containing ALL PRs, including merged/closed) to ensure Related Links are complete.
 	// updatePrDescriptions will internally filter which PRs to actually update (Open/Draft only).
-	if err := updatePrDescriptions(finalPrMap, parallel, opts.GhPath, verbose, string(snapshotData), filename, deps, depContent, overwrite); err != nil {
+	if err := updatePrDescriptions(finalPrMap, jobs, opts.GhPath, verbose, string(snapshotData), filename, deps, depContent, overwrite); err != nil {
 		fmt.Printf("error updating descriptions: %v\n", err)
 		os.Exit(1)
 	}
@@ -398,10 +398,10 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 	fmt.Println("Collecting final status...")
 	spinner = NewSpinner(verbose)
 	spinner.Start()
-	finalRows := CollectStatus(config, parallel, opts.GitPath, verbose, true)
+	finalRows := CollectStatus(config, jobs, opts.GitPath, verbose, true)
 
 	// Updated to pass finalPrMap directly
-	finalPrRows := CollectPrStatus(finalRows, config, parallel, opts.GhPath, verbose, finalPrMap)
+	finalPrRows := CollectPrStatus(finalRows, config, jobs, opts.GhPath, verbose, finalPrMap)
 	spinner.Stop()
 
 	// Filter for Display (Open or Draft only)
@@ -419,10 +419,10 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 
 // executePrCreationOnly creates PRs for the given repositories.
 // Returns a map of RepoName -> PR URL.
-func executePrCreationOnly(repos []conf.Repository, rows []StatusRow, parallel int, ghPath string, verbose bool, title, body string, draft bool) (map[string]string, error) {
+func executePrCreationOnly(repos []conf.Repository, rows []StatusRow, jobs int, ghPath string, verbose bool, title, body string, draft bool) (map[string]string, error) {
 	var mu sync.Mutex
 	var wg sync.WaitGroup
-	sem := make(chan struct{}, parallel)
+	sem := make(chan struct{}, jobs)
 	var errs []string
 	prMap := make(map[string]string)
 
