@@ -128,9 +128,6 @@ class MstlManualTestSyncConflict:
         # Use --ignore-stdin to prevent mstl from treating piped env/execution as config input
         self.run_cmd([self.bin_path, "init", "-f", self.config_file, "--ignore-stdin"], cwd=self.repos_dir)
 
-        # Copy config to root to workaround path resolution issue with .mstl/config.json in tests
-        shutil.copy(os.path.join(self.repos_dir, ".mstl", "config.json"), os.path.join(self.repos_dir, "config.json"))
-
         # 1. Create a conflict scenario
         log("Creating conflict scenario...")
 
@@ -152,7 +149,7 @@ class MstlManualTestSyncConflict:
         # 2. Check Status
         log("Checking status (should show conflict or divergence)...")
         # Use --ignore-stdin just in case
-        res = self.run_cmd([self.bin_path, "status", "-f", "config.json", "--ignore-stdin"], cwd=self.repos_dir)
+        res = self.run_cmd([self.bin_path, "status", "--ignore-stdin"], cwd=self.repos_dir)
         print(res.stdout)
 
         if "!" not in res.stdout:
@@ -162,7 +159,7 @@ class MstlManualTestSyncConflict:
         log("Running sync (expecting failure or conflict)...")
 
         # Pass "merge" to prompts, but use --ignore-stdin so ResolveCommonValues doesn't eat it as config
-        res = self.run_cmd([self.bin_path, "sync", "-f", "config.json", "--ignore-stdin"], cwd=self.repos_dir, input_str="merge\n", check=False)
+        res = self.run_cmd([self.bin_path, "sync", "--ignore-stdin"], cwd=self.repos_dir, input_str="merge\n", check=False)
 
         # It should NOT succeed. 'git pull --no-rebase' returns 1 on conflict.
         if res.returncode == 0:
