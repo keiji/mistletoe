@@ -16,6 +16,7 @@ class InteractiveRunner:
         self.args = None
         self.log_file = None
         self.test_name = description
+        self.parse_args()
 
     def parse_args(self):
         self.args = self.parser.parse_args()
