@@ -104,21 +104,21 @@ func TestMstlAndMstlGhCompatibility(t *testing.T) {
 
 		// Run mstl init
 		dirMstl := t.TempDir()
-		configDirMstl := t.TempDir()
-		configFileMstl := filepath.Join(configDirMstl, "repos.json")
+		// Use same dir for config to ensure BaseDir resolves correctly to CWD/TestDir
+		configFileMstl := filepath.Join(dirMstl, "repos.json")
 		if err := os.WriteFile(configFileMstl, []byte(configContent), 0644); err != nil {
 			t.Fatalf("failed to write config: %v", err)
 		}
 
-		cmd := exec.Command(binMstl, "init", "-f", configFileMstl)
-		// init creates repos in CWD unless configured otherwise.
+		// Note: passing --ignore-stdin to prevent CI environment issues
+		cmd := exec.Command(binMstl, "init", "-f", configFileMstl, "--ignore-stdin")
+		// init creates repos in config dir (BaseDir) or CWD. Here config is in dirMstl.
 		cmd.Dir = dirMstl
 		if out, err := cmd.CombinedOutput(); err != nil {
 			t.Fatalf("mstl init failed: %v\n%s", err, out)
 		}
 
 		// Verify mstl status
-		// Note: passing --ignore-stdin to prevent CI environment issues
 		cmdStatus := exec.Command(binMstl, "status", "-f", configFileMstl, "--ignore-stdin")
 		cmdStatus.Dir = dirMstl
 		if out, err := cmdStatus.CombinedOutput(); err != nil {
@@ -131,8 +131,7 @@ func TestMstlAndMstlGhCompatibility(t *testing.T) {
 
 		// Run mstl-gh init
 		dirMstlGh := t.TempDir()
-		configDirMstlGh := t.TempDir()
-		configFileMstlGh := filepath.Join(configDirMstlGh, "repos.json")
+		configFileMstlGh := filepath.Join(dirMstlGh, "repos.json")
 		if err := os.WriteFile(configFileMstlGh, []byte(configContent), 0644); err != nil {
 			t.Fatalf("failed to write config: %v", err)
 		}
