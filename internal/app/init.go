@@ -5,6 +5,7 @@ import (
 )
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -357,6 +358,10 @@ func handleInit(args []string, opts GlobalOptions) {
 		os.Exit(1)
 	}
 
+	// Post-init: Create .mstl directory and save config/dependencies
+	// "Reading source file is not performed. We write what is loaded in memory."
+	// Also filter out private repositories.
+
 	// Check if we should skip overwriting config/dependencies
 	// "If .mstl/config.json was read (explicitly specified or used as default), do not overwrite"
 	shouldSkipWrite := false
@@ -368,32 +373,30 @@ func handleInit(args []string, opts GlobalOptions) {
 	}
 
 	if !shouldSkipWrite {
-		// Post-init: Create .mstl directory and save config/dependencies
 		mstlDir := ".mstl"
 		if err := os.MkdirAll(mstlDir, 0755); err != nil {
 			fmt.Printf("Warning: Failed to create .mstl directory: %v\n", err)
 			return
 		}
 
-		// Save config.json
-		// If loaded from file, we read it again to copy (preserving comments/structure if possible,
-		// but conf.LoadConfigFile returns parsed struct. Ideally we copy original bytes).
-		// Since we have configData (from pipe) or we can read configFile.
-		var dataToWrite []byte
-		if configFile != "" {
-			var errRead error
-			dataToWrite, errRead = os.ReadFile(configFile)
-			if errRead != nil {
-				// Should not happen as we loaded it successfully before
-				fmt.Printf("Warning: Failed to read config file for copying: %v\n", errRead)
+		// Filter config
+		var filteredRepos []conf.Repository
+		for _, repo := range *config.Repositories {
+			if repo.Private != nil && *repo.Private {
+				continue
 			}
-		} else {
-			dataToWrite = configData
+			filteredRepos = append(filteredRepos, repo)
 		}
+		filteredConfig := *config
+		filteredConfig.Repositories = &filteredRepos
 
-		if len(dataToWrite) > 0 {
+		// Marshal filtered config
+		configBytes, err := json.MarshalIndent(filteredConfig, "", "  ")
+		if err != nil {
+			fmt.Printf("Warning: Failed to marshal configuration: %v\n", err)
+		} else {
 			configPath := filepath.Join(mstlDir, "config.json")
-			if err := os.WriteFile(configPath, dataToWrite, 0644); err != nil {
+			if err := os.WriteFile(configPath, configBytes, 0644); err != nil {
 				fmt.Printf("Warning: Failed to write %s: %v\n", configPath, err)
 			} else {
 				fmt.Printf("Configuration saved to %s\n", configPath)
@@ -403,10 +406,7 @@ func handleInit(args []string, opts GlobalOptions) {
 		// Save dependencies.md (Mermaid graph with nodes only)
 		depPath := filepath.Join(mstlDir, "dependencies.md")
 		graphContent := "```mermaid\ngraph TD\n"
-		for _, repo := range *config.Repositories {
-			// We need getRepoName here. It is in utils.go or pr_common.go but not exported?
-			// Check if it is available. It is in pr_common.go as 'getRepoName'.
-			// It is not exported. But internal/app package shares the scope.
+		for _, repo := range filteredRepos {
 			name := getRepoName(repo)
 			graphContent += fmt.Sprintf("    %s\n", name)
 		}

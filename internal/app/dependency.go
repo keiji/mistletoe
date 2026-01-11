@@ -49,9 +49,19 @@ func ParseDependencies(content string, validIDs []string) (*DependencyGraph, err
 	// 1. Simple arrows: -->, ---, -.->, ==>
 	// 2. Labeled arrows: -- text -->, == text ==>, -. text .->
 	// This regex is simplified to catch the arrow part.
-	// It looks for a sequence starting with <, -, or = and ending with >.
-	// It handles the "middle" part for labels.
-	arrowRe := regexp.MustCompile(`\s*<?(?:--|==|-\.)(?:.*?)>`)
+	// It looks for a sequence starting with <, -, or = and ending with >? (optional > for ---)
+	// Actually --- does not end with >.
+	// Let's broaden the regex to support ---
+	// \s*<?(?:--|==|-\.)(?:.*)(?:>|-)
+	// But simple --- is just ---.
+	// Original regex: `\s*<?(?:--|==|-\.)(?:.*?)>`
+	//
+	// New strategy: Match any sequence that looks like an arrow.
+	// Starts with <, -, =. Contains -, =, . Ends with >, -.
+	// Simplification: Just look for the connector patterns.
+	// -->, ---, -.->, ==>
+	// Use alternation to handle arrows ending in > (greedy priority) vs - (fallback).
+	arrowRe := regexp.MustCompile(`\s*(?:<?(?:--|==|-\.)(?:.*?)>|<?(?:--|==|-\.)(?:.*?)-)`)
 
 	// Regex to extract ID: start of string, take valid chars
 	// Valid mstl IDs: ^[a-zA-Z0-9._-]+$
@@ -137,4 +147,63 @@ func addDependency(g *DependencyGraph, from, to string) {
 
 	g.Forward[from] = append(g.Forward[from], to)
 	g.Reverse[to] = append(g.Reverse[to], from)
+}
+
+// FilterDependencyContent filters the Mermaid graph content, removing lines
+// that reference invalid repository IDs (e.g. private repositories).
+func FilterDependencyContent(content string, validIDs []string) string {
+	validIDMap := make(map[string]bool)
+	for _, id := range validIDs {
+		validIDMap[id] = true
+	}
+
+	var sb strings.Builder
+	scanner := bufio.NewScanner(strings.NewReader(content))
+
+	// Regex matches simplified arrows: -->, ---, -.->, ==>
+	// It captures the arrow including potential text in the middle.
+	arrowRe := regexp.MustCompile(`\s*(?:<?(?:--|==|-\.)(?:.*?)>|<?(?:--|==|-\.)(?:.*?)-)`)
+	// Regex for valid IDs (matches what extractID uses)
+	idRe := regexp.MustCompile(`^([a-zA-Z0-9._-]+)`)
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		trimmed := strings.TrimSpace(line)
+
+		// Pass through structural lines and empty lines
+		if trimmed == "" || strings.HasPrefix(trimmed, "%%") || strings.HasPrefix(trimmed, "graph ") || strings.HasPrefix(trimmed, "flowchart ") || strings.HasPrefix(trimmed, "```") {
+			sb.WriteString(line + "\n")
+			continue
+		}
+
+		// Split line by arrows to get all node parts
+		parts := arrowRe.Split(trimmed, -1)
+
+		allValid := true
+		for _, part := range parts {
+			part = strings.TrimSpace(part)
+			// Handle labels attached to the part (e.g., `|label| B` or `B`)
+			// If split results in part starting with label pipe, remove it.
+			if strings.HasPrefix(part, "|") {
+				pipeIdx := strings.Index(part[1:], "|")
+				if pipeIdx != -1 {
+					part = strings.TrimSpace(part[pipeIdx+2:])
+				}
+			}
+
+			id := extractID(part, idRe)
+			if id != "" {
+				// If we found an ID, it must be in the valid map.
+				if !validIDMap[id] {
+					allValid = false
+					break
+				}
+			}
+		}
+
+		if allValid {
+			sb.WriteString(line + "\n")
+		}
+	}
+	return sb.String()
 }

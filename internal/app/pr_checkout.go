@@ -243,9 +243,34 @@ func handlePrCheckout(args []string, opts GlobalOptions) {
 	if err := os.MkdirAll(mstlDir, 0755); err != nil {
 		fmt.Printf("Warning: Failed to create .mstl directory: %v\n", err)
 	} else {
+		// Filter config (exclude private repos)
+		var filteredRepos []conf.Repository
+		var validIDs []string
+		for _, repo := range *config.Repositories {
+			if repo.Private != nil && *repo.Private {
+				continue
+			}
+			filteredRepos = append(filteredRepos, repo)
+			// Collect valid IDs for dependency filtering
+			if repo.ID != nil && *repo.ID != "" {
+				validIDs = append(validIDs, *repo.ID)
+			} else {
+				// Should have been set by parsing or validating
+				// ParseMistletoeBlock -> Unmarshal -> Doesn't call validateRepositories immediately?
+				// We should derive ID if missing, similar to validateRepositories.
+				// Use GetRepoDirName logic from config package.
+				dirName := conf.GetRepoDirName(repo)
+				if dirName != "" {
+					validIDs = append(validIDs, dirName)
+				}
+			}
+		}
+		filteredConfig := *config
+		filteredConfig.Repositories = &filteredRepos
+
 		// Save config.json
 		configFile := filepath.Join(mstlDir, "config.json")
-		configBytes, err := json.MarshalIndent(config, "", "  ")
+		configBytes, err := json.MarshalIndent(filteredConfig, "", "  ")
 		if err == nil {
 			if err := os.WriteFile(configFile, configBytes, 0644); err != nil {
 				fmt.Printf("Warning: Failed to write %s: %v\n", configFile, err)
@@ -254,9 +279,10 @@ func handlePrCheckout(args []string, opts GlobalOptions) {
 			}
 		}
 
-		// Save dependencies.md if exists
+		// Save dependencies.md if exists (filtered)
 		if dependencyContent != "" {
-			if err := writeDependencyFile(mstlDir, dependencyContent); err != nil {
+			filteredDepContent := FilterDependencyContent(dependencyContent, validIDs)
+			if err := writeDependencyFile(mstlDir, filteredDepContent); err != nil {
 				fmt.Printf("Warning: Failed to write dependencies.md: %v\n", err)
 			} else {
 				fmt.Printf("Saved dependency graph to %s\n", filepath.Join(mstlDir, "dependencies.md"))

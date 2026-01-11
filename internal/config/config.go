@@ -44,6 +44,7 @@ type Repository struct {
 	Branch     *string  `json:"branch,omitempty"`
 	Revision   *string  `json:"revision,omitempty"`
 	BaseBranch *string  `json:"base-branch,omitempty"`
+	Private    *bool    `json:"private,omitempty"`
 }
 
 // Config represents the top-level configuration structure.

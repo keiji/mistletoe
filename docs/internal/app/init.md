@@ -34,7 +34,8 @@ cat config.json | mstl init [options]
       "url": "https://github.com/example/repo.git",
       "id": "repo-directory-name",
       "branch": "main",
-      "revision": "commit-hash"
+      "revision": "commit-hash",
+      "private": false
     }
   ]
 }
@@ -44,6 +45,7 @@ cat config.json | mstl init [options]
 *   **id**: (任意) リポジトリのディレクトリ名。省略された場合、URL のベース名（末尾）から `.git` を除いたものが ID となる (例: `.../repo.git` -> `repo`, `.../repo` -> `repo`)。ID (自動生成されたものを含む) は設定ファイル内で一意である必要あり
 *   **branch**: (任意) チェックアウト対象のブランチ
 *   **revision**: (任意) チェックアウト対象のコミットハッシュ
+*   **private**: (任意) 非公開リポジトリとしてマークするブール値。デフォルトは `false`。`true` に設定された場合、エクスポートされる設定ファイルや依存関係グラフから除外される
 
 ### 3.1. 入力検証 (Input Validation)
 
@@ -167,8 +169,8 @@ flowchart TD
 すべてのリポジトリ処理が完了した後、以下の処理が行われます。
 
 1.  **ディレクトリ作成**: `.mstl` ディレクトリを `--dest` で指定されたディレクトリ直下に作成します。
-2.  **設定保存**: 初期化に使用した設定（ファイルまたは標準入力から）を `.mstl/config.json` として保存します。
-3.  **依存関係グラフ生成**: リポジトリ一覧を基に、依存関係のないノードのみの Mermaid グラフを生成し、`.mstl/dependencies.md` として保存します。
+2.  **設定保存**: メモリ上の設定情報を `.mstl/config.json` として保存します。この際、`private: true` が設定されたリポジトリは除外されます。元の設定ファイルをコピーするのではなく、メモリ上のデータをJSONとして書き出します。
+3.  **依存関係グラフ生成**: メモリ上のリポジトリ一覧を基に、依存関係のないノードのみの Mermaid グラフを生成し、`.mstl/dependencies.md` として保存します。この際も、`private: true` が設定されたリポジトリは除外されます。
 
 ### 4.5 デバッグ (Debugging)
 
