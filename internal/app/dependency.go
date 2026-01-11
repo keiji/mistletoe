@@ -138,3 +138,86 @@ func addDependency(g *DependencyGraph, from, to string) {
 	g.Forward[from] = append(g.Forward[from], to)
 	g.Reverse[to] = append(g.Reverse[to], from)
 }
+
+// FilterDependencyContent filters the Mermaid graph content, removing lines
+// that reference invalid repository IDs (e.g. private repositories).
+func FilterDependencyContent(content string, validIDs []string) string {
+	validIDMap := make(map[string]bool)
+	for _, id := range validIDs {
+		validIDMap[id] = true
+	}
+
+	var sb strings.Builder
+	scanner := bufio.NewScanner(strings.NewReader(content))
+
+	// Regex matches simplified arrows: -->, ---, -.->, ==>
+	// It captures the arrow including potential text in the middle.
+	arrowRe := regexp.MustCompile(`\s*<?(?:--|==|-\.)(?:.*?)>`)
+	// Regex for valid IDs (matches what extractID uses)
+	idRe := regexp.MustCompile(`^([a-zA-Z0-9._-]+)`)
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		trimmed := strings.TrimSpace(line)
+
+		// Pass through structural lines and empty lines
+		if trimmed == "" || strings.HasPrefix(trimmed, "%%") || strings.HasPrefix(trimmed, "graph ") || strings.HasPrefix(trimmed, "flowchart ") || strings.HasPrefix(trimmed, "```") {
+			sb.WriteString(line + "\n")
+			continue
+		}
+
+		// Find arrow location
+		loc := arrowRe.FindStringIndex(trimmed)
+		if loc == nil {
+			// No arrow. Check if it's a node definition (just an ID).
+			// If it matches ID format and is NOT in validIDs, we should filter it.
+			// Only filter if it looks like a clean ID.
+
+			// Try to extract ID from the beginning
+			potentialID := extractID(trimmed, idRe)
+			if potentialID != "" && potentialID == trimmed {
+				// The whole line is an ID
+				if validIDMap[potentialID] {
+					sb.WriteString(line + "\n")
+				}
+				// Else skip (private repo node definition)
+				continue
+			}
+
+			// If it's not just an ID (e.g. "subgraph X" or "A(Label)"), we are less sure.
+			// Ideally we parse node definitions properly.
+			// But for "init" output which is just "    RepoName", the above check covers it.
+
+			sb.WriteString(line + "\n")
+			continue
+		}
+
+		// Extract parts
+		leftRaw := strings.TrimSpace(trimmed[:loc[0]])
+		rightRaw := strings.TrimSpace(trimmed[loc[1]:])
+
+		// Handle labels attached to the right side (e.g., `-->|label| B`)
+		if strings.HasPrefix(rightRaw, "|") {
+			pipeIdx := strings.Index(rightRaw[1:], "|")
+			if pipeIdx != -1 {
+				endIdx := pipeIdx + 2
+				rightRaw = strings.TrimSpace(rightRaw[endIdx:])
+			}
+		}
+
+		leftID := extractID(leftRaw, idRe)
+		rightID := extractID(rightRaw, idRe)
+
+		// If we successfully extracted two IDs, check if they are valid.
+		if leftID != "" && rightID != "" {
+			if validIDMap[leftID] && validIDMap[rightID] {
+				sb.WriteString(line + "\n")
+			}
+			// If either is invalid (private), we skip the line.
+		} else {
+			// Could not parse IDs clearly, preserve the line to be safe
+			sb.WriteString(line + "\n")
+		}
+	}
+	return sb.String()
+}
