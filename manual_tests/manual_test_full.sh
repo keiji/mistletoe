@@ -12,6 +12,9 @@ echo "========================================================" > "$OUTPUT_FILE"
 echo "Full Manual Test Started at $(date)" >> "$OUTPUT_FILE"
 echo "========================================================" >> "$OUTPUT_FILE"
 
+echo "Building binaries..."
+"$SCRIPT_DIR/build_all.sh"
+
 echo "Running manual_test_mstl.py..."
 python3 "$SCRIPT_DIR/manual_test_mstl.py" --output "$OUTPUT_FILE"
 
