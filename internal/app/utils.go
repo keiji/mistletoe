@@ -170,28 +170,28 @@ func RunEditor() (string, error) {
 
 // --- Flag Helpers ---
 
-// ResolveCommonValues resolves the configuration file path and parallel count
+// ResolveCommonValues resolves the configuration file path and jobs count
 // from the various flag inputs.
 // It also checks for stdin input if no config file is provided.
 // If ignoreStdin is true, standard input is never read.
-// For parallel flags, pass -1 to indicate they were not set.
-func ResolveCommonValues(fLong, fShort string, pVal, pValShort int, ignoreStdin bool) (string, int, []byte, error) {
-	// Parallel
+// For jobs flags, pass -1 to indicate they were not set.
+func ResolveCommonValues(fLong, fShort string, jVal, jValShort int, ignoreStdin bool) (string, int, []byte, error) {
+	// Jobs
 	// We use -1 to indicate "unset" (default)
-	parallel := -1
-	if pVal != -1 {
-		parallel = pVal
-	} else if pValShort != -1 {
-		parallel = pValShort
+	jobs := -1
+	if jVal != -1 {
+		jobs = jVal
+	} else if jValShort != -1 {
+		jobs = jValShort
 	}
 
-	// Only validate if parallel was set.
-	if parallel != -1 {
-		if parallel < MinParallel {
-			return "", 0, nil, fmt.Errorf("Parallel must be at least %d.", MinParallel)
+	// Only validate if jobs was set.
+	if jobs != -1 {
+		if jobs < MinJobs {
+			return "", 0, nil, fmt.Errorf("Jobs must be at least %d.", MinJobs)
 		}
-		if parallel > MaxParallel {
-			return "", 0, nil, fmt.Errorf("Parallel must be at most %d.", MaxParallel)
+		if jobs > MaxJobs {
+			return "", 0, nil, fmt.Errorf("Jobs must be at most %d.", MaxJobs)
 		}
 	}
 
@@ -275,7 +275,7 @@ func ResolveCommonValues(fLong, fShort string, pVal, pValShort int, ignoreStdin 
 		}
 	}
 
-	return configFile, parallel, configData, nil
+	return configFile, jobs, configData, nil
 }
 
 // --- Spinner ---

@@ -27,7 +27,7 @@ The core of Mistletoe is the configuration file (usually `config.json`) containi
 
 ```json
 {
-  "parallel": 4,
+  "jobs": 4,
   "repositories": [
     {
       "url": "https://github.com/example/repo1.git",

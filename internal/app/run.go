@@ -7,11 +7,11 @@ import (
 	"path/filepath"
 )
 
-// Parallel processing constants.
+// Jobs processing constants.
 const (
-	MinParallel     = 1
-	MaxParallel     = 128
-	DefaultParallel = 1
+	MinJobs     = 1
+	MaxJobs     = 128
+	DefaultJobs = 1
 )
 
 // Global application variables.

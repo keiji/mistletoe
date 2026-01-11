@@ -53,7 +53,7 @@ type PrStatusRow struct {
 
 // CollectPrStatus collects Pull Request status for the given repositories.
 // knownPRs is an optional map of [RepoID] -> []PrInfo to skip querying existing PRs.
-func CollectPrStatus(statusRows []StatusRow, config *conf.Config, parallel int, ghPath string, verbose bool, knownPRs map[string][]PrInfo) []PrStatusRow {
+func CollectPrStatus(statusRows []StatusRow, config *conf.Config, jobs int, ghPath string, verbose bool, knownPRs map[string][]PrInfo) []PrStatusRow {
 	repoMap := make(map[string]conf.Repository)
 	for _, r := range *config.Repositories {
 		repoMap[getRepoName(r)] = r
@@ -61,7 +61,7 @@ func CollectPrStatus(statusRows []StatusRow, config *conf.Config, parallel int, 
 
 	prRows := make([]PrStatusRow, len(statusRows))
 	var wg sync.WaitGroup
-	sem := make(chan struct{}, parallel)
+	sem := make(chan struct{}, jobs)
 	var mu sync.Mutex
 
 	for i, row := range statusRows {
@@ -347,9 +347,9 @@ func RenderPrStatusTable(w io.Writer, rows []PrStatusRow) {
 }
 
 // executePush pushes changes for the given repositories.
-func executePush(repos []conf.Repository, baseDir string, rows []StatusRow, parallel int, gitPath string, verbose bool) error {
+func executePush(repos []conf.Repository, baseDir string, rows []StatusRow, jobs int, gitPath string, verbose bool) error {
 	var wg sync.WaitGroup
-	sem := make(chan struct{}, parallel)
+	sem := make(chan struct{}, jobs)
 	var mu sync.Mutex
 	var errs []string
 
@@ -400,14 +400,14 @@ func executePush(repos []conf.Repository, baseDir string, rows []StatusRow, para
 	return nil
 }
 
-func updatePrDescriptions(prMap map[string][]PrInfo, parallel int, ghPath string, verbose bool, snapshotData, snapshotFilename string, deps *DependencyGraph, depContent string, overwrite bool) error {
+func updatePrDescriptions(prMap map[string][]PrInfo, jobs int, ghPath string, verbose bool, snapshotData, snapshotFilename string, deps *DependencyGraph, depContent string, overwrite bool) error {
 	if len(prMap) == 0 {
 		return nil
 	}
 
 	var mu sync.Mutex
 	var wg sync.WaitGroup
-	sem := make(chan struct{}, parallel)
+	sem := make(chan struct{}, jobs)
 	var errs []string
 
 	// Flatten tasks
@@ -616,10 +616,10 @@ func checkGhAvailability(ghPath string, verbose bool) error {
 // verifyGithubRequirements checks GitHub URL, permissions, base branch existence, and existing PRs.
 // It returns a map of RepoName -> Existing PR URL.
 // Accepts knownPRs map[string][]string (ID -> []URL) to optimize existing PR check.
-func verifyGithubRequirements(repos []conf.Repository, baseDir string, rows []StatusRow, parallel int, gitPath, ghPath string, verbose bool, knownPRs map[string][]string) (map[string]string, error) {
+func verifyGithubRequirements(repos []conf.Repository, baseDir string, rows []StatusRow, jobs int, gitPath, ghPath string, verbose bool, knownPRs map[string][]string) (map[string]string, error) {
 	var mu sync.Mutex
 	var wg sync.WaitGroup
-	sem := make(chan struct{}, parallel)
+	sem := make(chan struct{}, jobs)
 	var errs []string
 	existingPRs := make(map[string]string)
 

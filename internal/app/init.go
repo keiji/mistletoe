@@ -149,13 +149,13 @@ func validateEnvironment(repos []conf.Repository, baseDir, gitPath string, verbo
 }
 
 // PerformInit executes the initialization (clone/checkout) logic for the given repositories.
-func PerformInit(repos []conf.Repository, baseDir, gitPath string, parallel, depth int, verbose bool) error {
+func PerformInit(repos []conf.Repository, baseDir, gitPath string, jobs, depth int, verbose bool) error {
 	if err := validateEnvironment(repos, baseDir, gitPath, verbose); err != nil {
 		return fmt.Errorf("error validating environment: %w", err)
 	}
 
 	var wg sync.WaitGroup
-	sem := make(chan struct{}, parallel)
+	sem := make(chan struct{}, jobs)
 
 	for _, repo := range repos {
 		wg.Add(1)
@@ -271,7 +271,7 @@ func handleInit(args []string, opts GlobalOptions) {
 	var fShort, fLong string
 	var dLong string
 	var depth int
-	var pVal, pValShort int
+	var jVal, jValShort int
 	var vLong, vShort bool
 
 	fs := flag.NewFlagSet("init", flag.ExitOnError)
@@ -279,8 +279,8 @@ func handleInit(args []string, opts GlobalOptions) {
 	fs.StringVar(&fShort, "f", DefaultConfigFile, "configuration file (shorthand)")
 	fs.StringVar(&dLong, "dest", "", "destination directory")
 	fs.IntVar(&depth, "depth", 0, "Create a shallow clone with a history truncated to the specified number of commits")
-	fs.IntVar(&pVal, "parallel", -1, "number of parallel processes")
-	fs.IntVar(&pValShort, "p", -1, "number of parallel processes (shorthand)")
+	fs.IntVar(&jVal, "jobs", -1, "number of concurrent jobs")
+	fs.IntVar(&jValShort, "j", -1, "number of concurrent jobs (shorthand)")
 	var ignoreStdin bool
 	fs.BoolVar(&ignoreStdin, "ignore-stdin", false, "Ignore standard input")
 	fs.BoolVar(&vLong, "verbose", false, "Enable verbose output")
@@ -291,7 +291,7 @@ func handleInit(args []string, opts GlobalOptions) {
 		os.Exit(1)
 	}
 
-	configFile, parallel, configData, err := ResolveCommonValues(fLong, fShort, pVal, pValShort, ignoreStdin)
+	configFile, jobs, configData, err := ResolveCommonValues(fLong, fShort, jVal, jValShort, ignoreStdin)
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
 		os.Exit(1)
@@ -317,29 +317,29 @@ func handleInit(args []string, opts GlobalOptions) {
 		os.Exit(1)
 	}
 
-	// Resolve Parallel (Config fallback)
-	if parallel == -1 {
-		if config.Parallel != nil {
-			parallel = *config.Parallel
+	// Resolve Jobs (Config fallback)
+	if jobs == -1 {
+		if config.Jobs != nil {
+			jobs = *config.Jobs
 		} else {
-			parallel = DefaultParallel
+			jobs = DefaultJobs
 		}
 	}
 
 	// Verbose Override
 	verbose := vLong || vShort
-	if verbose && parallel > 1 {
-		fmt.Println("Verbose is specified, so parallel is treated as 1.")
-		parallel = 1
+	if verbose && jobs > 1 {
+		fmt.Println("Verbose is specified, so jobs is treated as 1.")
+		jobs = 1
 	}
 
 	// Final Validation
-	if parallel < MinParallel {
-		fmt.Printf("Error: Parallel must be at least %d.\n", MinParallel)
+	if jobs < MinJobs {
+		fmt.Printf("Error: Jobs must be at least %d.\n", MinJobs)
 		os.Exit(1)
 	}
-	if parallel > MaxParallel {
-		fmt.Printf("Error: Parallel must be at most %d.\n", MaxParallel)
+	if jobs > MaxJobs {
+		fmt.Printf("Error: Jobs must be at most %d.\n", MaxJobs)
 		os.Exit(1)
 	}
 
@@ -353,7 +353,7 @@ func handleInit(args []string, opts GlobalOptions) {
 		os.Exit(1)
 	}
 
-	if err := PerformInit(*config.Repositories, "", opts.GitPath, parallel, depth, verbose); err != nil {
+	if err := PerformInit(*config.Repositories, "", opts.GitPath, jobs, depth, verbose); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}

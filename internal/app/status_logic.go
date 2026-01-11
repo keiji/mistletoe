@@ -68,11 +68,11 @@ func ValidateRepositoriesIntegrity(config *conf.Config, gitPath string, verbose 
 }
 
 // CollectStatus collects status for all repositories.
-func CollectStatus(config *conf.Config, parallel int, gitPath string, verbose bool, noFetch bool) []StatusRow {
+func CollectStatus(config *conf.Config, jobs int, gitPath string, verbose bool, noFetch bool) []StatusRow {
 	var rows []StatusRow
 	var mu sync.Mutex
 	var wg sync.WaitGroup
-	sem := make(chan struct{}, parallel)
+	sem := make(chan struct{}, jobs)
 
 	for _, repo := range *config.Repositories {
 		wg.Add(1)

@@ -19,8 +19,8 @@ func handlePrCheckout(args []string, opts GlobalOptions) {
 		uLong     string
 		uShort    string
 		dLong     string
-		pVal      int
-		pValShort int
+		jVal      int
+		jValShort int
 		vLong     bool
 		vShort    bool
 	)
@@ -28,8 +28,8 @@ func handlePrCheckout(args []string, opts GlobalOptions) {
 	fs.StringVar(&uLong, "url", "", "Pull Request URL")
 	fs.StringVar(&uShort, "u", "", "Pull Request URL (shorthand)")
 	fs.StringVar(&dLong, "dest", "", "Destination directory")
-	fs.IntVar(&pVal, "parallel", -1, "Number of parallel processes")
-	fs.IntVar(&pValShort, "p", -1, "Number of parallel processes (shorthand)")
+	fs.IntVar(&jVal, "jobs", -1, "Number of concurrent jobs")
+	fs.IntVar(&jValShort, "j", -1, "Number of concurrent jobs (shorthand)")
 	fs.BoolVar(&vLong, "verbose", false, "Enable verbose output")
 	fs.BoolVar(&vShort, "v", false, "Enable verbose output (shorthand)")
 
@@ -53,19 +53,19 @@ func handlePrCheckout(args []string, opts GlobalOptions) {
 		os.Exit(1)
 	}
 
-	// Resolve Parallel - pr_checkout is unique, it doesn't utilize ResolveCommonValues for config loading initially
+	// Resolve Jobs - pr_checkout is unique, it doesn't utilize ResolveCommonValues for config loading initially
 	// because it doesn't take a config file argument (config comes from snapshot inside PR).
-	// However, it does take parallel flags.
-	// Since we don't have a config file to fallback to for 'parallel', we just use the flag or default.
-	// Wait, if config is inside snapshot, can we use parallel from snapshot config?
+	// However, it does take jobs flags.
+	// Since we don't have a config file to fallback to for 'jobs', we just use the flag or default.
+	// Wait, if config is inside snapshot, can we use jobs from snapshot config?
 	// The snapshot config struct has "Repositories". It's the same Config struct.
-	// So yes, if the snapshot JSON has "parallel", we could respect it.
+	// So yes, if the snapshot JSON has "jobs", we could respect it.
 
-	parallel := -1
-	if pVal != -1 {
-		parallel = pVal
-	} else if pValShort != -1 {
-		parallel = pValShort
+	jobs := -1
+	if jVal != -1 {
+		jobs = jVal
+	} else if jValShort != -1 {
+		jobs = jValShort
 	}
 
 	verbose := vLong || vShort
@@ -97,28 +97,28 @@ func handlePrCheckout(args []string, opts GlobalOptions) {
 		os.Exit(1)
 	}
 
-	// Resolve Parallel (Config fallback from Snapshot)
-	if parallel == -1 {
-		if config.Parallel != nil {
-			parallel = *config.Parallel
+	// Resolve Jobs (Config fallback from Snapshot)
+	if jobs == -1 {
+		if config.Jobs != nil {
+			jobs = *config.Jobs
 		} else {
-			parallel = DefaultParallel
+			jobs = DefaultJobs
 		}
 	}
 
 	// Verbose Override
-	if verbose && parallel > 1 {
-		fmt.Println("Verbose is specified, so parallel is treated as 1.")
-		parallel = 1
+	if verbose && jobs > 1 {
+		fmt.Println("Verbose is specified, so jobs is treated as 1.")
+		jobs = 1
 	}
 
 	// Final Validation
-	if parallel < MinParallel {
-		fmt.Printf("Error: Parallel must be at least %d.\n", MinParallel)
+	if jobs < MinJobs {
+		fmt.Printf("Error: Jobs must be at least %d.\n", MinJobs)
 		os.Exit(1)
 	}
-	if parallel > MaxParallel {
-		fmt.Printf("Error: Parallel must be at most %d.\n", MaxParallel)
+	if jobs > MaxJobs {
+		fmt.Printf("Error: Jobs must be at most %d.\n", MaxJobs)
 		os.Exit(1)
 	}
 
@@ -231,7 +231,7 @@ func handlePrCheckout(args []string, opts GlobalOptions) {
 	fmt.Println("Initializing repositories based on snapshot...")
 	// The snapshot contains the target state. We treat it as the config.
 	// PerformInit handles validation, cloning, and checking out.
-	if err := PerformInit(*config.Repositories, "", opts.GitPath, parallel, 0, verbose); err != nil {
+	if err := PerformInit(*config.Repositories, "", opts.GitPath, jobs, 0, verbose); err != nil {
 		fmt.Printf("Error during initialization: %v\n", err)
 		// We continue to status even if some failed? Or exit?
 		// Usually Init failure is critical.
@@ -294,8 +294,8 @@ func handlePrCheckout(args []string, opts GlobalOptions) {
 	fmt.Println("Verifying status...")
 	spinner := NewSpinner(verbose)
 	spinner.Start()
-	rows := CollectStatus(config, parallel, opts.GitPath, verbose, false)
-	prRows := CollectPrStatus(rows, config, parallel, opts.GhPath, verbose, nil)
+	rows := CollectStatus(config, jobs, opts.GitPath, verbose, false)
+	prRows := CollectPrStatus(rows, config, jobs, opts.GhPath, verbose, nil)
 	spinner.Stop()
 
 	RenderPrStatusTable(Stdout, prRows)

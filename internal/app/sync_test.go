@@ -78,9 +78,9 @@ func TestHandleSync(t *testing.T) {
 		}
 	})
 
-	// Scenario 1b: Clean Sync with Parallel (Check flag parsing)
-	t.Run("CleanSyncParallel", func(t *testing.T) {
-		out, err := runSync("", "-p", "2")
+	// Scenario 1b: Clean Sync with Jobs (Check flag parsing)
+	t.Run("CleanSyncJobs", func(t *testing.T) {
+		out, err := runSync("", "-j", "2")
 		if err != nil {
 			t.Fatalf("sync failed: %v, out: %s", err, out)
 		}

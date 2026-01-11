@@ -16,16 +16,16 @@ func handlePrStatus(args []string, opts GlobalOptions) {
 	var (
 		fLong     string
 		fShort    string
-		pVal      int
-		pValShort int
+		jVal      int
+		jValShort int
 		vLong     bool
 		vShort    bool
 	)
 
 	fs.StringVar(&fLong, "file", DefaultConfigFile, "Configuration file path")
 	fs.StringVar(&fShort, "f", DefaultConfigFile, "Configuration file path (shorthand)")
-	fs.IntVar(&pVal, "parallel", -1, "Number of parallel processes")
-	fs.IntVar(&pValShort, "p", -1, "Number of parallel processes (shorthand)")
+	fs.IntVar(&jVal, "jobs", -1, "Number of concurrent jobs")
+	fs.IntVar(&jValShort, "j", -1, "Number of concurrent jobs (shorthand)")
 	var ignoreStdin bool
 	fs.BoolVar(&ignoreStdin, "ignore-stdin", false, "Ignore standard input")
 	fs.BoolVar(&vLong, "verbose", false, "Enable verbose output")
@@ -37,7 +37,7 @@ func handlePrStatus(args []string, opts GlobalOptions) {
 	}
 
 	// Resolve common values
-	configPath, parallel, configData, err := ResolveCommonValues(fLong, fShort, pVal, pValShort, ignoreStdin)
+	configPath, jobs, configData, err := ResolveCommonValues(fLong, fShort, jVal, jValShort, ignoreStdin)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -65,28 +65,28 @@ func handlePrStatus(args []string, opts GlobalOptions) {
 		os.Exit(1)
 	}
 
-	// Resolve Parallel (Config fallback)
-	if parallel == -1 {
-		if config.Parallel != nil {
-			parallel = *config.Parallel
+	// Resolve Jobs (Config fallback)
+	if jobs == -1 {
+		if config.Jobs != nil {
+			jobs = *config.Jobs
 		} else {
-			parallel = DefaultParallel
+			jobs = DefaultJobs
 		}
 	}
 
 	// Verbose Override
-	if verbose && parallel > 1 {
-		fmt.Println("Verbose is specified, so parallel is treated as 1.")
-		parallel = 1
+	if verbose && jobs > 1 {
+		fmt.Println("Verbose is specified, so jobs is treated as 1.")
+		jobs = 1
 	}
 
 	// Final Validation
-	if parallel < MinParallel {
-		fmt.Printf("Error: Parallel must be at least %d.\n", MinParallel)
+	if jobs < MinJobs {
+		fmt.Printf("Error: Jobs must be at least %d.\n", MinJobs)
 		os.Exit(1)
 	}
-	if parallel > MaxParallel {
-		fmt.Printf("Error: Parallel must be at most %d.\n", MaxParallel)
+	if jobs > MaxJobs {
+		fmt.Printf("Error: Jobs must be at most %d.\n", MaxJobs)
 		os.Exit(1)
 	}
 
@@ -101,10 +101,10 @@ func handlePrStatus(args []string, opts GlobalOptions) {
 	spinner.Start()
 
 	// 4. Collect Status
-	rows := CollectStatus(config, parallel, opts.GitPath, verbose, false)
+	rows := CollectStatus(config, jobs, opts.GitPath, verbose, false)
 
 	// 5. Collect PR Status
-	prRows := CollectPrStatus(rows, config, parallel, opts.GhPath, verbose, nil)
+	prRows := CollectPrStatus(rows, config, jobs, opts.GhPath, verbose, nil)
 
 	spinner.Stop()
 

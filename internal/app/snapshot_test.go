@@ -246,15 +246,15 @@ func TestSnapshot_FileExists(t *testing.T) {
 	}
 }
 
-// TestGenerateSnapshot_ExcludesParallel verifies that the generated snapshot JSON does not contain the "parallel" field.
-func TestGenerateSnapshot_ExcludesParallel(t *testing.T) {
-	// 1. Create a dummy config with parallel set (this simulates loading a config that has it)
+// TestGenerateSnapshot_ExcludesJobs verifies that the generated snapshot JSON does not contain the "jobs" field.
+func TestGenerateSnapshot_ExcludesJobs(t *testing.T) {
+	// 1. Create a dummy config with jobs set (this simulates loading a config that has it)
 	// Although GenerateSnapshot creates a NEW config, passing a config to it is used for BaseBranch resolution.
-	// But the Parallel field in the input config doesn't matter for the output structure directly,
+	// But the Jobs field in the input config doesn't matter for the output structure directly,
 	// UNLESS GenerateSnapshot mistakenly copies it.
 
 	// However, GenerateSnapshot constructs a fresh conf.Config struct.
-	// The Parallel field in conf.Config is a pointer (*int). If it is nil, json omitempty hides it.
+	// The Jobs field in conf.Config is a pointer (*int). If it is nil, json omitempty hides it.
 	// If GenerateSnapshot doesn't set it, it is nil.
 
 	// We will call GenerateSnapshotVerbose directly to verify the output bytes.
@@ -274,10 +274,10 @@ func TestGenerateSnapshot_ExcludesParallel(t *testing.T) {
 	// Input config
 	repoID := "repo1"
 	repoURLPtr := &repoURL
-	parallelVal := 5
+	jobsVal := 5
 
 	inputConfig := &conf.Config{
-		Parallel: &parallelVal,
+		Jobs: &jobsVal,
 		Repositories: &[]conf.Repository{
 			{
 				ID: &repoID,
@@ -293,14 +293,14 @@ func TestGenerateSnapshot_ExcludesParallel(t *testing.T) {
 		t.Fatalf("GenerateSnapshotVerbose failed: %v", err)
 	}
 
-	// Verify "parallel" key is NOT present in jsonBytes
+	// Verify "jobs" key is NOT present in jsonBytes
 	// We can decode into a map[string]interface{}
 	var result map[string]interface{}
 	if err := json.Unmarshal(jsonBytes, &result); err != nil {
 		t.Fatalf("failed to unmarshal generated json: %v", err)
 	}
 
-	if _, ok := result["parallel"]; ok {
-		t.Errorf("generated snapshot contains 'parallel' key, but it should be excluded")
+	if _, ok := result["jobs"]; ok {
+		t.Errorf("generated snapshot contains 'jobs' key, but it should be excluded")
 	}
 }

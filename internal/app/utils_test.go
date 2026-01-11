@@ -159,8 +159,8 @@ func TestResolveCommonValues(t *testing.T) {
 		name        string
 		fLong       string
 		fShort      string
-		pVal        int
-		pValShort   int
+		jVal        int
+		jValShort   int
 		ignoreStdin bool
 		stdinData   string
 		wantFile    string
@@ -172,8 +172,8 @@ func TestResolveCommonValues(t *testing.T) {
 			name:      "Defaults",
 			fLong:     DefaultConfigFile,
 			fShort:    DefaultConfigFile,
-			pVal:      -1, // Simulating unset
-			pValShort: -1, // Simulating unset
+			jVal:      -1, // Simulating unset
+			jValShort: -1, // Simulating unset
 			wantFile:  "", // With strings.Reader(""), logic assumes Stdin is piped but empty, so clears configFile
 			wantP:     -1, // Should return unset
 			wantData:  "",
@@ -183,8 +183,8 @@ func TestResolveCommonValues(t *testing.T) {
 			name:        "Explicit File Long",
 			fLong:       "custom.json",
 			fShort:      DefaultConfigFile,
-			pVal:      -1,
-			pValShort: -1,
+			jVal:      -1,
+			jValShort: -1,
 			ignoreStdin: true, // Simulate TTY/No pipe
 			wantFile:    "custom.json",
 			wantP:       -1,
@@ -193,51 +193,51 @@ func TestResolveCommonValues(t *testing.T) {
 			name:        "Explicit File Short",
 			fLong:       DefaultConfigFile,
 			fShort:      "short.json",
-			pVal:      -1,
-			pValShort: -1,
+			jVal:      -1,
+			jValShort: -1,
 			ignoreStdin: true, // Simulate TTY/No pipe
 			wantFile:    "short.json",
 			wantP:       -1,
 		},
 		{
-			name:        "Parallel Long",
+			name:        "Jobs Long",
 			fLong:       DefaultConfigFile,
 			fShort:      DefaultConfigFile,
-			pVal:        4,
-			pValShort:   -1,
+			jVal:        4,
+			jValShort:   -1,
 			ignoreStdin: true, // Simulate TTY/No pipe
 			wantFile:    DefaultConfigFile,
 			wantP:       4,
 		},
 		{
-			name:        "Parallel Short",
+			name:        "Jobs Short",
 			fLong:       DefaultConfigFile,
 			fShort:      DefaultConfigFile,
-			pVal:        -1,
-			pValShort:   8,
+			jVal:        -1,
+			jValShort:   8,
 			ignoreStdin: true, // Simulate TTY/No pipe
 			wantFile:    DefaultConfigFile,
 			wantP:       8,
 		},
-		// Validation tests: ResolveCommonValues only validates if parallel IS SET (!= -1)
+		// Validation tests: ResolveCommonValues only validates if jobs IS SET (!= -1)
 		{
-			name:      "Parallel Invalid Low",
-			pVal:      0, // 0 < MinParallel (1)
-			pValShort: -1,
+			name:      "Jobs Invalid Low",
+			jVal:      0, // 0 < MinJobs (1)
+			jValShort: -1,
 			wantErr:   true,
 		},
 		{
-			name:      "Parallel Invalid High",
-			pVal:      200, // 200 > MaxParallel (128)
-			pValShort: -1,
+			name:      "Jobs Invalid High",
+			jVal:      200, // 200 > MaxJobs (128)
+			jValShort: -1,
 			wantErr:   true,
 		},
 		{
 			name:      "Stdin used when default file and stdin available",
 			fLong:     DefaultConfigFile,
 			fShort:    DefaultConfigFile,
-			pVal:      -1,
-			pValShort: -1,
+			jVal:      -1,
+			jValShort: -1,
 			stdinData: `{"repositories": []}`,
 			wantFile:  "", // Cleared when using stdin
 			wantData:  `{"repositories": []}`,
@@ -247,8 +247,8 @@ func TestResolveCommonValues(t *testing.T) {
 			name:      "Stdin ignored when ignoreStdin true",
 			fLong:     DefaultConfigFile,
 			fShort:    DefaultConfigFile,
-			pVal:      -1,
-			pValShort: -1,
+			jVal:      -1,
+			jValShort: -1,
 			ignoreStdin: true,
 			stdinData: `{"repositories": []}`,
 			wantFile:  DefaultConfigFile, // Uses default file
@@ -259,8 +259,8 @@ func TestResolveCommonValues(t *testing.T) {
 			name:      "Conflict: Custom file and Stdin",
 			fLong:     "custom.json",
 			fShort:    DefaultConfigFile,
-			pVal:      -1,
-			pValShort: -1,
+			jVal:      -1,
+			jValShort: -1,
 			stdinData: `{"repositories": []}`,
 			wantErr:   true,
 		},
@@ -268,8 +268,8 @@ func TestResolveCommonValues(t *testing.T) {
 			name:      "Explicit empty file forces Stdin",
 			fLong:     "",
 			fShort:    DefaultConfigFile, // fLong takes precedence as empty
-			pVal:      -1,
-			pValShort: -1,
+			jVal:      -1,
+			jValShort: -1,
 			stdinData: `{"repositories": []}`,
 			wantFile:  "",
 			wantData:  `{"repositories": []}`,
@@ -285,7 +285,7 @@ func TestResolveCommonValues(t *testing.T) {
 				Stdin = strings.NewReader("")
 			}
 
-			gotFile, gotP, gotData, err := ResolveCommonValues(tt.fLong, tt.fShort, tt.pVal, tt.pValShort, tt.ignoreStdin)
+			gotFile, gotP, gotData, err := ResolveCommonValues(tt.fLong, tt.fShort, tt.jVal, tt.jValShort, tt.ignoreStdin)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ResolveCommonValues() error = %v, wantErr %v", err, tt.wantErr)
 				return
