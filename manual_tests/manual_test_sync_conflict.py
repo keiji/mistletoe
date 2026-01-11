@@ -34,7 +34,12 @@ class MstlManualTestSyncConflict:
 
     def setup(self):
         self.test_dir = tempfile.mkdtemp(prefix="mstl_test_sync_")
-        self.bin_path = os.path.join(self.test_dir, "bin", "mstl")
+
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        self.bin_path = os.path.abspath(os.path.join(script_dir, "../bin/mstl"))
+        if sys.platform == "win32":
+            self.bin_path += ".exe"
+
         self.repos_dir = os.path.join(self.test_dir, "repos")
         self.remote_dir = os.path.join(self.test_dir, "remotes")
         self.config_file = os.path.join(self.test_dir, "mstl_config.json")
@@ -78,11 +83,6 @@ class MstlManualTestSyncConflict:
                 fail(f"Command failed: {' '.join(cmd)}\nStderr: {e.stderr}\nStdout: {e.stdout}")
             return e
 
-    def build_mstl(self):
-        log("Building mstl...")
-        os.makedirs(os.path.dirname(self.bin_path), exist_ok=True)
-        self.run_cmd(["go", "build", "-o", self.bin_path, "./cmd/mstl"], cwd=self.root_dir)
-
     def setup_repo(self):
         log("Setting up remote repository...")
         os.makedirs(self.remote_dir, exist_ok=True)
@@ -117,7 +117,9 @@ class MstlManualTestSyncConflict:
 
     def run_test_logic(self):
         self.setup() # Initialize dirs
-        self.build_mstl()
+        if not os.path.exists(self.bin_path):
+            fail(f"mstl binary not found at {self.bin_path}. Please run build_all.sh first.")
+
         self.setup_repo()
         self.create_config()
 

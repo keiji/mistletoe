@@ -47,15 +47,6 @@ def run_command(cmd, cwd=None, expect_error=False):
         print(f"Error running command: {e}")
         return -1, "", str(e)
 
-def build_mstl(output_path):
-    """Builds the mstl binary."""
-    log_header("Building mstl")
-    cmd = ["go", "build", "-o", output_path, "./cmd/mstl"]
-    code, out, err = run_command(cmd)
-    if code != 0:
-        log_fail(f"Build failed:\n{out}\n{err}")
-    log_pass("Build successful")
-
 def create_bare_repo(path):
     """Creates a bare git repository."""
     os.makedirs(path, exist_ok=True)
@@ -82,10 +73,13 @@ class InitDestTest:
         # Ensure cleanup runs even if we exit early via sys.exit(1)
         atexit.register(self.cleanup)
 
-        mstl_bin = os.path.join(self.root_dir, "mstl")
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        mstl_bin = os.path.abspath(os.path.join(script_dir, "../bin/mstl"))
+        if sys.platform == "win32":
+            mstl_bin += ".exe"
 
-        # Build mstl
-        build_mstl(mstl_bin)
+        if not os.path.exists(mstl_bin):
+            log_fail(f"mstl binary not found at {mstl_bin}. Please run build_all.sh first.")
 
         # Setup config file
         # We need a dummy repo to refer to in the config
