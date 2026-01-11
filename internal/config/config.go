@@ -217,11 +217,5 @@ func LoadConfigFile(configFile string) (*Config, error) {
 	// Set BaseDir to the directory containing the config file
 	config.BaseDir = filepath.Dir(absPath)
 
-	// If the directory name is ".mstl", we assume the workspace root is the parent directory.
-	// This allows users to place the configuration file in .mstl/config.json and have paths resolved relative to the workspace root.
-	if filepath.Base(config.BaseDir) == ".mstl" {
-		config.BaseDir = filepath.Dir(config.BaseDir)
-	}
-
 	return config, nil
 }
