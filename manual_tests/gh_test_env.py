@@ -77,13 +77,6 @@ class GhTestEnv:
         except subprocess.CalledProcessError:
             return False
 
-    def build_mstl_gh(self):
-        # No-op or check existence, as we use pre-built binary
-        if not os.path.exists(self.mstl_bin):
-             print_green(f"[ERROR] mstl-gh binary not found at {self.mstl_bin}. Please run build_all.sh first.")
-             sys.exit(1)
-        print_green(f"[-] Using pre-built mstl-gh at {self.mstl_bin}")
-
     def setup_repos(self, visibility=VISIBILITY_PRIVATE):
         if visibility not in [self.VISIBILITY_PRIVATE, self.VISIBILITY_PUBLIC]:
             raise ValueError(f"Invalid visibility: {visibility}")
