@@ -63,8 +63,7 @@ jobs:
           const fs = require('fs');
           const execSync = require('child_process').execSync;
 
-          try {
-            const output = execSync('go tool cover -func=coverage.out').toString();
+          function formatCoverageReport(output) {
             const lines = output.trim().split('\n');
             let totalCoverage = 'Unknown';
             let tableRows = [];
@@ -88,6 +87,13 @@ jobs:
             body += `<details>\n<summary>Detailed Report</summary>\n\n`;
             body += tableRows.join('\n');
             body += `\n</details>`;
+
+            return body;
+          }
+
+          try {
+            const output = execSync('go tool cover -func=coverage.out').toString();
+            const body = formatCoverageReport(output);
 
             github.rest.issues.createComment({
               issue_number: context.issue.number,
