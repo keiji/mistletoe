@@ -214,5 +214,8 @@ func LoadConfigFile(configFile string) (*Config, error) {
 		return nil, err
 	}
 
+	// Set BaseDir to the directory containing the config file
+	config.BaseDir = filepath.Dir(absPath)
+
 	return config, nil
 }

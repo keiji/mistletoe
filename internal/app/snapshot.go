@@ -210,6 +210,7 @@ func handleSnapshot(args []string, opts GlobalOptions) {
 		outputFile = fmt.Sprintf("mistletoe-snapshot-%s.json", identifier)
 	}
 
+	fmt.Fprintf(Stderr, "DEBUG: Checking existence of %s\n", outputFile)
 	if _, err := os.Stat(outputFile); err == nil {
 		fmt.Fprintf(Stderr, "Error: Output file '%s' exists.\n", outputFile)
 		osExit(1)
