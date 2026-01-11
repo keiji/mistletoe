@@ -7,7 +7,6 @@ import (
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -15,10 +14,6 @@ import (
 	"testing"
 )
 
-// Helper to provide *string
-func strPtr(s string) *string {
-	return &s
-}
 
 // setupRemoteAndContent from common_test.go is assumed to be available
 // If not, we copy it here for self-contained test
