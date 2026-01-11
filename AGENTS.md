@@ -34,6 +34,14 @@ Before creating a Pull Request, ensure that you verify not only that the build s
     *   **Strict Rule: Commits are only allowed when ALL unit tests PASS. No commit is permitted if even one unit test fails. This is a top priority.**
     *   You **MUST** ensure that all tests pass before committing code.
     *   Run `go test -v ./...` to verify functionality locally.
+    *   **Environment Stability**: Be aware that CI environments may have different characteristics (e.g., available stdin/stdout). Ensure tests are robust against these differences (e.g., by mocking standard input/output or using flags like `--ignore-stdin` where appropriate).
+    *   **Verification**: Do not assume success based on partial logs. Always verify the final exit code and the full test summary. If a test helper captures exit codes (e.g., mocking `os.Exit`), ensure it correctly propagates these codes using named return values or explicit assignment to avoid false positives.
+
+# Quality Assurance & Process
+
+*   **Self-Correction**: If a test failure occurs, identify the root cause (logic bug, test bug, or environment issue) and fix it *before* asking for another review. Do not submit code that you know or suspect might fail.
+*   **Cost Awareness**: Repeated cycles of "submit -> fail -> fix" are costly. Strive for "first-time right" by running comprehensive local verification.
+*   **Commit Content**: Ensure every commit contains actual, meaningful changes. Do not push empty or redundant commits.
 
 ## How to run revive (for Agents)
 
