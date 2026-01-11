@@ -46,11 +46,11 @@ func RunGit(dir string, gitPath string, verbose bool, args ...string) (string, e
 	start := time.Now()
 	cmdStr := fmt.Sprintf("%s %s", gitPath, strings.Join(args, " "))
 	if verbose {
-		fmt.Fprintf(os.Stderr, "[CMD] %s ", cmdStr)
+		fmt.Fprintf(Stderr, "[CMD] %s ", cmdStr)
 	}
 	defer func() {
 		if verbose {
-			fmt.Fprintf(os.Stderr, "(%s)\n", formatDuration(time.Since(start)))
+			fmt.Fprintf(Stderr, "(%s)\n", formatDuration(time.Since(start)))
 		}
 	}()
 
@@ -65,7 +65,7 @@ func RunGit(dir string, gitPath string, verbose bool, args ...string) (string, e
 	return strings.TrimSpace(string(out)), nil
 }
 
-// RunGitInteractive runs a git command connected to os.Stdout/Stderr.
+// RunGitInteractive runs a git command connected to Stdout/Stderr.
 func RunGitInteractive(dir string, gitPath string, verbose bool, args ...string) error {
 	if verbose {
 		// Lock execution to ensure logs are printed sequentially.
@@ -76,11 +76,11 @@ func RunGitInteractive(dir string, gitPath string, verbose bool, args ...string)
 	start := time.Now()
 	cmdStr := fmt.Sprintf("%s %s", gitPath, strings.Join(args, " "))
 	if verbose {
-		fmt.Fprintf(os.Stderr, "[CMD] %s ", cmdStr)
+		fmt.Fprintf(Stderr, "[CMD] %s ", cmdStr)
 	}
 	defer func() {
 		if verbose {
-			fmt.Fprintf(os.Stderr, "(%s)\n", formatDuration(time.Since(start)))
+			fmt.Fprintf(Stderr, "(%s)\n", formatDuration(time.Since(start)))
 		}
 	}()
 
@@ -88,8 +88,9 @@ func RunGitInteractive(dir string, gitPath string, verbose bool, args ...string)
 	if dir != "" {
 		cmd.Dir = dir
 	}
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	cmd.Stdout = Stdout
+	cmd.Stderr = Stderr
+	cmd.Stdin = Stdin
 	return cmd.Run()
 }
 
@@ -106,11 +107,11 @@ func RunGh(ghPath string, verbose bool, args ...string) (string, error) {
 	start := time.Now()
 	cmdStr := fmt.Sprintf("%s %s", ghPath, strings.Join(args, " "))
 	if verbose {
-		fmt.Fprintf(os.Stderr, "[CMD] %s ", cmdStr)
+		fmt.Fprintf(Stderr, "[CMD] %s ", cmdStr)
 	}
 	defer func() {
 		if verbose {
-			fmt.Fprintf(os.Stderr, "(%s)\n", formatDuration(time.Since(start)))
+			fmt.Fprintf(Stderr, "(%s)\n", formatDuration(time.Since(start)))
 		}
 	}()
 
@@ -147,9 +148,9 @@ func RunEditor() (string, error) {
 	tmpFile.Close() // Close immediately, let editor open it
 
 	cmd := ExecCommand(editor, tmpFile.Name())
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	cmd.Stdin = Stdin
+	cmd.Stdout = Stdout
+	cmd.Stderr = Stderr
 
 	if err := cmd.Run(); err != nil {
 		return "", fmt.Errorf("failed to run editor: %w", err)
@@ -311,10 +312,10 @@ func (s *Spinner) Start() {
 		for {
 			select {
 			case <-s.stop:
-				fmt.Print("\r\033[K") // Clear line
+				fmt.Fprint(Stderr, "\r\033[K") // Clear line
 				return
 			case <-ticker.C:
-				fmt.Printf("\rProcessing... %s", chars[i])
+				fmt.Fprintf(Stderr, "\rProcessing... %s", chars[i])
 				i = (i + 1) % len(chars)
 			}
 		}

@@ -7,7 +7,6 @@ import (
 import (
 	"flag"
 	"fmt"
-	"os"
 )
 
 func handleStatus(args []string, opts GlobalOptions) {
@@ -15,7 +14,8 @@ func handleStatus(args []string, opts GlobalOptions) {
 	var jVal, jValShort int
 	var vLong, vShort bool
 
-	fs := flag.NewFlagSet("status", flag.ExitOnError)
+	fs := flag.NewFlagSet("status", flag.ContinueOnError)
+	fs.SetOutput(Stderr)
 	fs.StringVar(&fLong, "file", DefaultConfigFile, "configuration file")
 	fs.StringVar(&fShort, "f", DefaultConfigFile, "configuration file (shorthand)")
 	fs.IntVar(&jVal, "jobs", -1, "number of concurrent jobs")
@@ -26,14 +26,16 @@ func handleStatus(args []string, opts GlobalOptions) {
 	fs.BoolVar(&vShort, "v", false, "Enable verbose output (shorthand)")
 
 	if err := ParseFlagsFlexible(fs, args); err != nil {
-		fmt.Println("Error parsing flags:", err)
-		os.Exit(1)
+		fmt.Fprintln(Stderr, "Error parsing flags:", err)
+		osExit(1)
+		return
 	}
 
 	configFile, jobs, configData, err := ResolveCommonValues(fLong, fShort, jVal, jValShort, ignoreStdin)
 	if err != nil {
-		fmt.Printf("Error: %v\n", err)
-		os.Exit(1)
+		fmt.Fprintf(Stderr, "Error: %v\n", err)
+		osExit(1)
+		return
 	}
 
 	var config *conf.Config
@@ -44,8 +46,9 @@ func handleStatus(args []string, opts GlobalOptions) {
 	}
 
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		fmt.Fprintln(Stderr, err)
+		osExit(1)
+		return
 	}
 
 	// Resolve Jobs (Config fallback)
@@ -60,26 +63,28 @@ func handleStatus(args []string, opts GlobalOptions) {
 	// Verbose Override
 	verbose := vLong || vShort
 	if verbose && jobs > 1 {
-		fmt.Println("Verbose is specified, so jobs is treated as 1.")
+		fmt.Fprintln(Stdout, "Verbose is specified, so jobs is treated as 1.")
 		jobs = 1
 	}
 
 	// Final Validation
 	if jobs < MinJobs {
-		fmt.Printf("Error: Jobs must be at least %d.\n", MinJobs)
-		os.Exit(1)
+		fmt.Fprintf(Stderr, "Error: Jobs must be at least %d.\n", MinJobs)
+		osExit(1)
+		return
 	}
 	if jobs > MaxJobs {
-		fmt.Printf("Error: Jobs must be at most %d.\n", MaxJobs)
-		os.Exit(1)
+		fmt.Fprintf(Stderr, "Error: Jobs must be at most %d.\n", MaxJobs)
+		osExit(1)
+		return
 	}
 
 	spinner := NewSpinner(verbose)
 
 	fail := func(format string, a ...interface{}) {
 		spinner.Stop()
-		fmt.Printf(format, a...)
-		os.Exit(1)
+		fmt.Fprintf(Stderr, format, a...)
+		osExit(1)
 	}
 
 	spinner.Start()
@@ -87,6 +92,7 @@ func handleStatus(args []string, opts GlobalOptions) {
 	// Validation Phase
 	if err := ValidateRepositoriesIntegrity(config, opts.GitPath, verbose); err != nil {
 		fail("%v\n", err)
+		return
 	}
 
 	// Output Phase

@@ -323,21 +323,21 @@ func ValidateStatusForAction(rows []StatusRow, checkPullable bool) {
 			behindRepos = append(behindRepos, row.Repo)
 		}
 		if row.HasConflict {
-			fmt.Printf("error: repository '%s' has conflicts. Cannot proceed.\n", row.Repo)
+			fmt.Fprintf(Stderr, "error: repository '%s' has conflicts. Cannot proceed.\n", row.Repo)
 			osExit(1)
 		}
 		if row.BranchName == "HEAD" {
-			fmt.Printf("error: repository '%s' is in a detached HEAD state. Cannot proceed.\n", row.Repo)
+			fmt.Fprintf(Stderr, "error: repository '%s' is in a detached HEAD state. Cannot proceed.\n", row.Repo)
 			osExit(1)
 		}
 	}
 
 	if len(behindRepos) > 0 {
-		fmt.Printf("error: the following repositories are behind remote and require a pull:\n")
+		fmt.Fprintf(Stderr, "error: the following repositories are behind remote and require a pull:\n")
 		for _, r := range behindRepos {
-			fmt.Printf(" - %s\n", r)
+			fmt.Fprintf(Stderr, " - %s\n", r)
 		}
-		fmt.Println("Please pull changes before proceeding.")
+		fmt.Fprintln(Stderr, "Please pull changes before proceeding.")
 		osExit(1)
 	}
 }

@@ -5,45 +5,14 @@ import (
 )
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"testing"
-	"encoding/json"
 )
-
-var binaryPath string
-
-func TestMain(m *testing.M) {
-	// Build the binary
-	if runtime.GOOS == "windows" {
-		binaryPath = filepath.Join(os.TempDir(), "mstl-test.exe")
-	} else {
-		binaryPath = filepath.Join(os.TempDir(), "mstl-test")
-	}
-
-	// Build command
-	rootDir, err := filepath.Abs("../..")
-	if err != nil {
-		fmt.Printf("Failed to get root dir: %v\n", err)
-		os.Exit(1)
-	}
-	cmdPath := filepath.Join(rootDir, "cmd", "mstl")
-	cmd := exec.Command("go", "build", "-o", binaryPath, cmdPath)
-	if err := cmd.Run(); err != nil {
-		fmt.Printf("Failed to build binary: %v\n", err)
-		os.Exit(1)
-	}
-
-	// Run tests
-	code := m.Run()
-
-	// Cleanup
-	os.Remove(binaryPath)
-	os.Exit(code)
-}
 
 // Helper to create a fully set up dummy git repo
 func setupDummyRepo(t *testing.T, dir, remoteURL, branchName string) {
@@ -77,6 +46,33 @@ func setupDummyRepo(t *testing.T, dir, remoteURL, branchName string) {
 	}
 }
 
+func runHandleSnapshot(t *testing.T, args []string, workDir string) (string, string, int) {
+	var stdoutBuf, stderrBuf bytes.Buffer
+	originalStdout, originalStderr := Stdout, Stderr
+	originalOsExit := osExit
+	defer func() {
+		Stdout, Stderr = originalStdout, originalStderr
+		osExit = originalOsExit
+	}()
+	Stdout = &stdoutBuf
+	Stderr = &stderrBuf
+
+	exitCode := 0
+	osExit = func(code int) {
+		exitCode = code
+		panic("os.Exit called")
+	}
+	defer func() { recover() }()
+
+	cwd, _ := os.Getwd()
+	os.Chdir(workDir)
+	defer os.Chdir(cwd)
+
+	handleSnapshot(args, GlobalOptions{GitPath: "git"})
+
+	return stdoutBuf.String(), stderrBuf.String(), exitCode
+}
+
 func TestSnapshot(t *testing.T) {
 	// Create temp dir
 	tmpDir, err := os.MkdirTemp("", "mstl-snapshot-test")
@@ -104,11 +100,9 @@ func TestSnapshot(t *testing.T) {
 	// Run snapshot
 	outputFile := "snapshot.json"
 
-	cmd := exec.Command(binaryPath, "snapshot", "-o", outputFile, "-f", "")
-	cmd.Dir = tmpDir
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("snapshot command failed: %v\nOutput: %s", err, out)
+	_, _, code := runHandleSnapshot(t, []string{"-o", outputFile, "-f", ""}, tmpDir)
+	if code != 0 {
+		t.Errorf("Expected exit code 0, got %d", code)
 	}
 
 	// Verify output file exists
@@ -141,12 +135,9 @@ func TestSnapshot(t *testing.T) {
 		repoMap[*r.ID] = r
 	}
 
-	// Check repo1
-	// Note: r.ID is the directory name. Since we created "repo1" inside tmpDir,
-	// and ran snapshot inside tmpDir, the dir name scanned is "repo1".
 	r1, ok := repoMap["repo1"]
 	if !ok {
-		t.Errorf("repo1 not found in %v", repoMap)
+		t.Errorf("repo1 not found")
 	} else {
 		if *r1.URL != repo1URL {
 			t.Errorf("repo1 URL mismatch: got %s, want %s", *r1.URL, repo1URL)
@@ -178,28 +169,22 @@ func TestSnapshot(t *testing.T) {
 }
 
 func TestSnapshot_DefaultFilename(t *testing.T) {
-	// Create temp dir
 	tmpDir, err := os.MkdirTemp("", "mstl-snapshot-default")
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
 
-	// Setup repos in tmpDir
 	repo1Dir := filepath.Join(tmpDir, "repo1")
 	repo1URL := "https://github.com/example/repo1.git"
 	repo1Branch := "main"
 	setupDummyRepo(t, repo1Dir, repo1URL, repo1Branch)
 
-	// Run snapshot without -o
-	cmd := exec.Command(binaryPath, "snapshot", "-f", "")
-	cmd.Dir = tmpDir
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("snapshot command failed: %v\nOutput: %s", err, out)
+	_, _, code := runHandleSnapshot(t, []string{"-f", ""}, tmpDir)
+	if code != 0 {
+		t.Errorf("Expected exit code 0, got %d", code)
 	}
 
-	// We don't know the exact ID easily without duplicating logic, but we can search for the file pattern
 	files, err := os.ReadDir(tmpDir)
 	if err != nil {
 		t.Fatalf("failed to read dir: %v", err)
@@ -222,44 +207,32 @@ func TestSnapshot_DefaultFilename(t *testing.T) {
 }
 
 func TestSnapshot_FileExists(t *testing.T) {
-	// Create temp dir
 	tmpDir, err := os.MkdirTemp("", "mstl-snapshot-fail")
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
 
-	// Create existing output file
 	outputFile := "existing.json"
 	fullOutputPath := filepath.Join(tmpDir, outputFile)
 	if err := os.WriteFile(fullOutputPath, []byte("{}"), 0644); err != nil {
 		t.Fatalf("failed to create existing output file: %v", err)
 	}
 
-	cmd := exec.Command(binaryPath, "snapshot", "-o", outputFile)
-	cmd.Dir = tmpDir
-	out, err := cmd.CombinedOutput()
+	_, stderr, code := runHandleSnapshot(t, []string{"-o", outputFile}, tmpDir)
 
-	// Expect failure
-	if err == nil {
-		t.Errorf("expected command to fail when file exists, but it succeeded. Output: %s", out)
+	if code != 1 {
+		t.Errorf("Expected exit code 1, got %d", code)
+	}
+	if !strings.Contains(stderr, "exists") {
+		t.Errorf("Expected exists error")
 	}
 }
 
-// TestGenerateSnapshot_ExcludesJobs verifies that the generated snapshot JSON does not contain the "jobs" field.
+// Keep TestGenerateSnapshot_ExcludesJobs as is (it calls GenerateSnapshotVerbose directly)
 func TestGenerateSnapshot_ExcludesJobs(t *testing.T) {
-	// 1. Create a dummy config with jobs set (this simulates loading a config that has it)
-	// Although GenerateSnapshot creates a NEW config, passing a config to it is used for BaseBranch resolution.
-	// But the Jobs field in the input config doesn't matter for the output structure directly,
-	// UNLESS GenerateSnapshot mistakenly copies it.
+	// ... (Existing implementation was correct, calling exported function)
 
-	// However, GenerateSnapshot constructs a fresh conf.Config struct.
-	// The Jobs field in conf.Config is a pointer (*int). If it is nil, json omitempty hides it.
-	// If GenerateSnapshot doesn't set it, it is nil.
-
-	// We will call GenerateSnapshotVerbose directly to verify the output bytes.
-
-	// Create a dummy repo so we have something to snapshot
 	tmpDir, err := os.MkdirTemp("", "mstl-gen-snapshot-test")
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
@@ -271,7 +244,6 @@ func TestGenerateSnapshot_ExcludesJobs(t *testing.T) {
 	repoBranch := "main"
 	setupDummyRepo(t, repoDir, repoURL, repoBranch)
 
-	// Input config
 	repoID := "repo1"
 	repoURLPtr := &repoURL
 	jobsVal := 5
@@ -284,17 +256,14 @@ func TestGenerateSnapshot_ExcludesJobs(t *testing.T) {
 				URL: repoURLPtr,
 			},
 		},
-		BaseDir: tmpDir, // Ensure it looks in tmpDir
+		BaseDir: tmpDir,
 	}
 
-	// Call GenerateSnapshotVerbose
 	jsonBytes, _, err := GenerateSnapshotVerbose(inputConfig, "git", false)
 	if err != nil {
 		t.Fatalf("GenerateSnapshotVerbose failed: %v", err)
 	}
 
-	// Verify "jobs" key is NOT present in jsonBytes
-	// We can decode into a map[string]interface{}
 	var result map[string]interface{}
 	if err := json.Unmarshal(jsonBytes, &result); err != nil {
 		t.Fatalf("failed to unmarshal generated json: %v", err)
