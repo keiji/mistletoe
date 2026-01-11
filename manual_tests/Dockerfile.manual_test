@@ -32,9 +32,6 @@ RUN --mount=type=secret,id=mistletoe_manual_test_github_token \
 WORKDIR /app
 COPY . .
 
-# Build mstl-gh
-RUN go build -o /usr/local/bin/mstl-gh ./cmd/mstl-gh
-
 # Instructions for running:
 # 1. Build: docker build --secret id=mistletoe_manual_test_github_token,env=GITHUB_TOKEN -t mstl-gh-test -f manual_tests/Dockerfile.manual_test .
 # 2. Run: docker run -it --rm -v $(pwd):/app mstl-gh-test /bin/bash
