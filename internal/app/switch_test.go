@@ -5,6 +5,7 @@ import (
 )
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"os/exec"
@@ -53,11 +54,7 @@ func TestHandleSwitch(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	// Build the mstl binary to test end-to-end (simulating integration test)
-	// We need to build it because handleSwitch calls os.Exit on error, which kills the test runner.
-	binPath := buildMstl(t)
-
-	// Change to tmpDir so that mstl operates relatively if needed (though we use absolute paths in config)
+	// Change to tmpDir
 	cwd, _ := os.Getwd()
 	defer func() {
 		if err := os.Chdir(cwd); err != nil {
@@ -71,7 +68,6 @@ func TestHandleSwitch(t *testing.T) {
 	// Create 2 dummy repos
 	repo1 := filepath.Join(tmpDir, "repo1")
 	repo2 := filepath.Join(tmpDir, "repo2")
-	// Use URLs matching config below
 	setupRepo(t, repo1, "repo1")
 	setupRepo(t, repo2, "repo2")
 
@@ -90,41 +86,75 @@ func TestHandleSwitch(t *testing.T) {
 		t.Fatalf("failed to write config: %v", err)
 	}
 
-	// Helper to run mstl
-	// Returns output and error
-	runMstl := func(args ...string) (string, error) {
-		cmd := exec.Command(binPath, args...)
-		out, err := cmd.CombinedOutput()
-		return string(out), err
+	// Mock Stdout/Stderr and osExit
+	var stdoutBuf, stderrBuf bytes.Buffer
+	originalStdout, originalStderr := Stdout, Stderr
+	originalOsExit := osExit
+	defer func() {
+		Stdout, Stderr = originalStdout, originalStderr
+		osExit = originalOsExit
+	}()
+	Stdout = &stdoutBuf
+	Stderr = &stderrBuf
+
+	// Helper to run handleSwitch with capture
+	runHandleSwitch := func(args ...string) (stdout string, stderr string, code int) {
+		stdoutBuf.Reset()
+		stderrBuf.Reset()
+
+		// Mock Stdin to empty
+		Stdin = strings.NewReader("")
+
+		osExit = func(c int) {
+			code = c
+			panic("os.Exit called")
+		}
+
+		defer func() {
+			recover()
+			stdout = stdoutBuf.String()
+			stderr = stderrBuf.String()
+		}()
+
+		// Append --ignore-stdin
+		fullArgs := append(args, "--ignore-stdin")
+		handleSwitch(fullArgs, GlobalOptions{GitPath: "git"})
+
+		stdout = stdoutBuf.String()
+		stderr = stderrBuf.String()
+		return
 	}
 
 	// Scenario 1: Switch to non-existent branch (fail)
-	// args: switch feature-branch --file ...
 	t.Run("Switch NonExistent Strict", func(t *testing.T) {
-		_, err := runMstl("switch", "feature-branch", "--file", configPath)
-		if err == nil {
-			t.Fatal("expected error for non-existent branch in strict mode, but got nil")
+		_, stderr, code := runHandleSwitch("feature-branch", "--file", configPath)
+		if code != 1 {
+			t.Errorf("expected exit code 1, got %d", code)
+		}
+		if !strings.Contains(stderr, "missing in repositories") {
+			t.Errorf("unexpected stderr: %s", stderr)
 		}
 	})
 
 	// Scenario 2: Create branch (success)
-	// args: switch -c feature-branch --file ...
 	t.Run("Switch Create Success", func(t *testing.T) {
-		// ADD -v to see debug output
-		out, err := runMstl("switch", "-v", "-c", "feature-branch", "--file", configPath)
-		if err != nil {
-			t.Fatalf("failed to create branch: %v\nOutput: %s", err, out)
+		out, _, code := runHandleSwitch("-v", "-c", "feature-branch", "--file", configPath)
+		if code != 0 {
+			t.Errorf("expected exit code 0, got %d", code)
 		}
 		// Verify
 		verifyBranch(t, repo1, "feature-branch")
 		verifyBranch(t, repo2, "feature-branch")
+		if !strings.Contains(out, "Creating and switching to branch") {
+			t.Logf("Output: %s", out)
+		}
 	})
 
 	// Scenario 3: Flexible ordering
-	// args: switch --file ... -c feature-branch-2
 	t.Run("Switch Flexible Ordering", func(t *testing.T) {
-		if _, err := runMstl("switch", "--file", configPath, "-c", "feature-branch-2"); err != nil {
-			t.Fatalf("failed to create branch with flexible ordering: %v", err)
+		_, _, code := runHandleSwitch("--file", configPath, "-c", "feature-branch-2")
+		if code != 0 {
+			t.Errorf("expected exit code 0, got %d", code)
 		}
 		verifyBranch(t, repo1, "feature-branch-2")
 		verifyBranch(t, repo2, "feature-branch-2")
@@ -132,37 +162,49 @@ func TestHandleSwitch(t *testing.T) {
 
 	// Scenario 4: Error - switch branch -c (Ambiguous / Invalid flag usage)
 	t.Run("Switch Invalid Flag Position", func(t *testing.T) {
-		out, err := runMstl("switch", "abranch", "-c", "--file", configPath)
-		if err == nil {
-			t.Fatal("expected error for 'switch abranch -c', got success")
+		_, stderr, code := runHandleSwitch("abranch", "-c", "--file", configPath)
+		if code != 1 {
+			t.Errorf("expected exit code 1, got %d", code)
 		}
-		if !strings.Contains(out, "flag needs an argument") && !strings.Contains(out, "Invalid data format") {
-			t.Logf("Output: %s", out)
+		// flag package outputs to Stderr
+		if !strings.Contains(stderr, "flag needs an argument") && !strings.Contains(stderr, "parse error") && !strings.Contains(stderr, "invalid") {
+			// Note: flag.ContinueOnError means ParseFlagsFlexible returns error, and we print "Error parsing flags:"
+			if !strings.Contains(stderr, "Error parsing flags") {
+				t.Logf("Stderr: %s", stderr)
+			}
 		}
 	})
 
 	// Scenario 5: Error - switch -c branch extra
 	t.Run("Switch Extra Args", func(t *testing.T) {
-		out, err := runMstl("switch", "-c", "branch3", "extra", "--file", configPath)
-		if err == nil {
-			t.Fatal("expected error for extra args")
+		_, stderr, code := runHandleSwitch("-c", "branch3", "extra", "--file", configPath)
+		if code != 1 {
+			t.Errorf("expected exit code 1, got %d", code)
 		}
-		if !strings.Contains(out, "Unexpected argument: extra") {
-			t.Logf("Output: %s", out)
+		if !strings.Contains(stderr, "Unexpected argument: extra") {
+			t.Logf("Stderr: %s", stderr)
 		}
 	})
 
 	// Scenario 6: Mixed - switch branch -c branch2
-	// parser: branch (pos), -c (flag), branch2 (value).
-	// result: createBranchName=branch2, args=[branch].
-	// Error: Unexpected argument: branch.
 	t.Run("Switch Ambiguous Mixed", func(t *testing.T) {
-		out, err := runMstl("switch", "branchA", "-c", "branchB", "--file", configPath)
-		if err == nil {
-			t.Fatal("expected error for ambiguous mixed args")
+		_, stderr, code := runHandleSwitch("branchA", "-c", "branchB", "--file", configPath)
+		if code != 1 {
+			t.Errorf("expected exit code 1, got %d", code)
 		}
-		if !strings.Contains(out, "Unexpected argument: branchA") {
-			t.Logf("Output: %s", out)
+		if !strings.Contains(stderr, "Unexpected argument: branchA") {
+			t.Logf("Stderr: %s", stderr)
+		}
+	})
+
+	// Scenario 8: Jobs validation
+	t.Run("Switch Jobs Invalid", func(t *testing.T) {
+		_, stderr, code := runHandleSwitch("b", "-j", "0", "--file", configPath)
+		if code != 1 {
+			t.Errorf("expected exit code 1, got %d", code)
+		}
+		if !strings.Contains(stderr, "Jobs must be at least") {
+			t.Logf("Stderr: %s", stderr)
 		}
 	})
 }

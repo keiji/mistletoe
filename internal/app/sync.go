@@ -8,7 +8,6 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
-	"os"
 	"strings"
 )
 
@@ -17,7 +16,8 @@ func handleSync(args []string, opts GlobalOptions) {
 	var jVal, jValShort int
 	var vLong, vShort bool
 
-	fs := flag.NewFlagSet("sync", flag.ExitOnError)
+	fs := flag.NewFlagSet("sync", flag.ContinueOnError)
+	fs.SetOutput(Stderr)
 	fs.StringVar(&fLong, "file", DefaultConfigFile, "Configuration file path")
 	fs.StringVar(&fShort, "f", DefaultConfigFile, "Configuration file path (shorthand)")
 	fs.IntVar(&jVal, "jobs", -1, "number of concurrent jobs")
@@ -28,14 +28,16 @@ func handleSync(args []string, opts GlobalOptions) {
 	fs.BoolVar(&vShort, "v", false, "Enable verbose output (shorthand)")
 
 	if err := ParseFlagsFlexible(fs, args); err != nil {
-		fmt.Println("Error parsing flags:", err)
-		os.Exit(1)
+		fmt.Fprintln(Stderr, "Error parsing flags:", err)
+		osExit(1)
+		return
 	}
 
 	configFile, jobs, configData, err := ResolveCommonValues(fLong, fShort, jVal, jValShort, ignoreStdin)
 	if err != nil {
-		fmt.Printf("Error: %v\n", err)
-		os.Exit(1)
+		fmt.Fprintf(Stderr, "Error: %v\n", err)
+		osExit(1)
+		return
 	}
 
 	var config *conf.Config
@@ -46,8 +48,9 @@ func handleSync(args []string, opts GlobalOptions) {
 	}
 
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		fmt.Fprintln(Stderr, err)
+		osExit(1)
+		return
 	}
 
 	// Resolve Jobs (Config fallback)
@@ -62,26 +65,28 @@ func handleSync(args []string, opts GlobalOptions) {
 	// Verbose Override
 	verbose := vLong || vShort
 	if verbose && jobs > 1 {
-		fmt.Println("Verbose is specified, so jobs is treated as 1.")
+		fmt.Fprintln(Stdout, "Verbose is specified, so jobs is treated as 1.")
 		jobs = 1
 	}
 
 	// Final Validation
 	if jobs < MinJobs {
-		fmt.Printf("Error: Jobs must be at least %d.\n", MinJobs)
-		os.Exit(1)
+		fmt.Fprintf(Stderr, "Error: Jobs must be at least %d.\n", MinJobs)
+		osExit(1)
+		return
 	}
 	if jobs > MaxJobs {
-		fmt.Printf("Error: Jobs must be at most %d.\n", MaxJobs)
-		os.Exit(1)
+		fmt.Fprintf(Stderr, "Error: Jobs must be at most %d.\n", MaxJobs)
+		osExit(1)
+		return
 	}
 
 	spinner := NewSpinner(verbose)
 
 	fail := func(format string, a ...interface{}) {
 		spinner.Stop()
-		fmt.Printf(format, a...)
-		os.Exit(1)
+		fmt.Fprintf(Stderr, format, a...)
+		osExit(1)
 	}
 
 	spinner.Start()
@@ -89,6 +94,7 @@ func handleSync(args []string, opts GlobalOptions) {
 	// Validation Phase
 	if err := ValidateRepositoriesIntegrity(config, opts.GitPath, verbose); err != nil {
 		fail("%v\n", err)
+		return
 	}
 
 	// Status Phase
@@ -114,10 +120,10 @@ func handleSync(args []string, opts GlobalOptions) {
 
 	if needsPull {
 		if needsStrategy {
-			fmt.Println("Updates available.")
-			fmt.Print("Merge, rebase, or abort? [merge/rebase/abort]: ")
+			fmt.Fprintln(Stdout, "Updates available.")
+			fmt.Fprint(Stdout, "Merge, rebase, or abort? [merge/rebase/abort]: ")
 
-			scanner := bufio.NewScanner(os.Stdin)
+			scanner := bufio.NewScanner(Stdin)
 			if scanner.Scan() {
 				input := strings.ToLower(strings.TrimSpace(scanner.Text()))
 				switch input {
@@ -126,32 +132,36 @@ func handleSync(args []string, opts GlobalOptions) {
 				case "rebase", "r":
 					argsPull = append(argsPull, "--rebase")
 				case "abort", "a", "q":
-					fmt.Println("Aborted.")
-					os.Exit(0)
+					fmt.Fprintln(Stdout, "Aborted.")
+					osExit(0)
+					return
 				default:
-					fmt.Println("Invalid input. Aborted.")
-					os.Exit(1)
+					fmt.Fprintln(Stdout, "Invalid input. Aborted.")
+					osExit(1)
+					return
 				}
 			} else {
 				// EOF or error
-				os.Exit(1)
+				osExit(1)
+				return
 			}
 		} else {
-			fmt.Println("Updates available. Pulling...")
+			fmt.Fprintln(Stdout, "Updates available. Pulling...")
 		}
 	}
 
 	// Execute Pull
 	for _, row := range rows {
 		if row.RemoteRev == "" {
-			fmt.Printf("Skipping %s: Remote branch not found.\n", row.Repo)
+			fmt.Fprintf(Stdout, "Skipping %s: Remote branch not found.\n", row.Repo)
 			continue
 		}
 
-		fmt.Printf("Syncing %s...\n", row.Repo)
+		fmt.Fprintf(Stdout, "Syncing %s...\n", row.Repo)
 		if err := RunGitInteractive(row.RepoDir, opts.GitPath, verbose, argsPull...); err != nil {
-			fmt.Printf("Error pulling %s: %v\n", row.Repo, err)
-			os.Exit(1) // Abort on error as per "Sequentially pull" typical strict behavior or "abort" logic
+			fmt.Fprintf(Stderr, "Error pulling %s: %v\n", row.Repo, err)
+			osExit(1) // Abort on error as per "Sequentially pull" typical strict behavior or "abort" logic
+			return
 		}
 	}
 }

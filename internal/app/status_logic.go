@@ -36,10 +36,14 @@ type StatusRow struct {
 
 // ValidateRepositoriesIntegrity checks if repositories exist and are valid.
 func ValidateRepositoriesIntegrity(config *conf.Config, gitPath string, verbose bool) error {
+	// Debug
+	// fmt.Fprintf(Stderr, "DEBUG: ValidateRepositoriesIntegrity BaseDir=%s\n", config.BaseDir)
+
 	for _, repo := range *config.Repositories {
 		targetDir := config.GetRepoPath(repo)
 		info, err := os.Stat(targetDir)
 		if os.IsNotExist(err) {
+			// fmt.Fprintf(Stderr, "DEBUG: skipping %s (not exist)\n", targetDir)
 			continue
 		}
 		if err != nil {
@@ -60,6 +64,9 @@ func ValidateRepositoriesIntegrity(config *conf.Config, gitPath string, verbose 
 		if err != nil {
 			return fmt.Errorf("error: directory %s is a git repo but failed to get remote origin: %v", targetDir, err)
 		}
+
+		// fmt.Fprintf(Stderr, "DEBUG: targetDir=%s, currentURL='%s', expectedURL='%s'\n", targetDir, currentURL, *repo.URL)
+
 		if currentURL != *repo.URL {
 			return fmt.Errorf("error: directory %s exists with different remote origin: %s (expected %s)", targetDir, currentURL, *repo.URL)
 		}
@@ -323,21 +330,21 @@ func ValidateStatusForAction(rows []StatusRow, checkPullable bool) {
 			behindRepos = append(behindRepos, row.Repo)
 		}
 		if row.HasConflict {
-			fmt.Printf("error: repository '%s' has conflicts. Cannot proceed.\n", row.Repo)
+			fmt.Fprintf(Stderr, "error: repository '%s' has conflicts. Cannot proceed.\n", row.Repo)
 			osExit(1)
 		}
 		if row.BranchName == "HEAD" {
-			fmt.Printf("error: repository '%s' is in a detached HEAD state. Cannot proceed.\n", row.Repo)
+			fmt.Fprintf(Stderr, "error: repository '%s' is in a detached HEAD state. Cannot proceed.\n", row.Repo)
 			osExit(1)
 		}
 	}
 
 	if len(behindRepos) > 0 {
-		fmt.Printf("error: the following repositories are behind remote and require a pull:\n")
+		fmt.Fprintf(Stderr, "error: the following repositories are behind remote and require a pull:\n")
 		for _, r := range behindRepos {
-			fmt.Printf(" - %s\n", r)
+			fmt.Fprintf(Stderr, " - %s\n", r)
 		}
-		fmt.Println("Please pull changes before proceeding.")
+		fmt.Fprintln(Stderr, "Please pull changes before proceeding.")
 		osExit(1)
 	}
 }
