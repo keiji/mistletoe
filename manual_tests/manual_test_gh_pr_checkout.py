@@ -12,6 +12,7 @@ from interactive_runner import InteractiveRunner, print_green
 
 def main():
     runner = InteractiveRunner("Pull Request Checkout Test")
+    runner.parse_args()
 
     env = GhTestEnv()
 

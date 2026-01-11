@@ -9,6 +9,7 @@ from interactive_runner import InteractiveRunner, print_green
 
 def main():
     runner = InteractiveRunner("Multi-Repo Pull Request Creation Test")
+    runner.parse_args()
 
     env = GhTestEnv()
 

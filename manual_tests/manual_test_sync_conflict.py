@@ -172,6 +172,7 @@ class MstlManualTestSyncConflict:
 
 def main():
     runner = InteractiveRunner("mstl sync Conflict Test")
+    runner.parse_args()
     test = MstlManualTestSyncConflict()
 
     description = (

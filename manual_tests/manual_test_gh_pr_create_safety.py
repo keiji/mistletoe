@@ -25,6 +25,7 @@ def run_command(cmd, cwd=None, env=None):
 
 def main():
     runner = InteractiveRunner("'pr create' Safety Check Test")
+    runner.parse_args()
 
     # Define vars to be used in cleanup
     test_dir_ptr = {"path": None}

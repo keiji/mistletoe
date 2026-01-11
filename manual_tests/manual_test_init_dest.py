@@ -189,6 +189,7 @@ class InitDestTest:
 
 def main():
     runner = InteractiveRunner("Init Destination Test")
+    runner.parse_args()
     test = InitDestTest()
 
     description = (

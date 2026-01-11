@@ -259,6 +259,7 @@ class MstlManualTest:
 
 def main():
     runner = InteractiveRunner("mstl Core Functionality Test")
+    runner.parse_args()
     test = MstlManualTest()
 
     description = (
