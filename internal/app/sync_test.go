@@ -137,24 +137,6 @@ func TestHandleSync(t *testing.T) {
 
 		// Input "merge"
 		out, _, code := runHandleSync("merge\n", "--ignore-stdin")
-		// Wait, if we ignore stdin, how do we pass "merge"?
-		// ResolveCommonValues sees config file + stdin data.
-		// If input is provided, ResolveCommonValues assumes it is config data unless ignored.
-		// But handleSync reads from Stdin LATER for the interactive prompt.
-		// We need ResolveCommonValues to IGNORE stdin (as config), but handleSync to READ stdin (as prompt).
-		// Current ResolveCommonValues consumes Stdin if not ignored.
-		// This is a conflict in design for testing vs piping.
-
-		// If we use "--ignore-stdin", ResolveCommonValues ignores it.
-		// But handleSync bufio.NewScanner(Stdin) reads from it.
-		// Does bufio read from the SAME Stdin reader? Yes.
-		// Does ResolveCommonValues drain it?
-		// If ignoreStdin is true, ResolveCommonValues does NOT read it.
-		// So handleSync can read "merge\n".
-
-		// So we MUST pass --ignore-stdin to prevent ResolveCommonValues from failing with "conflict".
-
-		out, _, code = runHandleSync("merge\n", "--ignore-stdin")
 		if code != 0 {
 			t.Errorf("expected exit code 0, got %d", code)
 		}
@@ -177,7 +159,8 @@ func TestHandleSync(t *testing.T) {
 		exec.Command("git", "-C", repo1, "add", ".").Run()
 		exec.Command("git", "-C", repo1, "commit", "-m", "Conflict B").Run()
 
-		out, stderr, code := runHandleSync("merge\n")
+		// Pass --ignore-stdin explicitly
+		out, stderr, code := runHandleSync("merge\n", "--ignore-stdin")
 		if code != 1 {
 			t.Errorf("expected exit code 1 for conflict, got %d", code)
 		}

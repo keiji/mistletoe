@@ -263,7 +263,7 @@ func TestStatusCmd(t *testing.T) {
 	})
 }
 
-func runHandleStatus(t *testing.T, configFile, workDir string) (string, string, int) {
+func runHandleStatus(t *testing.T, configFile, workDir string) (stdout string, stderr string, exitCode int) {
 	var stdoutBuf, stderrBuf bytes.Buffer
 	originalStdout, originalStderr := Stdout, Stderr
 	originalOsExit := osExit
@@ -274,22 +274,26 @@ func runHandleStatus(t *testing.T, configFile, workDir string) (string, string, 
 	Stdout = &stdoutBuf
 	Stderr = &stderrBuf
 
-	// Mock Stdin to empty to prevent ResolveCommonValues conflict error
+	// Mock Stdin
 	Stdin = strings.NewReader("")
 
-	exitCode := 0
 	osExit = func(code int) {
 		exitCode = code
 		panic("os.Exit called")
 	}
-	defer func() { recover() }()
+	defer func() {
+		recover()
+		stdout = stdoutBuf.String()
+		stderr = stderrBuf.String()
+	}()
 
 	cwd, _ := os.Getwd()
 	os.Chdir(workDir)
 	defer os.Chdir(cwd)
 
-	// Append --ignore-stdin for robustness against environment
 	handleStatus([]string{"--file", configFile, "--ignore-stdin"}, GlobalOptions{GitPath: "git"})
 
-	return stdoutBuf.String(), stderrBuf.String(), exitCode
+	stdout = stdoutBuf.String()
+	stderr = stderrBuf.String()
+	return
 }

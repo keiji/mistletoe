@@ -102,6 +102,9 @@ func TestHandleSwitch(t *testing.T) {
 		stdoutBuf.Reset()
 		stderrBuf.Reset()
 
+		// Mock Stdin to empty
+		Stdin = strings.NewReader("")
+
 		osExit = func(c int) {
 			code = c
 			panic("os.Exit called")
@@ -113,7 +116,9 @@ func TestHandleSwitch(t *testing.T) {
 			stderr = stderrBuf.String()
 		}()
 
-		handleSwitch(args, GlobalOptions{GitPath: "git"})
+		// Append --ignore-stdin
+		fullArgs := append(args, "--ignore-stdin")
+		handleSwitch(fullArgs, GlobalOptions{GitPath: "git"})
 
 		stdout = stdoutBuf.String()
 		stderr = stderrBuf.String()

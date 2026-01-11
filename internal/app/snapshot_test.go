@@ -7,7 +7,6 @@ import (
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -47,7 +46,7 @@ func setupDummyRepo(t *testing.T, dir, remoteURL, branchName string) {
 	}
 }
 
-func runHandleSnapshot(t *testing.T, args []string, workDir string) (string, string, int) {
+func runHandleSnapshot(t *testing.T, args []string, workDir string) (stdout string, stderr string, exitCode int) {
 	var stdoutBuf, stderrBuf bytes.Buffer
 	originalStdout, originalStderr := Stdout, Stderr
 	originalOsExit := osExit
@@ -61,12 +60,15 @@ func runHandleSnapshot(t *testing.T, args []string, workDir string) (string, str
 	// Mock Stdin
 	Stdin = strings.NewReader("")
 
-	exitCode := 0
 	osExit = func(code int) {
 		exitCode = code
 		panic("os.Exit called")
 	}
-	defer func() { recover() }()
+	defer func() {
+		recover()
+		stdout = stdoutBuf.String()
+		stderr = stderrBuf.String()
+	}()
 
 	cwd, _ := os.Getwd()
 	os.Chdir(workDir)
@@ -76,7 +78,9 @@ func runHandleSnapshot(t *testing.T, args []string, workDir string) (string, str
 	fullArgs := append(args, "--ignore-stdin")
 	handleSnapshot(fullArgs, GlobalOptions{GitPath: "git"})
 
-	return stdoutBuf.String(), stderrBuf.String(), exitCode
+	stdout = stdoutBuf.String()
+	stderr = stderrBuf.String()
+	return
 }
 
 func TestSnapshot(t *testing.T) {
