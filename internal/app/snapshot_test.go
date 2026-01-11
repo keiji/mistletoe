@@ -7,11 +7,12 @@ import (
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 	"testing"
+	"strings"
 )
 
 // Helper to create a fully set up dummy git repo
@@ -57,6 +58,9 @@ func runHandleSnapshot(t *testing.T, args []string, workDir string) (string, str
 	Stdout = &stdoutBuf
 	Stderr = &stderrBuf
 
+	// Mock Stdin
+	Stdin = strings.NewReader("")
+
 	exitCode := 0
 	osExit = func(code int) {
 		exitCode = code
@@ -68,7 +72,9 @@ func runHandleSnapshot(t *testing.T, args []string, workDir string) (string, str
 	os.Chdir(workDir)
 	defer os.Chdir(cwd)
 
-	handleSnapshot(args, GlobalOptions{GitPath: "git"})
+	// Append --ignore-stdin
+	fullArgs := append(args, "--ignore-stdin")
+	handleSnapshot(fullArgs, GlobalOptions{GitPath: "git"})
 
 	return stdoutBuf.String(), stderrBuf.String(), exitCode
 }

@@ -36,14 +36,10 @@ type StatusRow struct {
 
 // ValidateRepositoriesIntegrity checks if repositories exist and are valid.
 func ValidateRepositoriesIntegrity(config *conf.Config, gitPath string, verbose bool) error {
-	cwd, _ := os.Getwd()
-	fmt.Fprintf(Stderr, "DEBUG: ValidateRepositoriesIntegrity CWD=%s BaseDir=%s\n", cwd, config.BaseDir)
-
 	for _, repo := range *config.Repositories {
 		targetDir := config.GetRepoPath(repo)
 		info, err := os.Stat(targetDir)
 		if os.IsNotExist(err) {
-			fmt.Fprintf(Stderr, "DEBUG: skipping %s (not exist) targetDir=%s\n", *repo.ID, targetDir)
 			continue
 		}
 		if err != nil {
@@ -64,9 +60,6 @@ func ValidateRepositoriesIntegrity(config *conf.Config, gitPath string, verbose 
 		if err != nil {
 			return fmt.Errorf("error: directory %s is a git repo but failed to get remote origin: %v", targetDir, err)
 		}
-
-		fmt.Fprintf(Stderr, "DEBUG: targetDir=%s, currentURL='%s', expectedURL='%s'\n", targetDir, currentURL, *repo.URL)
-
 		if currentURL != *repo.URL {
 			return fmt.Errorf("error: directory %s exists with different remote origin: %s (expected %s)", targetDir, currentURL, *repo.URL)
 		}
@@ -235,11 +228,19 @@ func getRepoStatus(repo conf.Repository, baseDir, gitPath string, verbose bool, 
 					base, err := RunGit(targetDir, gitPath, verbose, "merge-base", localHeadFull, remoteHeadFull)
 					if err == nil && base != "" {
 						base = strings.TrimSpace(base)
+						// Debug output for conflict detection analysis
+						// fmt.Fprintf(Stderr, "DEBUG: Conflict check: base=%s local=%s remote=%s\n", base, localHeadFull, remoteHeadFull)
+
 						output, err := RunGit(targetDir, gitPath, verbose, "merge-tree", base, localHeadFull, remoteHeadFull)
 						if err == nil {
 							if strings.Contains(output, "<<<<<<<") {
 								hasConflict = true
+							} else {
+								// Debug check
+								// fmt.Fprintf(Stderr, "DEBUG: No conflict marker found in merge-tree output (len=%d)\n", len(output))
 							}
+						} else {
+							// fmt.Fprintf(Stderr, "DEBUG: merge-tree failed: %v\n", err)
 						}
 					}
 				}
