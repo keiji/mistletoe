@@ -126,15 +126,15 @@ func TestGenerateMistletoeBody_WithDependencies(t *testing.T) {
 		t.Error("Missing url-lib in body")
 	}
 
-	if !strings.Contains(body, "#### Dependents") {
-		t.Error("Missing Dependents section")
+	if !strings.Contains(body, "#### Used by") {
+		t.Error("Missing Used by section")
 	}
 	if !strings.Contains(body, "url-dep2") {
 		t.Error("Missing url-dep2 in body")
 	}
 
-	if !strings.Contains(body, "#### Others") {
-		t.Error("Missing Others section")
+	if !strings.Contains(body, "#### Related to") {
+		t.Error("Missing Related to section")
 	}
 	if !strings.Contains(body, "url-other") {
 		t.Error("Missing url-other in body")
@@ -317,29 +317,29 @@ func TestDependencyCategorization_Verification(t *testing.T) {
 			}
 
 			checkSection("Dependencies", tc.ExpectDependencies)
-			checkSection("Dependents", tc.ExpectDependents)
-			checkSection("Others", tc.ExpectOthers)
+			checkSection("Used by", tc.ExpectDependents)
+			checkSection("Related to", tc.ExpectOthers)
 
 			// Additional check: Ensure items are not miscategorized.
 			if len(tc.ExpectDependencies) > 0 && len(tc.ExpectDependents) > 0 {
 				depIdx := strings.Index(body, "#### Dependencies")
-				deperIdx := strings.Index(body, "#### Dependents")
+				deperIdx := strings.Index(body, "#### Used by")
 
 				if depIdx > deperIdx {
-					t.Error("Dependencies section should come before Dependents")
+					t.Error("Dependencies section should come before Used by")
 				}
 
 				for _, u := range tc.ExpectDependencies {
 					uIdx := strings.Index(body, u)
 					if uIdx > deperIdx {
-						t.Errorf("URL %s (Dependency) appears after Dependents header", u)
+						t.Errorf("URL %s (Dependency) appears after Used by header", u)
 					}
 				}
 
 				for _, u := range tc.ExpectDependents {
 					uIdx := strings.Index(body, u)
 					if uIdx < deperIdx {
-						t.Errorf("URL %s (Dependent) appears before Dependents header", u)
+						t.Errorf("URL %s (Dependent) appears before Used by header", u)
 					}
 				}
 			}

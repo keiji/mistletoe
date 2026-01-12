@@ -226,7 +226,7 @@ func TestWriteDependencyFile(t *testing.T) {
 		t.Fatalf("writeDependencyFile failed: %v", err)
 	}
 
-	depFile := filepath.Join(mstlDir, "dependencies.md")
+	depFile := filepath.Join(mstlDir, "dependency-graph.md")
 	data, err := os.ReadFile(depFile)
 	if err != nil {
 		t.Fatalf("Failed to read file: %v", err)

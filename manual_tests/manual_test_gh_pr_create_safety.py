@@ -159,10 +159,10 @@ sys.exit(0)
         with open(config_path, "w") as f:
             json.dump(config, f)
 
-        # Create .mstl directory and dependencies.md
+        # Create .mstl directory and dependency-graph.md
         mstl_dir = os.path.join(test_dir, ".mstl")
         os.makedirs(mstl_dir, exist_ok=True)
-        with open(os.path.join(mstl_dir, "dependencies.md"), "w") as f:
+        with open(os.path.join(mstl_dir, "dependency-graph.md"), "w") as f:
             f.write("graph TD\nrepo-a")
 
         # Run mstl-gh pr create with PTY

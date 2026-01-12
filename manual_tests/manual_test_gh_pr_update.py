@@ -52,9 +52,9 @@ def main():
             subprocess.run(["git", "commit", "-m", "Add test.txt"], cwd=r_dir, check=True, stdout=subprocess.DEVNULL)
 
         print_green("[-] Running 'pr create'...")
-        env.run_mstl_cmd(["pr", "create", "-t", "Update Test PR", "-b", "Body", "--dependencies", "dependencies.md"])
+        env.run_mstl_cmd(["pr", "create", "-t", "Update Test PR", "-b", "Body", "--dependencies", "dependency-graph.md"])
 
-        print_green("[-] Modifying dependencies.md (Adding D --> A)...")
+        print_green("[-] Modifying dependency-graph.md (Adding D --> A)...")
         # Read existing graph
         with open(env.dependency_file, "r") as f:
             content = f.read()
@@ -85,7 +85,7 @@ def main():
 
         print_green("[-] Running 'pr update'...")
         # pr update updates existing PRs
-        env.run_mstl_cmd(["pr", "update", "--dependencies", "dependencies.md", "--verbose"])
+        env.run_mstl_cmd(["pr", "update", "--dependencies", "dependency-graph.md", "--verbose"])
 
         # Display PR URLs for verification
         print_green(f"[-] Please verify the PR for Repo D ({repo_d}):")

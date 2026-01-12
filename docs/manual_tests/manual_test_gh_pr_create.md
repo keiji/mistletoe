@@ -57,7 +57,7 @@
 mstl-gh pr create \
   -t "Interactive Test PR" \
   -b "Testing interactive script" \
-  --dependencies dependencies.md \
+  --dependencies dependency-graph.md \
   --verbose
 ```
 

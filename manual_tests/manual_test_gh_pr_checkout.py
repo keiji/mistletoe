@@ -56,7 +56,7 @@ def main():
 
         print_green("[-] Running 'pr create' to setup PRs...")
         # Manual input for creation
-        env.run_mstl_cmd(["pr", "create", "-t", "Checkout Test PR", "-b", "Body", "--dependencies", "dependencies.md"])
+        env.run_mstl_cmd(["pr", "create", "-t", "Checkout Test PR", "-b", "Body", "--dependencies", "dependency-graph.md"])
 
         # Retrieve PR URL for Repo A
         print_green(f"[-] retrieving PR URL for {repo_a}...")
@@ -89,7 +89,7 @@ def main():
         "2. 'mstl-gh pr checkout' downloads the state from the PR snapshot.\n"
         "3. A new directory './pr_checkout' is created.\n"
         "4. Inside './pr_checkout', all 4 repositories exist and are checked out to the PR branch/commit.\n"
-        "5. The .mstl/dependencies.md in the checked out dir should match the original."
+        "5. The .mstl/dependency-graph.md in the checked out dir should match the original."
     )
 
     runner.execute_scenario(

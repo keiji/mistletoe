@@ -56,7 +56,7 @@
 mstl-gh pr create \
   -t "Interactive Test Draft PR" \
   -b "Testing interactive script with draft" \
-  --dependencies dependencies.md \
+  --dependencies dependency-graph.md \
   --draft \
   --verbose
 ```

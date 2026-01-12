@@ -30,7 +30,7 @@ class GhTestEnv:
 
         self.test_dir = os.path.join(self.cwd, f"test_workspace_{self.uuid}")
         self.config_file = os.path.join(self.test_dir, "mistletoe.json")
-        self.dependency_file = os.path.join(self.test_dir, "dependencies.md")
+        self.dependency_file = os.path.join(self.test_dir, "dependency-graph.md")
 
         # Repository info placeholders
         self.repo_names = []

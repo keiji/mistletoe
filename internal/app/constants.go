@@ -47,5 +47,5 @@ const (
 // Default constants
 const (
 	DefaultConfigFile   = ".mstl/config.json"
-	DefaultDependencies = ".mstl/dependencies.md"
+	DefaultDependencies = ".mstl/dependency-graph.md"
 )

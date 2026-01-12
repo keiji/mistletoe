@@ -221,7 +221,7 @@ mstl-gh pr create -f <config_file> [options]
 
 If `--dependencies` is provided, the graph content is embedded in the PR body (hidden in a details block with a Mermaid preview), and related PRs are categorized based on the graph.
 
-**Example dependencies file (`dependencies.md`):**
+**Example dependencies file (`dependency-graph.md`):**
 
 ````markdown
 ```mermaid
