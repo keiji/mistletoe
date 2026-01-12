@@ -4,7 +4,7 @@ go 1.25.5
 
 require (
 	github.com/olekukonko/tablewriter v1.1.2
-	golang.org/x/text v0.32.0
+	golang.org/x/text v0.33.0
 )
 
 require (
