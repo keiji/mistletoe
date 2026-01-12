@@ -269,18 +269,17 @@ func validateAndPrepareInitDest(dest string) error {
 
 func handleInit(args []string, opts GlobalOptions) {
 	var fShort, fLong string
-	var dLong string
+	var destLong string
+	var dependenciesLong string
 	var depth int
 	var jVal, jValShort int
 	var vLong, vShort bool
 
 	fs := flag.NewFlagSet("init", flag.ExitOnError)
-	var depFile string
-
 	fs.StringVar(&fLong, "file", DefaultConfigFile, "configuration file")
 	fs.StringVar(&fShort, "f", DefaultConfigFile, "configuration file (shorthand)")
-	fs.StringVar(&dLong, "dest", "", "destination directory")
-	fs.StringVar(&depFile, "dependencies", "", "Path to dependency graph file")
+	fs.StringVar(&destLong, "dest", "", "destination directory")
+	fs.StringVar(&dependenciesLong, "dependencies", "", "Path to dependency graph file")
 	fs.IntVar(&depth, "depth", 0, "Create a shallow clone with a history truncated to the specified number of commits")
 	fs.IntVar(&jVal, "jobs", -1, "number of concurrent jobs")
 	fs.IntVar(&jValShort, "j", -1, "number of concurrent jobs (shorthand)")
@@ -344,8 +343,8 @@ func handleInit(args []string, opts GlobalOptions) {
 	}
 
 	dest := "."
-	if dLong != "" {
-		dest = dLong
+	if destLong != "" {
+		dest = destLong
 	}
 
 	if err := validateAndPrepareInitDest(dest); err != nil {
@@ -355,7 +354,7 @@ func handleInit(args []string, opts GlobalOptions) {
 
 	// Validate dependency file if provided
 	var depContent []byte
-	if depFile != "" {
+	if dependenciesLong != "" {
 		// Collect all valid IDs (including private ones) for initial validation
 		var allIDs []string
 		for _, repo := range *config.Repositories {
@@ -367,7 +366,7 @@ func handleInit(args []string, opts GlobalOptions) {
 
 		// Read and validate
 		// Since ParseDependencies takes string, we read file first.
-		rawContent, err := os.ReadFile(depFile)
+		rawContent, err := os.ReadFile(dependenciesLong)
 		if err != nil {
 			fmt.Printf("Error reading dependency file: %v\n", err)
 			os.Exit(1)
@@ -434,7 +433,7 @@ func handleInit(args []string, opts GlobalOptions) {
 		depPath := filepath.Join(mstlDir, "dependency-graph.md")
 		var graphContent string
 
-		if depFile != "" {
+		if dependenciesLong != "" {
 			// Filter the provided content against the filtered repositories (excluding private ones)
 			var filteredIDs []string
 			for _, repo := range filteredRepos {
