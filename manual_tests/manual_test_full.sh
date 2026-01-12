@@ -21,6 +21,9 @@ python3 "$SCRIPT_DIR/manual_test_mstl.py" --output "$OUTPUT_FILE"
 echo "Running manual_test_init_dest.py..."
 python3 "$SCRIPT_DIR/manual_test_init_dest.py" --output "$OUTPUT_FILE"
 
+echo "Running manual_test_init_dependencies.py..."
+python3 "$SCRIPT_DIR/manual_test_init_dependencies.py" --output "$OUTPUT_FILE"
+
 echo "Running manual_test_sync_conflict.py..."
 python3 "$SCRIPT_DIR/manual_test_sync_conflict.py" --output "$OUTPUT_FILE"
 

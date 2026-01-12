@@ -269,7 +269,8 @@ func validateAndPrepareInitDest(dest string) error {
 
 func handleInit(args []string, opts GlobalOptions) {
 	var fShort, fLong string
-	var dLong string
+	var destLong string
+	var dependenciesLong string
 	var depth int
 	var jVal, jValShort int
 	var vLong, vShort bool
@@ -277,7 +278,8 @@ func handleInit(args []string, opts GlobalOptions) {
 	fs := flag.NewFlagSet("init", flag.ExitOnError)
 	fs.StringVar(&fLong, "file", DefaultConfigFile, "configuration file")
 	fs.StringVar(&fShort, "f", DefaultConfigFile, "configuration file (shorthand)")
-	fs.StringVar(&dLong, "dest", "", "destination directory")
+	fs.StringVar(&destLong, "dest", "", "destination directory")
+	fs.StringVar(&dependenciesLong, "dependencies", "", "Path to dependency graph file")
 	fs.IntVar(&depth, "depth", 0, "Create a shallow clone with a history truncated to the specified number of commits")
 	fs.IntVar(&jVal, "jobs", -1, "number of concurrent jobs")
 	fs.IntVar(&jValShort, "j", -1, "number of concurrent jobs (shorthand)")
@@ -341,13 +343,40 @@ func handleInit(args []string, opts GlobalOptions) {
 	}
 
 	dest := "."
-	if dLong != "" {
-		dest = dLong
+	if destLong != "" {
+		dest = destLong
 	}
 
 	if err := validateAndPrepareInitDest(dest); err != nil {
 		fmt.Println("Error:", err)
 		os.Exit(1)
+	}
+
+	// Validate dependency file if provided
+	var depContent []byte
+	if dependenciesLong != "" {
+		// Collect all valid IDs (including private ones) for initial validation
+		var allIDs []string
+		for _, repo := range *config.Repositories {
+			// ID is guaranteed to be set by validateRepositories in LoadConfig*
+			if repo.ID != nil {
+				allIDs = append(allIDs, *repo.ID)
+			}
+		}
+
+		// Read and validate
+		// Since ParseDependencies takes string, we read file first.
+		rawContent, err := os.ReadFile(dependenciesLong)
+		if err != nil {
+			fmt.Printf("Error reading dependency file: %v\n", err)
+			os.Exit(1)
+		}
+		depContent = rawContent
+
+		if _, err := ParseDependencies(string(depContent), allIDs); err != nil {
+			fmt.Printf("Error validating dependency graph: %v\n", err)
+			os.Exit(1)
+		}
 	}
 
 	if err := PerformInit(*config.Repositories, "", opts.GitPath, jobs, depth, verbose); err != nil {
@@ -400,14 +429,22 @@ func handleInit(args []string, opts GlobalOptions) {
 			}
 		}
 
-		// Save dependency-graph.md (Mermaid graph with nodes only)
+		// Save dependency-graph.md
 		depPath := filepath.Join(mstlDir, "dependency-graph.md")
-		graphContent := "```mermaid\ngraph TD\n"
-		for _, repo := range filteredRepos {
-			name := getRepoName(repo)
-			graphContent += fmt.Sprintf("    %s\n", name)
+		var graphContent string
+
+		if dependenciesLong != "" {
+			// Use the provided content as is (already validated)
+			graphContent = string(depContent)
+		} else {
+			// Generate default graph (Mermaid graph with nodes only)
+			graphContent = "```mermaid\ngraph TD\n"
+			for _, repo := range filteredRepos {
+				name := getRepoName(repo)
+				graphContent += fmt.Sprintf("    %s\n", name)
+			}
+			graphContent += "```\n"
 		}
-		graphContent += "```\n"
 
 		if err := os.WriteFile(depPath, []byte(graphContent), 0644); err != nil {
 			fmt.Printf("Warning: Failed to write %s: %v\n", depPath, err)
