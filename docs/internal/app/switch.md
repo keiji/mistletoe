@@ -26,6 +26,7 @@ mstl switch --create <branch_name> --file <path> [options]
 | `--ignore-stdin` | | 標準入力を無視する | false |
 | `--verbose` | `-v` | デバッグ用の詳細ログを出力（実行された git コマンドを表示） | false |
 
+**注意**: 同じ種類のオプション（例: `--file` と `-f`）が同時に異なる値で指定された場合はエラーとなります。
 > **注意**: 位置引数としての `<branch_name>` と、`--create` オプションは排他的です。両方を同時に指定するとエラーになります。
 
 ## 3. ロジックフロー (Logic Flow)
@@ -37,7 +38,10 @@ mstl switch --create <branch_name> --file <path> [options]
 ```mermaid
 flowchart TD
     Start(["開始"]) --> ParseArgs["引数・フラグパース"]
-    ParseArgs --> LoadConfig["設定読み込み"]
+    ParseArgs --> ValidateFlags{"オプション整合性チェック"}
+    ValidateFlags -- "エラー" --> ErrorExit(["エラー終了"])
+    ValidateFlags -- "OK" --> LoadConfig["設定読み込み"]
+
     LoadConfig --> PreCheckLoop["事前チェックループ (並列)"]
 
     subgraph "事前チェック (Pre-check Phase)"

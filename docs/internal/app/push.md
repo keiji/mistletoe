@@ -19,6 +19,8 @@ mstl push [options]
 | `--ignore-stdin` | | 標準入力を無視する | false |
 | `--verbose` | `-v` | デバッグ用の詳細ログを出力（実行された git コマンドを表示） | false |
 
+**注意**: 同じ種類のオプション（例: `--file` と `-f`）が同時に異なる値で指定された場合はエラーとなります。
+
 ## 3. ロジックフロー (Logic Flow)
 
 安全なプッシュを行うため、厳密な事前チェックを行います。
@@ -27,7 +29,10 @@ mstl push [options]
 
 ```mermaid
 flowchart TD
-    Start(["開始"]) --> LoadConfigSub[["設定読み込み"]]
+    Start(["開始"]) --> ParseArgs["引数パース"]
+    ParseArgs --> ValidateFlags{"オプション整合性チェック"}
+    ValidateFlags -- "エラー" --> Stop(["終了"])
+    ValidateFlags -- "OK" --> LoadConfigSub[["設定読み込み"]]
     LoadConfigSub --> StatusCheck["ステータス確認 (statusロジック再利用)"]
     StatusCheck --> AnalyzeState{"全体の状態分析"}
 

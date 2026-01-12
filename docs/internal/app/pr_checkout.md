@@ -16,6 +16,8 @@ mstl-gh pr checkout -u [PRのURL] [-j jobs] [options]
     *   `-j`, `--jobs`: 並列実行数（デフォルトは設定または1）。
     *   `-v`, `--verbose`: デバッグ用の詳細ログを出力（実行された git/gh コマンドを表示）
 
+**注意**: 同じ種類のオプション（例: `--url` と `-u`）が同時に異なる値で指定された場合はエラーとなります。
+
 ### 動作要件
 1.  **環境確認**:
     *   `git`コマンドが利用可能であることを確認します。
@@ -51,8 +53,11 @@ mstl-gh pr checkout -u [PRのURL] [-j jobs] [options]
 
 ```mermaid
 flowchart TD
-    Start["開始"] --> CheckEnv{"Git/Gh確認"}
-    CheckEnv -- NG --> ErrorEnv["エラー終了"]
+    Start["開始"] --> ParseArgs["引数パース"]
+    ParseArgs --> ValidateFlags{"オプション整合性チェック"}
+    ValidateFlags -- "エラー" --> ErrorEnv["エラー終了"]
+    ValidateFlags -- "OK" --> CheckEnv{"Git/Gh確認"}
+    CheckEnv -- NG --> ErrorEnv
     CheckEnv -- OK --> GetPRInfo["PR情報の取得 (gh pr view)"]
     GetPRInfo --> CheckInfo{"情報の取得成功?"}
     CheckInfo -- No --> ErrorEnv

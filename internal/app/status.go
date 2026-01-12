@@ -31,6 +31,16 @@ func handleStatus(args []string, opts GlobalOptions) {
 		return
 	}
 
+	if err := CheckFlagDuplicates(fs, [][2]string{
+		{"file", "f"},
+		{"jobs", "j"},
+		{"verbose", "v"},
+	}); err != nil {
+		fmt.Fprintln(Stderr, "Error:", err)
+		osExit(1)
+		return
+	}
+
 	configFile, jobs, configData, err := ResolveCommonValues(fLong, fShort, jVal, jValShort, ignoreStdin)
 	if err != nil {
 		fmt.Fprintf(Stderr, "Error: %v\n", err)

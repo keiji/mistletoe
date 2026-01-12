@@ -20,6 +20,8 @@ mstl snapshot [options]
 | `--ignore-stdin` | | 標準入力を無視する | false |
 | `--verbose` | `-v` | デバッグ用の詳細ログを出力（実行された git コマンドを表示） | false |
 
+**注意**: 同じ種類のオプション（例: `--output-file` と `-o`）が同時に異なる値で指定された場合はエラーとなります。
+
 ※ `identifier` は含まれるリポジトリのリビジョン情報のハッシュ値から計算されます。
 
 ## 3. 動作仕様 (Specifications)
@@ -50,7 +52,10 @@ mstl snapshot [options]
 ```mermaid
 flowchart TD
     Start(["開始"]) --> ParseArgs["引数パース"]
-    ParseArgs --> CheckInput{"入力ソース (-f)"}
+    ParseArgs --> ValidateFlags{"オプション整合性チェック"}
+    ValidateFlags -- "エラー" --> End(["終了"])
+    ValidateFlags -- "OK" --> CheckInput{"入力ソース (-f)"}
+
     CheckInput -- "File" --> LoadConfig["設定ファイルロード (Optional)"]
     CheckInput -- "Stdin" --> ReadStdin["標準入力読み込み"]
     ReadStdin --> Decode["Base64デコード"]

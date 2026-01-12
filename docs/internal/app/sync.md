@@ -19,6 +19,8 @@ mstl sync --file <path> [options]
 | `--ignore-stdin` | | 標準入力を無視する | false |
 | `--verbose` | `-v` | デバッグ用の詳細ログを出力（実行された git コマンドを表示） | false |
 
+**注意**: 同じ種類のオプション（例: `--file` と `-f`）が同時に異なる値で指定された場合はエラーとなります。
+
 ## 3. ロジックフロー (Logic Flow)
 
 実行フローは、**設定読み込み**、**ステータス収集**、**戦略決定**、**同期実行**のフェーズで構成されます。
@@ -28,10 +30,13 @@ mstl sync --file <path> [options]
 ```mermaid
 flowchart TD
     Start(["開始"]) --> ParseArgs["引数パース"]
-    ParseArgs --> LoadConfig["設定読み込み"]
+    ParseArgs --> ValidateFlags{"オプション整合性チェック"}
+    ValidateFlags -- "エラー" --> ErrorExit(["エラー終了"])
+    ValidateFlags -- "OK" --> LoadConfig["設定読み込み"]
+
     LoadConfig --> ValidateIntegrity["整合性検証"]
 
-    ValidateIntegrity -- "エラー" --> ErrorExit(["エラー終了"])
+    ValidateIntegrity -- "エラー" --> ErrorExit
     ValidateIntegrity -- "成功" --> CollectStatus["ステータス収集 (並列)"]
 
     CollectStatus --> Analyze{"競合判定"}

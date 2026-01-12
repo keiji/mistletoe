@@ -43,6 +43,16 @@ func handlePrUpdate(args []string, opts GlobalOptions) {
 		os.Exit(1)
 	}
 
+	if err := CheckFlagDuplicates(fs, [][2]string{
+		{"file", "f"},
+		{"jobs", "j"},
+		{"overwrite", "w"},
+		{"verbose", "v"},
+	}); err != nil {
+		fmt.Println("Error:", err)
+		os.Exit(1)
+	}
+
 	// Resolve common values
 	configPath, jobs, configData, err := ResolveCommonValues(fLong, fShort, jVal, jValShort, ignoreStdin)
 	if err != nil {

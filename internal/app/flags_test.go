@@ -131,3 +131,101 @@ func TestParseFlagsFlexible(t *testing.T) {
 		})
 	}
 }
+
+func TestCheckFlagDuplicates(t *testing.T) {
+	tests := []struct {
+		name          string
+		args          []string
+		pairs         [][2]string
+		setupFs       func(*flag.FlagSet)
+		expectError   bool
+		errorContains string
+	}{
+		{
+			name: "no duplicate",
+			args: []string{"--long", "A"},
+			pairs: [][2]string{
+				{"long", "s"},
+			},
+			setupFs: func(fs *flag.FlagSet) {
+				fs.String("long", "", "")
+				fs.String("s", "", "")
+			},
+			expectError: false,
+		},
+		{
+			name: "duplicate same value",
+			args: []string{"--long", "A", "-s", "A"},
+			pairs: [][2]string{
+				{"long", "s"},
+			},
+			setupFs: func(fs *flag.FlagSet) {
+				fs.String("long", "", "")
+				fs.String("s", "", "")
+			},
+			expectError: false,
+		},
+		{
+			name: "duplicate different value",
+			args: []string{"--long", "A", "-s", "B"},
+			pairs: [][2]string{
+				{"long", "s"},
+			},
+			setupFs: func(fs *flag.FlagSet) {
+				fs.String("long", "", "")
+				fs.String("s", "", "")
+			},
+			expectError: true,
+			errorContains: "options --long and -s cannot be specified with different values",
+		},
+		{
+			name: "duplicate boolean same",
+			args: []string{"--verbose", "-v"},
+			pairs: [][2]string{
+				{"verbose", "v"},
+			},
+			setupFs: func(fs *flag.FlagSet) {
+				fs.Bool("verbose", false, "")
+				fs.Bool("v", false, "")
+			},
+			expectError: false,
+		},
+		{
+			// Note: flags bool syntax is tricky. --verbose=false
+			name: "duplicate boolean different",
+			args: []string{"--verbose=false", "-v=true"},
+			pairs: [][2]string{
+				{"verbose", "v"},
+			},
+			setupFs: func(fs *flag.FlagSet) {
+				fs.Bool("verbose", false, "")
+				fs.Bool("v", false, "")
+			},
+			expectError: true,
+			errorContains: "options --verbose and -v cannot be specified with different values",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fs := flag.NewFlagSet("test", flag.ContinueOnError)
+			tt.setupFs(fs)
+			fs.Parse(tt.args)
+
+			err := CheckFlagDuplicates(fs, tt.pairs)
+			if tt.expectError {
+				if err == nil {
+					t.Errorf("Expected error but got nil")
+					return
+				}
+				if !reflect.DeepEqual(err.Error(), tt.errorContains) {
+					t.Errorf("Error mismatch: got %q, want %q", err.Error(), tt.errorContains)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Unexpected error: %v", err)
+				}
+			}
+		})
+	}
+}

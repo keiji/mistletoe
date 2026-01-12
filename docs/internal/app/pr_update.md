@@ -26,13 +26,18 @@ mstl-gh pr update [options]
 | `--ignore-stdin` | | 標準入力を無視する | false |
 | `--verbose` | `-v` | デバッグ用の詳細ログを出力（実行された git/gh コマンドを表示） | false |
 
+**注意**: 同じ種類のオプション（例: `--file` と `-f`）が同時に異なる値で指定された場合はエラーとなります。
+
 ## 3. ロジックフロー (Logic Flow)
 
 ### 3.1. フローチャート (Flowchart)
 
 ```mermaid
 flowchart TD
-    Start(["開始"]) --> LoadConfigSub[["設定読み込み"]]
+    Start(["開始"]) --> ParseArgs["引数パース"]
+    ParseArgs --> ValidateFlags{"オプション整合性チェック"}
+    ValidateFlags -- "エラー" --> Stop(["終了 (更新対象なし)"])
+    ValidateFlags -- "OK" --> LoadConfigSub[["設定読み込み"]]
     LoadConfigSub --> LoadDep[["依存関係グラフ読み込み (Optional)"]]
     LoadDep --> ValidateAuth["gh CLI認証確認"]
     ValidateAuth --> CollectStatus["ステータス・PR状況収集 (Spinner)"]
