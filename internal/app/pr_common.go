@@ -20,6 +20,7 @@ import (
 
 	"github.com/olekukonko/tablewriter"
 	"github.com/olekukonko/tablewriter/renderer"
+	"github.com/olekukonko/tablewriter/tw"
 )
 
 // PrInfo holds information about a Pull Request.
@@ -315,6 +316,7 @@ func SortPrs(prs []PrInfo) {
 func RenderPrStatusTable(w io.Writer, rows []PrStatusRow) {
 	table := tablewriter.NewTable(w,
 		tablewriter.WithRenderer(renderer.NewMarkdown()),
+		tablewriter.WithAlignment(tw.MakeAlign(5, tw.AlignLeft)),
 	)
 	table.Header("Repository", "Base", "Branch/Rev", "Status", "PR")
 
