@@ -52,8 +52,8 @@ type Config struct {
 	Repositories *[]Repository `json:"repositories"`
 	// Jobs is the default number of parallel processes to use.
 	Jobs *int `json:"jobs,omitempty"`
-	// BaseDir is the directory where the configuration file is located.
-	// It is used to resolve relative paths for repositories.
+	// BaseDir is the base directory for resolving relative paths for repositories.
+	// It defaults to the current working directory.
 	// This field is not serialized.
 	BaseDir string `json:"-"`
 }
@@ -213,9 +213,6 @@ func LoadConfigFile(configFile string) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	// Set BaseDir to the directory containing the config file
-	config.BaseDir = filepath.Dir(absPath)
 
 	return config, nil
 }
