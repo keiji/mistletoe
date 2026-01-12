@@ -65,16 +65,13 @@ func handlePrCheckout(args []string, opts GlobalOptions) {
 	// Resolve Jobs - pr_checkout is unique, it doesn't utilize ResolveCommonValues for config loading initially
 	// because it doesn't take a config file argument (config comes from snapshot inside PR).
 	// However, it does take jobs flags.
-	// Since we don't have a config file to fallback to for 'jobs', we just use the flag or default.
-	// Wait, if config is inside snapshot, can we use jobs from snapshot config?
-	// The snapshot config struct has "Repositories". It's the same Config struct.
-	// So yes, if the snapshot JSON has "jobs", we could respect it.
+	// Since we don't have a config file to fallback to for 'jobs' initially, we just resolve flag.
 
-	jobs := -1
+	jobsFlag := -1
 	if jVal != -1 {
-		jobs = jVal
+		jobsFlag = jVal
 	} else if jValShort != -1 {
-		jobs = jValShort
+		jobsFlag = jValShort
 	}
 
 	verbose := vLong || vShort
@@ -107,28 +104,16 @@ func handlePrCheckout(args []string, opts GlobalOptions) {
 	}
 
 	// Resolve Jobs (Config fallback from Snapshot)
-	if jobs == -1 {
-		if config.Jobs != nil {
-			jobs = *config.Jobs
-		} else {
-			jobs = DefaultJobs
-		}
+	jobs, err := DetermineJobs(jobsFlag, config)
+	if err != nil {
+		fmt.Printf("Error: %v\n", err)
+		os.Exit(1)
 	}
 
 	// Verbose Override
 	if verbose && jobs > 1 {
 		fmt.Println("Verbose is specified, so jobs is treated as 1.")
 		jobs = 1
-	}
-
-	// Final Validation
-	if jobs < MinJobs {
-		fmt.Printf("Error: Jobs must be at least %d.\n", MinJobs)
-		os.Exit(1)
-	}
-	if jobs > MaxJobs {
-		fmt.Printf("Error: Jobs must be at most %d.\n", MaxJobs)
-		os.Exit(1)
 	}
 
 	// Filter repositories based on Related PR status (Open/Draft only)

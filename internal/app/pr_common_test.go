@@ -2,9 +2,12 @@ package app
 
 import (
 	"bytes"
+	"os"
 	"reflect"
 	"strings"
 	"testing"
+
+	conf "mistletoe/internal/config"
 )
 
 func TestSortPrs(t *testing.T) {
@@ -104,4 +107,50 @@ func TestRenderPrStatusTable(t *testing.T) {
 	assertContains(t, output, StatusSymbolUnpushed)
 
 	assertContains(t, output, "Status Legend:")
+}
+
+func TestLoadDependencyGraph(t *testing.T) {
+	// Create dummy config
+	id := "repo1"
+	url := "https://github.com/user/repo1"
+	cfg := &conf.Config{
+		Repositories: &[]conf.Repository{
+			{ID: &id, URL: &url},
+		},
+	}
+
+	// Create dummy dependency file
+	tmpDir := t.TempDir()
+	depPath := tmpDir + "/deps.md"
+	content := "```mermaid\ngraph TD\nrepo1\n```"
+	if err := os.WriteFile(depPath, []byte(content), 0644); err != nil {
+		t.Fatalf("failed to write deps file: %v", err)
+	}
+
+	// Test 1: Load Success
+	graph, loadedContent, err := LoadDependencyGraph(depPath, cfg)
+	if err != nil {
+		t.Errorf("LoadDependencyGraph failed: %v", err)
+	}
+	if loadedContent != content {
+		t.Errorf("content mismatch")
+	}
+	if graph == nil {
+		t.Errorf("graph is nil")
+	}
+
+	// Test 2: Empty path
+	graph, _, err = LoadDependencyGraph("", cfg)
+	if err != nil {
+		t.Errorf("expected no error for empty path, got %v", err)
+	}
+	if graph != nil {
+		t.Errorf("expected nil graph for empty path")
+	}
+
+	// Test 3: Invalid path
+	_, _, err = LoadDependencyGraph("nonexistent.md", cfg)
+	if err == nil {
+		t.Errorf("expected error for nonexistent file")
+	}
 }
