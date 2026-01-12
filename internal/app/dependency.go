@@ -1,3 +1,4 @@
+// Package app implements the core application logic.
 package app
 
 
