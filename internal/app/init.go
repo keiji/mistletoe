@@ -300,7 +300,7 @@ func handleInit(args []string, opts GlobalOptions) {
 		os.Exit(1)
 	}
 
-	configFile, jobs, configData, err := ResolveCommonValues(fLong, fShort, jVal, jValShort, ignoreStdin)
+	configFile, jobsFlag, configData, err := ResolveCommonValues(fLong, fShort, jVal, jValShort, ignoreStdin)
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
 		os.Exit(1)
@@ -326,13 +326,11 @@ func handleInit(args []string, opts GlobalOptions) {
 		os.Exit(1)
 	}
 
-	// Resolve Jobs (Config fallback)
-	if jobs == -1 {
-		if config.Jobs != nil {
-			jobs = *config.Jobs
-		} else {
-			jobs = DefaultJobs
-		}
+	// Resolve Jobs
+	jobs, err := DetermineJobs(jobsFlag, config)
+	if err != nil {
+		fmt.Printf("Error: %v\n", err)
+		os.Exit(1)
 	}
 
 	// Verbose Override
@@ -340,16 +338,6 @@ func handleInit(args []string, opts GlobalOptions) {
 	if verbose && jobs > 1 {
 		fmt.Println("Verbose is specified, so jobs is treated as 1.")
 		jobs = 1
-	}
-
-	// Final Validation
-	if jobs < MinJobs {
-		fmt.Printf("Error: Jobs must be at least %d.\n", MinJobs)
-		os.Exit(1)
-	}
-	if jobs > MaxJobs {
-		fmt.Printf("Error: Jobs must be at most %d.\n", MaxJobs)
-		os.Exit(1)
 	}
 
 	dest := "."

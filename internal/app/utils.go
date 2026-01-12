@@ -10,6 +10,8 @@ import (
 	"sync"
 	"time"
 
+	conf "mistletoe/internal/config"
+
 	"golang.org/x/text/language"
 	"golang.org/x/text/message"
 )
@@ -277,6 +279,31 @@ func ResolveCommonValues(fLong, fShort string, jVal, jValShort int, ignoreStdin 
 	}
 
 	return configFile, jobs, configData, nil
+}
+
+// DetermineJobs resolves the final jobs count based on flag input and configuration.
+// If jobsFlag is -1 (unset), it checks the configuration.
+// If both are unset, it returns DefaultJobs.
+// It also enforces Min/Max bounds.
+func DetermineJobs(jobsFlag int, config *conf.Config) (int, error) {
+	jobs := jobsFlag
+
+	if jobs == -1 {
+		if config != nil && config.Jobs != nil {
+			jobs = *config.Jobs
+		} else {
+			jobs = DefaultJobs
+		}
+	}
+
+	if jobs < MinJobs {
+		return 0, fmt.Errorf("Jobs must be at least %d.", MinJobs)
+	}
+	if jobs > MaxJobs {
+		return 0, fmt.Errorf("Jobs must be at most %d.", MaxJobs)
+	}
+
+	return jobs, nil
 }
 
 // --- Spinner ---

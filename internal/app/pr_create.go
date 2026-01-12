@@ -70,7 +70,7 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 	}
 
 	// Resolve common values
-	configPath, jobs, configData, err := ResolveCommonValues(fLong, fShort, jVal, jValShort, ignoreStdin)
+	configPath, jobsFlag, configData, err := ResolveCommonValues(fLong, fShort, jVal, jValShort, ignoreStdin)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -110,13 +110,11 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 		os.Exit(1)
 	}
 
-	// Resolve Jobs (Config fallback)
-	if jobs == -1 {
-		if config.Jobs != nil {
-			jobs = *config.Jobs
-		} else {
-			jobs = DefaultJobs
-		}
+	// Resolve Jobs
+	jobs, err := DetermineJobs(jobsFlag, config)
+	if err != nil {
+		fmt.Printf("Error: %v\n", err)
+		os.Exit(1)
 	}
 
 	// Verbose Override
@@ -125,37 +123,13 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 		jobs = 1
 	}
 
-	// Final Validation
-	if jobs < MinJobs {
-		fmt.Printf("Error: Jobs must be at least %d.\n", MinJobs)
-		os.Exit(1)
-	}
-	if jobs > MaxJobs {
-		fmt.Printf("Error: Jobs must be at most %d.\n", MaxJobs)
-		os.Exit(1)
-	}
-
 	// 3. Load Dependencies (if specified)
-	var deps *DependencyGraph
-	var depContent string
-	if depPath != "" {
-		contentBytes, errRead := os.ReadFile(depPath)
-		if errRead != nil {
-			fmt.Printf("error reading dependency file: %v\n", errRead)
-			os.Exit(1)
-		}
-		depContent = string(contentBytes)
-
-		var validIDs []string
-		for _, r := range *config.Repositories {
-			validIDs = append(validIDs, getRepoName(r))
-		}
-		var errDep error
-		deps, errDep = ParseDependencies(depContent, validIDs)
-		if errDep != nil {
-			fmt.Printf("error loading dependencies: %v\n", errDep)
-			os.Exit(1)
-		}
+	deps, depContent, err := LoadDependencyGraph(depPath, config)
+	if err != nil {
+		fmt.Printf("%v\n", err)
+		os.Exit(1)
+	}
+	if depContent != "" {
 		fmt.Println("Dependency graph loaded successfully.")
 	}
 

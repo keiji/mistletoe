@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
@@ -737,4 +738,30 @@ func verifyGithubRequirements(repos []conf.Repository, baseDir string, rows []St
 		return nil, fmt.Errorf("GitHub validation failed:\n%s", strings.Join(errs, "\n"))
 	}
 	return existingPRs, nil
+}
+
+// LoadDependencyGraph loads and parses the dependency graph from the specified file.
+// If the path is empty, it returns nil and no error.
+func LoadDependencyGraph(depPath string, config *conf.Config) (*DependencyGraph, string, error) {
+	if depPath == "" {
+		return nil, "", nil
+	}
+
+	contentBytes, errRead := os.ReadFile(depPath)
+	if errRead != nil {
+		return nil, "", fmt.Errorf("error reading dependency file: %v", errRead)
+	}
+	depContent := string(contentBytes)
+
+	var validIDs []string
+	for _, r := range *config.Repositories {
+		validIDs = append(validIDs, getRepoName(r))
+	}
+
+	deps, errDep := ParseDependencies(depContent, validIDs)
+	if errDep != nil {
+		return nil, "", fmt.Errorf("error loading dependencies: %v", errDep)
+	}
+
+	return deps, depContent, nil
 }

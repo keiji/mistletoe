@@ -41,7 +41,7 @@ func handleStatus(args []string, opts GlobalOptions) {
 		return
 	}
 
-	configFile, jobs, configData, err := ResolveCommonValues(fLong, fShort, jVal, jValShort, ignoreStdin)
+	configFile, jobsFlag, configData, err := ResolveCommonValues(fLong, fShort, jVal, jValShort, ignoreStdin)
 	if err != nil {
 		fmt.Fprintf(Stderr, "Error: %v\n", err)
 		osExit(1)
@@ -61,13 +61,12 @@ func handleStatus(args []string, opts GlobalOptions) {
 		return
 	}
 
-	// Resolve Jobs (Config fallback)
-	if jobs == -1 {
-		if config.Jobs != nil {
-			jobs = *config.Jobs
-		} else {
-			jobs = DefaultJobs
-		}
+	// Resolve Jobs
+	jobs, err := DetermineJobs(jobsFlag, config)
+	if err != nil {
+		fmt.Fprintf(Stderr, "Error: %v\n", err)
+		osExit(1)
+		return
 	}
 
 	// Verbose Override
@@ -75,18 +74,6 @@ func handleStatus(args []string, opts GlobalOptions) {
 	if verbose && jobs > 1 {
 		fmt.Fprintln(Stdout, "Verbose is specified, so jobs is treated as 1.")
 		jobs = 1
-	}
-
-	// Final Validation
-	if jobs < MinJobs {
-		fmt.Fprintf(Stderr, "Error: Jobs must be at least %d.\n", MinJobs)
-		osExit(1)
-		return
-	}
-	if jobs > MaxJobs {
-		fmt.Fprintf(Stderr, "Error: Jobs must be at most %d.\n", MaxJobs)
-		osExit(1)
-		return
 	}
 
 	spinner := NewSpinner(verbose)

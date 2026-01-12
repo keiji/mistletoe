@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	conf "mistletoe/internal/config"
 )
 
 // TestRunEditor verifies RunEditor functionality.
@@ -298,6 +300,83 @@ func TestResolveCommonValues(t *testing.T) {
 			}
 			if string(gotData) != tt.wantData {
 				t.Errorf("ResolveCommonValues() data = %v, want %v", string(gotData), tt.wantData)
+			}
+		})
+	}
+}
+
+func TestDetermineJobs(t *testing.T) {
+	defaultJobs := DefaultJobs
+	confJobs := 10
+	badLow := 0
+	badHigh := 1000
+
+	tests := []struct {
+		name       string
+		jobsFlag   int
+		config     *conf.Config
+		want       int
+		wantErr    bool
+	}{
+		{
+			name:     "Flag Set (Wins)",
+			jobsFlag: 5,
+			config:   &conf.Config{Jobs: &confJobs},
+			want:     5,
+		},
+		{
+			name:     "Flag Unset, Config Set",
+			jobsFlag: -1,
+			config:   &conf.Config{Jobs: &confJobs},
+			want:     10,
+		},
+		{
+			name:     "Flag Unset, Config Unset (Default)",
+			jobsFlag: -1,
+			config:   &conf.Config{Jobs: nil},
+			want:     defaultJobs,
+		},
+		{
+			name:     "Flag Unset, Config Nil (Default)",
+			jobsFlag: -1,
+			config:   nil,
+			want:     defaultJobs,
+		},
+		{
+			name:     "Flag Invalid Low",
+			jobsFlag: 0,
+			config:   nil,
+			wantErr:  true,
+		},
+		{
+			name:     "Flag Invalid High",
+			jobsFlag: 200,
+			config:   nil,
+			wantErr:  true,
+		},
+		{
+			name:     "Config Invalid Low (Flag Unset)",
+			jobsFlag: -1,
+			config:   &conf.Config{Jobs: &badLow},
+			wantErr:  true,
+		},
+		{
+			name:     "Config Invalid High (Flag Unset)",
+			jobsFlag: -1,
+			config:   &conf.Config{Jobs: &badHigh},
+			wantErr:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := DetermineJobs(tt.jobsFlag, tt.config)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("DetermineJobs() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("DetermineJobs() = %v, want %v", got, tt.want)
 			}
 		})
 	}

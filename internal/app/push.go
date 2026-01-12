@@ -43,7 +43,7 @@ func handlePush(args []string, opts GlobalOptions) {
 		return
 	}
 
-	configFile, jobs, configData, err := ResolveCommonValues(fLong, fShort, jVal, jValShort, ignoreStdin)
+	configFile, jobsFlag, configData, err := ResolveCommonValues(fLong, fShort, jVal, jValShort, ignoreStdin)
 	if err != nil {
 		fmt.Fprintf(Stderr, "error: %v\n", err)
 		osExit(1)
@@ -63,13 +63,12 @@ func handlePush(args []string, opts GlobalOptions) {
 		return
 	}
 
-	// Resolve Jobs (Config fallback)
-	if jobs == -1 {
-		if config.Jobs != nil {
-			jobs = *config.Jobs
-		} else {
-			jobs = DefaultJobs
-		}
+	// Resolve Jobs
+	jobs, err := DetermineJobs(jobsFlag, config)
+	if err != nil {
+		fmt.Fprintf(Stderr, "Error: %v\n", err)
+		osExit(1)
+		return
 	}
 
 	// Verbose Override
@@ -77,18 +76,6 @@ func handlePush(args []string, opts GlobalOptions) {
 	if verbose && jobs > 1 {
 		fmt.Fprintln(Stdout, "Verbose is specified, so jobs is treated as 1.")
 		jobs = 1
-	}
-
-	// Final Validation
-	if jobs < MinJobs {
-		fmt.Fprintf(Stderr, "Error: Jobs must be at least %d.\n", MinJobs)
-		osExit(1)
-		return
-	}
-	if jobs > MaxJobs {
-		fmt.Fprintf(Stderr, "Error: Jobs must be at most %d.\n", MaxJobs)
-		osExit(1)
-		return
 	}
 
 	spinner := NewSpinner(verbose)
@@ -114,16 +101,7 @@ func handlePush(args []string, opts GlobalOptions) {
 
 	RenderStatusTable(Stdout, rows)
 
-	// ValidateStatusForAction now returns error if invalid, but we need to check if it exits?
-	// The implementation of ValidateStatusForAction in status_logic.go currently calls log.Fatalf or similar?
-	// No, memory says: "Safety checks for push... are centralized in ValidateStatusForAction...".
-	// Let's check ValidateStatusForAction implementation later, but assuming it returns error or exits.
-	// Actually, looking at status_logic.go earlier, it was:
-	// func ValidateStatusForAction(rows []StatusRow, checkBehind bool) { ... }
-	// It likely calls os.Exit internally if it fails. I might need to refactor that too!
-	// But let's assume it's fine for now or I'll catch it in tests.
-	// Wait, if ValidateStatusForAction calls os.Exit directly, my test will crash.
-	// I should check status_logic.go.
+	// Validate status
 	ValidateStatusForAction(rows, true)
 
 	// Identify repositories to push
