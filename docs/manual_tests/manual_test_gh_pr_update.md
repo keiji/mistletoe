@@ -7,7 +7,7 @@
 このテストでは、以下のシナリオを検証します。
 
 1.  4つのリポジトリ（A, B, C, D）で Pull Request を作成する（A -> B -> C, D は独立）。
-2.  ローカルの依存関係定義（`dependencies.md`）を変更し、D が A に依存するようにする（D -> A）。
+2.  ローカルの依存関係定義（`dependency-graph.md`）を変更し、D が A に依存するようにする（D -> A）。
 3.  `pr update` を実行する。
 4.  リポジトリ D の Pull Request が更新され、A への依存関係が表示されることを確認する。
 
@@ -29,7 +29,7 @@
 
 ### 2. 依存関係の変更
 
-ローカルの `.mstl/dependencies.md` (または指定ファイル) を編集し、以下の行を追加します。
+ローカルの `.mstl/dependency-graph.md` (または指定ファイル) を編集し、以下の行を追加します。
 
 ```mermaid
     Repo_D --> Repo_A
@@ -41,7 +41,7 @@
 
 ```bash
 mstl-gh pr update \
-  --dependencies dependencies.md \
+  --dependencies dependency-graph.md \
   --verbose
 ```
 

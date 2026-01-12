@@ -403,8 +403,8 @@ func handleInit(args []string, opts GlobalOptions) {
 			}
 		}
 
-		// Save dependencies.md (Mermaid graph with nodes only)
-		depPath := filepath.Join(mstlDir, "dependencies.md")
+		// Save dependency-graph.md (Mermaid graph with nodes only)
+		depPath := filepath.Join(mstlDir, "dependency-graph.md")
 		graphContent := "```mermaid\ngraph TD\n"
 		for _, repo := range filteredRepos {
 			name := getRepoName(repo)

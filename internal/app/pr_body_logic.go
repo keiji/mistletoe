@@ -136,7 +136,7 @@ func GenerateMistletoeBody(snapshotData string, snapshotFilename string, current
 		}
 	} else {
 		if len(dependencies) > 0 {
-			sb.WriteString("#### Depends on\n")
+			sb.WriteString("#### Dependencies\n")
 			for _, item := range dependencies {
 				sb.WriteString(fmt.Sprintf(" * %s\n", item.URL))
 			}
@@ -144,7 +144,7 @@ func GenerateMistletoeBody(snapshotData string, snapshotFilename string, current
 		}
 
 		if len(dependents) > 0 {
-			sb.WriteString("#### Depended on by\n")
+			sb.WriteString("#### Used by\n")
 			for _, item := range dependents {
 				sb.WriteString(fmt.Sprintf(" * %s\n", item.URL))
 			}

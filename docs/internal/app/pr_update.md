@@ -20,7 +20,7 @@ mstl-gh pr update [options]
 | オプション | 短縮形 | 説明 | デフォルト |
 | :--- | :--- | :--- | :--- |
 | `--file` | `-f` | 設定ファイル (JSON) のパス。 | `.mstl/config.json` |
-| `--dependencies` | `-d` | 依存関係グラフ（Mermaid形式）のMarkdownファイルパス。 | `.mstl/dependencies.md` |
+| `--dependencies` | `-d` | 依存関係グラフ（Mermaid形式）のMarkdownファイルパス。 | `.mstl/dependency-graph.md` |
 | `--jobs` | `-j` | 並列実行数。 | 1 |
 | `--overwrite` | `-w` | 既存PRの作成者が自分以外で、Mistletoeブロックがない場合でも上書きを許可する。 | false |
 | `--ignore-stdin` | | 標準入力を無視する | false |

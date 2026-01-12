@@ -18,7 +18,7 @@ mstl-gh pr create [options]
 | `--title` | `-t` | PR のタイトル。 | (エディタで入力) |
 | `--body` | `-b` | PR の本文。 | (エディタで入力) |
 | `--file` | `-f` | 設定ファイル (JSON) のパス。 | `.mstl/config.json` |
-| `--dependencies` | | 依存関係グラフ（Mermaid形式）のMarkdownファイルパス。 | `.mstl/dependencies.md` |
+| `--dependencies` | | 依存関係グラフ（Mermaid形式）のMarkdownファイルパス。 | `.mstl/dependency-graph.md` |
 | `--draft` | | ドラフトPRとして作成（リポジトリが対応している場合）。 | false |
 | `--jobs` | `-j` | 並列実行数。 | 1 |
 | `--overwrite` | `-w` | 既存PRの作成者が自分以外で、Mistletoeブロックがない場合でも上書きを許可する。 | false |
@@ -187,9 +187,9 @@ PR 本文の末尾に、自動生成された不可視（または折りたた�
     *   他のリポジトリで作成された関連 PR へのリンク一覧。
     *   `--dependencies` が指定された場合、以下のセクションに分類して記載されます：
         *   **Dependencies**: このリポジトリが依存している先のリポジトリのPR。
-        *   **Dependents**: このリポジトリに依存している元のリポジトリのPR。
-        *   **Others**: 依存関係がない、またはグラフに含まれないリポジトリのPR。
-            *   **注記**: Dependencies と Dependents が存在せず、Others のみが存在する場合、"Others" の小見出しは省略され、リストが直接表示されます。
+        *   **Used by**: このリポジトリに依存している元のリポジトリのPR。
+        *   **Related to**: 依存関係がない、またはグラフに含まれないリポジトリのPR。
+            *   **注記**: Dependencies と Used by が存在せず、Related to のみが存在する場合、"Related to" の小見出しは省略され、リストが直接表示されます。
     *   指定がない場合は、単一のリストとして全関連PRを表示します。
 2.  **関連 PR リンク (JSON形式, `<details>` 内)**:
     *   ファイル名: `mistletoe-related-pr-[identifier].json`

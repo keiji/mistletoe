@@ -119,15 +119,15 @@ func TestGenerateMistletoeBody_WithDependencies(t *testing.T) {
 
 	body := GenerateMistletoeBody(snapshot, filename, currentID, allPRs, deps, "")
 
-	if !strings.Contains(body, "#### Depends on") {
-		t.Error("Missing Depends on section")
+	if !strings.Contains(body, "#### Dependencies") {
+		t.Error("Missing Dependencies section")
 	}
 	if !strings.Contains(body, "url-lib") {
 		t.Error("Missing url-lib in body")
 	}
 
-	if !strings.Contains(body, "#### Depended on by") {
-		t.Error("Missing Depended on by section")
+	if !strings.Contains(body, "#### Used by") {
+		t.Error("Missing Used by section")
 	}
 	if !strings.Contains(body, "url-dep2") {
 		t.Error("Missing url-dep2 in body")
@@ -316,30 +316,30 @@ func TestDependencyCategorization_Verification(t *testing.T) {
 				}
 			}
 
-			checkSection("Depends on", tc.ExpectDependencies)
-			checkSection("Depended on by", tc.ExpectDependents)
+			checkSection("Dependencies", tc.ExpectDependencies)
+			checkSection("Used by", tc.ExpectDependents)
 			checkSection("Related to", tc.ExpectOthers)
 
 			// Additional check: Ensure items are not miscategorized.
 			if len(tc.ExpectDependencies) > 0 && len(tc.ExpectDependents) > 0 {
-				depIdx := strings.Index(body, "#### Depends on")
-				deperIdx := strings.Index(body, "#### Depended on by")
+				depIdx := strings.Index(body, "#### Dependencies")
+				deperIdx := strings.Index(body, "#### Used by")
 
 				if depIdx > deperIdx {
-					t.Error("Depends on section should come before Depended on by")
+					t.Error("Dependencies section should come before Used by")
 				}
 
 				for _, u := range tc.ExpectDependencies {
 					uIdx := strings.Index(body, u)
 					if uIdx > deperIdx {
-						t.Errorf("URL %s (Dependency) appears after Depended on by header", u)
+						t.Errorf("URL %s (Dependency) appears after Used by header", u)
 					}
 				}
 
 				for _, u := range tc.ExpectDependents {
 					uIdx := strings.Index(body, u)
 					if uIdx < deperIdx {
-						t.Errorf("URL %s (Dependent) appears before Depended on by header", u)
+						t.Errorf("URL %s (Dependent) appears before Used by header", u)
 					}
 				}
 			}

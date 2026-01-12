@@ -279,13 +279,13 @@ func handlePrCheckout(args []string, opts GlobalOptions) {
 			}
 		}
 
-		// Save dependencies.md if exists (filtered)
+		// Save dependency-graph.md if exists (filtered)
 		if dependencyContent != "" {
 			filteredDepContent := FilterDependencyContent(dependencyContent, validIDs)
 			if err := writeDependencyFile(mstlDir, filteredDepContent); err != nil {
-				fmt.Printf("Warning: Failed to write dependencies.md: %v\n", err)
+				fmt.Printf("Warning: Failed to write dependency-graph.md: %v\n", err)
 			} else {
-				fmt.Printf("Saved dependency graph to %s\n", filepath.Join(mstlDir, "dependencies.md"))
+				fmt.Printf("Saved dependency graph to %s\n", filepath.Join(mstlDir, "dependency-graph.md"))
 			}
 		}
 	}
@@ -315,6 +315,6 @@ func writeDependencyFile(dir, content string) error {
 		finalContent = sb.String()
 	}
 
-	depFile := filepath.Join(dir, "dependencies.md")
+	depFile := filepath.Join(dir, "dependency-graph.md")
 	return os.WriteFile(depFile, []byte(finalContent), 0644)
 }
