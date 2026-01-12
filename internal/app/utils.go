@@ -201,22 +201,13 @@ func ResolveCommonValues(fLong, fShort string, jVal, jValShort int, ignoreStdin 
 	// conf.Config File
 	defaultConfig := DefaultConfigFile
 	var configFile string
-	var isDefault bool
 
 	if fLong != defaultConfig {
 		configFile = fLong
-		isDefault = false
 	} else if fShort != defaultConfig {
 		configFile = fShort
-		isDefault = false
 	} else {
 		configFile = defaultConfig
-		isDefault = true
-	}
-
-	// If user supplied empty string explicitly, we treat it as "no file", so we look for stdin.
-	if configFile == "" {
-		isDefault = false // effectively treated as manual override to nothing
 	}
 
 	var configData []byte
@@ -248,19 +239,11 @@ func ResolveCommonValues(fLong, fShort string, jVal, jValShort int, ignoreStdin 
 			stdinAvailable = true
 		}
 
-		if configFile == "" {
+		if stdinAvailable {
+			checkStdin = true
+		} else if configFile == "" {
 			// Explicit empty string -> force stdin
 			checkStdin = true
-		} else if isDefault {
-			// Default file -> prioritize stdin if available
-			if stdinAvailable {
-				checkStdin = true
-			}
-		} else {
-			// User provided custom file -> check if stdin is also provided (Conflict)
-			if stdinAvailable {
-				return "", 0, nil, fmt.Errorf("conflict: cannot specify configuration file '%s' and use standard input simultaneously", configFile)
-			}
 		}
 	}
 
