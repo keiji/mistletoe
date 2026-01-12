@@ -23,6 +23,8 @@ cat config.json | mstl init [options]
 | `--ignore-stdin` | | 標準入力を無視する | false |
 | `--verbose` | `-v` | デバッグ用の詳細ログを出力（実行された git コマンドを表示） | false |
 
+**注意**: 同じ種類のオプション（例: `--file` と `-f`）が同時に異なる値で指定された場合はエラーとなります。
+
 ## 3. 設定構造 (Configuration Structure)
 
 このコマンドは、リポジトリのリストを含む JSON 設定ファイルを想定しています。
@@ -73,9 +75,11 @@ cat config.json | mstl init [options]
 ```mermaid
 flowchart TD
     Start(["開始"]) --> ParseArgs["引数パース"]
-    ParseArgs --> CheckDest{"対象ディレクトリ検証"}
+    ParseArgs --> ValidateFlags{"オプション整合性チェック"}
+    ValidateFlags -- "エラー (値不一致)" --> ErrorExit(["エラー終了"])
+    ValidateFlags -- "OK" --> CheckDest{"対象ディレクトリ検証"}
 
-    CheckDest -- "ファイル/空でない/親なし" --> ErrorExit(["エラー終了"])
+    CheckDest -- "ファイル/空でない/親なし" --> ErrorExit
     CheckDest -- "OK" --> ChangeDir["対象ディレクトリへ移動"]
 
     ChangeDir --> CheckFile{"設定ファイル指定あり？"}

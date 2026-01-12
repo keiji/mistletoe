@@ -3,6 +3,7 @@ package app
 import (
 	"errors"
 	"flag"
+	"fmt"
 	"strings"
 )
 
@@ -64,6 +65,27 @@ func ParseFlagsFlexible(fs *flag.FlagSet, args []string) error {
 	// Reconstruct args: flags first, then positionals
 	newArgs := append(flagArgs, posArgs...)
 	return fs.Parse(newArgs)
+}
+
+// CheckFlagDuplicates checks if any pair of long and short flags are both set with different values.
+func CheckFlagDuplicates(fs *flag.FlagSet, pairs [][2]string) error {
+	setFlags := make(map[string]string)
+	fs.Visit(func(f *flag.Flag) {
+		setFlags[f.Name] = f.Value.String()
+	})
+
+	for _, pair := range pairs {
+		long, short := pair[0], pair[1]
+		valLong, hasLong := setFlags[long]
+		valShort, hasShort := setFlags[short]
+
+		if hasLong && hasShort {
+			if valLong != valShort {
+				return fmt.Errorf("options --%s and -%s cannot be specified with different values", long, short)
+			}
+		}
+	}
+	return nil
 }
 
 type boolFlag interface {

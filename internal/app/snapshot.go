@@ -46,6 +46,17 @@ func handleSnapshot(args []string, opts GlobalOptions) {
 		return
 	}
 
+	if err := CheckFlagDuplicates(fs, [][2]string{
+		{"output-file", "o"},
+		{"file", "f"},
+		{"jobs", "j"},
+		{"verbose", "v"},
+	}); err != nil {
+		fmt.Fprintln(Stderr, "Error:", err)
+		osExit(1)
+		return
+	}
+
 	outputFile := oLong
 	if outputFile == "" {
 		outputFile = oShort

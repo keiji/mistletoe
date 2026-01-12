@@ -38,6 +38,15 @@ func handlePrCheckout(args []string, opts GlobalOptions) {
 		os.Exit(1)
 	}
 
+	if err := CheckFlagDuplicates(fs, [][2]string{
+		{"url", "u"},
+		{"jobs", "j"},
+		{"verbose", "v"},
+	}); err != nil {
+		fmt.Println("Error:", err)
+		os.Exit(1)
+	}
+
 	dest := dLong
 	if dest == "" {
 		dest = "."
