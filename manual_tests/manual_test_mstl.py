@@ -151,6 +151,32 @@ class MstlManualTest:
             fail("Repositories not cloned")
         log("Success: mstl init")
 
+    def test_init_stdin(self):
+        log("Testing 'init' with stdin...")
+
+        # Define separate directory for stdin test
+        stdin_test_dir = os.path.join(self.test_dir, "repos_stdin")
+        os.makedirs(stdin_test_dir, exist_ok=True)
+
+        # Prepare Config JSON for Repo 1 Only (Reuse existing remote)
+        config = {
+            "repositories": [
+                {"url": os.path.join(self.remote_dir, "repo1.git")}
+            ]
+        }
+        config_json = json.dumps(config)
+
+        log("Running mstl init with piped input...")
+        self.run_cmd([self.bin_path, "init", "--dest", stdin_test_dir, "--verbose"], cwd=self.test_dir, input_str=config_json)
+
+        # Verify
+        if not os.path.isdir(os.path.join(stdin_test_dir, "repo1")):
+            fail("Repositories not cloned from stdin config")
+        if not os.path.exists(os.path.join(stdin_test_dir, ".mstl", "config.json")):
+             fail(".mstl/config.json not created in stdin test")
+
+        log("Success: mstl init stdin")
+
     def test_status_clean(self):
         log("Testing 'status' (Clean)...")
         # After init, we should rely on the local .mstl/config.json
@@ -254,6 +280,7 @@ class MstlManualTest:
         self.setup_remotes()
         self.create_config()
         self.test_init()
+        self.test_init_stdin()
         self.test_status_clean()
         self.test_switch()
         self.test_push()
