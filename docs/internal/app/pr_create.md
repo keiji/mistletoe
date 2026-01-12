@@ -33,7 +33,10 @@ mstl-gh pr create [options]
 
 ```mermaid
 flowchart TD
-    Start(["開始"]) --> LoadConfigSub[["設定読み込み"]]
+    Start(["開始"]) --> ParseArgs["引数パース"]
+    ParseArgs --> ValidateFlags{"オプション整合性チェック"}
+    ValidateFlags -- "エラー" --> Stop(["終了"])
+    ValidateFlags -- "OK" --> LoadConfigSub[["設定読み込み"]]
     LoadConfigSub --> LoadDep[["依存関係グラフ読み込み (Optional)"]]
     LoadDep --> ValidateAuth["gh CLI認証確認"]
     ValidateAuth --> CollectStatus["ステータス・PR状況収集 (Spinner)"]

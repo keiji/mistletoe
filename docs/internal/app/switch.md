@@ -38,7 +38,10 @@ mstl switch --create <branch_name> --file <path> [options]
 ```mermaid
 flowchart TD
     Start(["開始"]) --> ParseArgs["引数・フラグパース"]
-    ParseArgs --> LoadConfig["設定読み込み"]
+    ParseArgs --> ValidateFlags{"オプション整合性チェック"}
+    ValidateFlags -- "エラー" --> ErrorExit(["エラー終了"])
+    ValidateFlags -- "OK" --> LoadConfig["設定読み込み"]
+
     LoadConfig --> PreCheckLoop["事前チェックループ (並列)"]
 
     subgraph "事前チェック (Pre-check Phase)"

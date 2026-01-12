@@ -52,7 +52,10 @@ mstl snapshot [options]
 ```mermaid
 flowchart TD
     Start(["開始"]) --> ParseArgs["引数パース"]
-    ParseArgs --> CheckInput{"入力ソース (-f)"}
+    ParseArgs --> ValidateFlags{"オプション整合性チェック"}
+    ValidateFlags -- "エラー" --> End(["終了"])
+    ValidateFlags -- "OK" --> CheckInput{"入力ソース (-f)"}
+
     CheckInput -- "File" --> LoadConfig["設定ファイルロード (Optional)"]
     CheckInput -- "Stdin" --> ReadStdin["標準入力読み込み"]
     ReadStdin --> Decode["Base64デコード"]

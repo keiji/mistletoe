@@ -46,12 +46,15 @@ mstl status [options]
 ```mermaid
 flowchart TD
     Start(["開始"]) --> ParseArgs["引数パース"]
-    ParseArgs --> CheckInput{"入力ソース"}
+    ParseArgs --> ValidateFlags{"オプション整合性チェック"}
+    ValidateFlags -- "エラー" --> ErrorExit(["エラー終了"])
+    ValidateFlags -- "OK" --> CheckInput{"入力ソース"}
+
     CheckInput -- "File" --> LoadConfig["設定読み込み"]
     CheckInput -- "Stdin" --> ReadStdin["標準入力読み込み"]
     ReadStdin --> LoadConfig
     LoadConfig --> ValidateEnv["環境検証 (全リポジトリ)"]
-    ValidateEnv -- "エラー" --> ErrorExit(["エラー終了"])
+    ValidateEnv -- "エラー" --> ErrorExit
     ValidateEnv -- "成功" --> InitSpinner["スピナー開始"]
     InitSpinner --> ParallelLoop["並列ループ開始"]
 

@@ -44,7 +44,11 @@ mstl-gh pr status [options]
 
 ```mermaid
 flowchart TD
-    Start(["開始"]) --> CheckInput{"入力ソース"}
+    Start(["開始"]) --> ParseArgs["引数パース"]
+    ParseArgs --> ValidateFlags{"オプション整合性チェック"}
+    ValidateFlags -- "エラー" --> Stop(["終了"])
+    ValidateFlags -- "OK" --> CheckInput{"入力ソース"}
+
     CheckInput -- "File" --> LoadConfig["設定ロード"]
     CheckInput -- "Stdin" --> ReadStdin["標準入力読み込み"]
     ReadStdin --> LoadConfig

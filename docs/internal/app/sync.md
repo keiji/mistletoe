@@ -30,10 +30,13 @@ mstl sync --file <path> [options]
 ```mermaid
 flowchart TD
     Start(["開始"]) --> ParseArgs["引数パース"]
-    ParseArgs --> LoadConfig["設定読み込み"]
+    ParseArgs --> ValidateFlags{"オプション整合性チェック"}
+    ValidateFlags -- "エラー" --> ErrorExit(["エラー終了"])
+    ValidateFlags -- "OK" --> LoadConfig["設定読み込み"]
+
     LoadConfig --> ValidateIntegrity["整合性検証"]
 
-    ValidateIntegrity -- "エラー" --> ErrorExit(["エラー終了"])
+    ValidateIntegrity -- "エラー" --> ErrorExit
     ValidateIntegrity -- "成功" --> CollectStatus["ステータス収集 (並列)"]
 
     CollectStatus --> Analyze{"競合判定"}
