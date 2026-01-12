@@ -102,6 +102,7 @@ mstl init -f <config_file> [options]
 
 **Options:**
 *   `--dest <path>`: Destination directory (default: current directory).
+*   `--dependencies <path>`: Path to a Markdown file containing a Mermaid dependency graph.
 *   `--depth <int>`: Create a shallow clone with a history truncated to the specified number of commits.
 *   `-j, --jobs <int>`: Number of concurrent jobs to use (default: 1).
 *   `-v, --verbose`: Enable verbose output.
