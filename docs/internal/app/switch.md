@@ -26,6 +26,7 @@ mstl switch --create <branch_name> --file <path> [options]
 | `--ignore-stdin` | | 標準入力を無視する | false |
 | `--verbose` | `-v` | デバッグ用の詳細ログを出力（実行された git コマンドを表示） | false |
 
+**注意**: 同じ種類のオプション（例: `--file` と `-f`）が同時に異なる値で指定された場合はエラーとなります。
 > **注意**: 位置引数としての `<branch_name>` と、`--create` オプションは排他的です。両方を同時に指定するとエラーになります。
 
 ## 3. ロジックフロー (Logic Flow)

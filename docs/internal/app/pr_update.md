@@ -26,6 +26,8 @@ mstl-gh pr update [options]
 | `--ignore-stdin` | | 標準入力を無視する | false |
 | `--verbose` | `-v` | デバッグ用の詳細ログを出力（実行された git/gh コマンドを表示） | false |
 
+**注意**: 同じ種類のオプション（例: `--file` と `-f`）が同時に異なる値で指定された場合はエラーとなります。
+
 ## 3. ロジックフロー (Logic Flow)
 
 ### 3.1. フローチャート (Flowchart)
