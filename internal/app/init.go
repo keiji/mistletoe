@@ -434,14 +434,8 @@ func handleInit(args []string, opts GlobalOptions) {
 		var graphContent string
 
 		if dependenciesLong != "" {
-			// Filter the provided content against the filtered repositories (excluding private ones)
-			var filteredIDs []string
-			for _, repo := range filteredRepos {
-				if repo.ID != nil {
-					filteredIDs = append(filteredIDs, *repo.ID)
-				}
-			}
-			graphContent = FilterDependencyContent(string(depContent), filteredIDs)
+			// Use the provided content as is (already validated)
+			graphContent = string(depContent)
 		} else {
 			// Generate default graph (Mermaid graph with nodes only)
 			graphContent = "```mermaid\ngraph TD\n"

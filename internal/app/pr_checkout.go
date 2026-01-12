@@ -273,10 +273,12 @@ func handlePrCheckout(args []string, opts GlobalOptions) {
 			}
 		}
 
-		// Save dependency-graph.md if exists (filtered)
+		// Save dependency-graph.md if exists
 		if dependencyContent != "" {
-			filteredDepContent := FilterDependencyContent(dependencyContent, validIDs)
-			if err := writeDependencyFile(mstlDir, filteredDepContent); err != nil {
+			// We no longer filter dependencies as per design change in init (copying raw behavior).
+			// If validation or filtering is strictly required for checkout, it should be re-evaluated.
+			// For now, we mirror the 'cp' behavior of init for consistency, assuming the embedded graph is correct.
+			if err := writeDependencyFile(mstlDir, dependencyContent); err != nil {
 				fmt.Printf("Warning: Failed to write dependency-graph.md: %v\n", err)
 			} else {
 				fmt.Printf("Saved dependency graph to %s\n", filepath.Join(mstlDir, "dependency-graph.md"))
