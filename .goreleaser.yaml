@@ -64,15 +64,12 @@ changelog:
       - '^docs:'
       - '^test:'
 
-homebrew_casks:
+brews:
   - name: mistletoe
     repository:
       owner: keiji
       name: homebrew-tap
       token: "{{ .Env.GORELEASER_GITHUB_TOKEN }}"
-    directory: Casks
     homepage: "https://github.com/keiji/mistletoe"
     description: "Mistletoe CLI tool"
-    binaries:
-      - mstl
-      - mstl-gh
+    license: "Apache-2.0"
