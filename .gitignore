@@ -3,6 +3,7 @@
 /mistletoe
 /mstl-gh
 /bin/
+/dist/
 
 # Coverage
 coverage.out
