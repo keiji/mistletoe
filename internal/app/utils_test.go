@@ -258,13 +258,16 @@ func TestResolveCommonValues(t *testing.T) {
 			wantP:     -1,
 		},
 		{
-			name:      "Conflict: Custom file and Stdin",
+			name:      "Priority: Stdin Overrides Custom File",
 			fLong:     "custom.json",
 			fShort:    DefaultConfigFile,
 			jVal:      -1,
 			jValShort: -1,
 			stdinData: `{"repositories": []}`,
-			wantErr:   true,
+			wantFile:  "", // Should be cleared to use stdin
+			wantData:  `{"repositories": []}`,
+			wantP:     -1,
+			wantErr:   false,
 		},
 		{
 			name:      "Explicit empty file forces Stdin",

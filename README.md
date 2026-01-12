@@ -65,9 +65,12 @@ Global options for most commands:
 *   `-j, --jobs <int>`: Number of concurrent jobs to use (default: 1, or value from config).
 *   `-v, --verbose`: Enable verbose output (shows executed git/gh commands).
 
-If the `-f` flag is omitted, `mstl` will attempt to read the configuration from **standard input (stdin)**.
+Configuration loading priority:
+1.  **Standard Input (stdin)**: If standard input is provided, it takes precedence over any file specified.
+2.  **File Option**: If standard input is not provided and `-f` / `--file` is specified, the file is used.
+3.  **Default**: If neither is specified, `.mstl/config.json` is used.
 
-Example using pipe:
+Example using pipe (prioritized over file):
 ```bash
 cat config.json | mstl init
 ```
