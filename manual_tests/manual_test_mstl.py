@@ -280,7 +280,7 @@ class MstlManualTest:
         self.setup_remotes()
         self.create_config()
         self.test_init()
-        self.test_init_stdin() # Added this call
+        self.test_init_stdin()
         self.test_status_clean()
         self.test_switch()
         self.test_push()

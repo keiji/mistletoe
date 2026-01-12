@@ -21,6 +21,8 @@
     *   Ensure tests cover edge cases and error conditions.
 *   **Manual Tests**:
     *   Refer to `manual_tests/index.md` for manual test implementation guidelines.
+*   **Code Comments**:
+    *   **No Change History**: Do not include comments about the change history or actions taken in the code (e.g., "Added this call", "Fixed bug", "Modified by ..."). The Git history is the source of truth for changes. Comments should focus on "why" and "how" the code works, not "what changed".
 
 # Pull Request Guidelines
 
