@@ -270,6 +270,7 @@ func RenderStatusTable(w io.Writer, rows []StatusRow) {
 	table := tablewriter.NewTable(w,
 		tablewriter.WithHeaderAutoFormat(tw.Off),
 		tablewriter.WithRowAutoWrap(tw.WrapNone),
+		tablewriter.WithAlignment(tw.MakeAlign(5, tw.AlignLeft)),
 		tablewriter.WithRendition(tw.Rendition{
 			Borders: tw.Border{Left: tw.On, Top: tw.Off, Right: tw.On, Bottom: tw.Off},
 			Settings: tw.Settings{
