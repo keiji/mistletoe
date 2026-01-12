@@ -7,6 +7,15 @@ This project provides two binaries:
 *   **`mstl`**: The core tool for standard Git operations (init, status, switch, push, sync, snapshot).
 *   **`mstl-gh`**: An extended version that includes all `mstl` features plus GitHub integration (via `gh` CLI) for managing Pull Requests across multiple repositories.
 
+## Installation
+
+You can install `mistletoe` via Homebrew:
+
+```bash
+brew tap keiji/tap
+brew install mistletoe
+```
+
 ## How to build
 
 This project requires **Go 1.24.3** or higher.
