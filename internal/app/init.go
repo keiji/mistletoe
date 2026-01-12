@@ -276,10 +276,11 @@ func handleInit(args []string, opts GlobalOptions) {
 	var vLong, vShort bool
 
 	fs := flag.NewFlagSet("init", flag.ExitOnError)
+	var depFile string
+
 	fs.StringVar(&fLong, "file", DefaultConfigFile, "configuration file")
 	fs.StringVar(&fShort, "f", DefaultConfigFile, "configuration file (shorthand)")
 	fs.StringVar(&dLong, "dest", "", "destination directory")
-	var depFile string
 	fs.StringVar(&depFile, "dependencies", "", "Path to dependency graph file")
 	fs.IntVar(&depth, "depth", 0, "Create a shallow clone with a history truncated to the specified number of commits")
 	fs.IntVar(&jVal, "jobs", -1, "number of concurrent jobs")
