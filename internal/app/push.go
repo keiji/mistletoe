@@ -126,8 +126,8 @@ func handlePush(args []string, opts GlobalOptions) {
 	if input == "y" || input == "yes" {
 		for _, row := range pushable {
 			fmt.Fprintf(Stdout, "Pushing %s (branch: %s)...\n", row.Repo, row.BranchName)
-			// git push origin [branchname]
-			if err := RunGitInteractive(row.RepoDir, opts.GitPath, verbose, "push", "origin", row.BranchName); err != nil {
+			// git push -u origin [branchname]
+			if err := RunGitInteractive(row.RepoDir, opts.GitPath, verbose, "push", "-u", "origin", row.BranchName); err != nil {
 				fmt.Fprintf(Stdout, "Failed to push %s: %v.\n", row.Repo, err)
 			}
 		}
