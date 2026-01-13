@@ -108,6 +108,13 @@ class MstlManualTest:
 
         self.run_cmd(["git", "add", "README.md"], cwd=repo1_seed)
         self.run_cmd(["git", "commit", "-m", "Initial commit repo1"], cwd=repo1_seed)
+
+        # Add another commit to verify depth
+        with open(os.path.join(repo1_seed, "test.txt"), "w") as f:
+            f.write("test")
+        self.run_cmd(["git", "add", "test.txt"], cwd=repo1_seed)
+        self.run_cmd(["git", "commit", "-m", "Second commit repo1"], cwd=repo1_seed)
+
         self.run_cmd(["git", "push", "origin", "main"], cwd=repo1_seed)
         self.run_cmd(["git", "--git-dir", os.path.join(self.remote_dir, "repo1.git"), "symbolic-ref", "HEAD", "refs/heads/main"])
 
@@ -126,10 +133,14 @@ class MstlManualTest:
 
     def create_config(self):
         log("Creating mstl configuration...")
+        # Use file:// protocol to support --depth in local clones
+        repo1_url = "file://" + os.path.join(self.remote_dir, "repo1.git")
+        repo2_url = "file://" + os.path.join(self.remote_dir, "repo2.git")
+
         config = {
             "repositories": [
-                {"url": os.path.join(self.remote_dir, "repo1.git")},
-                {"url": os.path.join(self.remote_dir, "repo2.git")}
+                {"url": repo1_url},
+                {"url": repo2_url}
             ]
         }
         with open(self.config_file, "w") as f:
@@ -151,6 +162,24 @@ class MstlManualTest:
             fail("Repositories not cloned")
         log("Success: mstl init")
 
+    def test_init_depth(self):
+        log("Testing 'init --depth 1'...")
+        shallow_dir = os.path.join(self.test_dir, "repos_shallow")
+        os.makedirs(shallow_dir, exist_ok=True)
+        self.run_cmd([self.bin_path, "init", "-f", self.config_file, "--depth", "1", "--verbose", "--ignore-stdin", "--dest", shallow_dir], cwd=self.test_dir)
+
+        # Verify commit count
+        repo1_path = os.path.join(shallow_dir, "repo1")
+        if not os.path.isdir(repo1_path):
+             fail("repo1 not cloned in shallow dir")
+
+        res = self.run_cmd(["git", "rev-list", "--count", "HEAD"], cwd=repo1_path)
+        count = res.stdout.strip()
+        if count != "1":
+            fail(f"repo1 depth is {count}, expected 1")
+
+        log("Success: mstl init --depth 1")
+
     def test_init_stdin(self):
         log("Testing 'init' with stdin...")
 
@@ -159,9 +188,10 @@ class MstlManualTest:
         os.makedirs(stdin_test_dir, exist_ok=True)
 
         # Prepare Config JSON for Repo 1 Only (Reuse existing remote)
+        repo1_url = "file://" + os.path.join(self.remote_dir, "repo1.git")
         config = {
             "repositories": [
-                {"url": os.path.join(self.remote_dir, "repo1.git")}
+                {"url": repo1_url}
             ]
         }
         config_json = json.dumps(config)
@@ -280,6 +310,7 @@ class MstlManualTest:
         self.setup_remotes()
         self.create_config()
         self.test_init()
+        self.test_init_depth()
         self.test_init_stdin()
         self.test_status_clean()
         self.test_switch()
