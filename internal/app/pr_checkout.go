@@ -19,6 +19,7 @@ func handlePrCheckout(args []string, opts GlobalOptions) {
 		uLong     string
 		uShort    string
 		dLong     string
+		depth     int
 		jVal      int
 		jValShort int
 		vLong     bool
@@ -28,6 +29,7 @@ func handlePrCheckout(args []string, opts GlobalOptions) {
 	fs.StringVar(&uLong, "url", "", "Pull Request URL")
 	fs.StringVar(&uShort, "u", "", "Pull Request URL (shorthand)")
 	fs.StringVar(&dLong, "dest", "", "Destination directory")
+	fs.IntVar(&depth, "depth", 0, "Create a shallow clone with a history truncated to the specified number of commits")
 	fs.IntVar(&jVal, "jobs", -1, "Number of concurrent jobs")
 	fs.IntVar(&jValShort, "j", -1, "Number of concurrent jobs (shorthand)")
 	fs.BoolVar(&vLong, "verbose", false, "Enable verbose output")
@@ -225,7 +227,7 @@ func handlePrCheckout(args []string, opts GlobalOptions) {
 	fmt.Println("Initializing repositories based on snapshot...")
 	// The snapshot contains the target state. We treat it as the config.
 	// PerformInit handles validation, cloning, and checking out.
-	if err := PerformInit(*config.Repositories, "", opts.GitPath, jobs, 0, verbose); err != nil {
+	if err := PerformInit(*config.Repositories, "", opts.GitPath, jobs, depth, verbose); err != nil {
 		fmt.Printf("Error during initialization: %v\n", err)
 		// We continue to status even if some failed? Or exit?
 		// Usually Init failure is critical.

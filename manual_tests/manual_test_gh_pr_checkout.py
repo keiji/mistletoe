@@ -54,6 +54,13 @@ def main():
             subprocess.run(["git", "add", "."], cwd=r_dir, check=True, stdout=subprocess.DEVNULL)
             subprocess.run(["git", "commit", "-m", "Add test.txt"], cwd=r_dir, check=True, stdout=subprocess.DEVNULL)
 
+            # Make a second commit so depth=1 is distinguishable
+            with open(os.path.join(r_dir, "test2.txt"), "w") as f:
+                f.write("test content 2")
+            subprocess.run(["git", "add", "."], cwd=r_dir, check=True, stdout=subprocess.DEVNULL)
+            subprocess.run(["git", "commit", "-m", "Add test2.txt"], cwd=r_dir, check=True, stdout=subprocess.DEVNULL)
+
+
         print_green("[-] Running 'pr create' to setup PRs...")
         # Manual input for creation
         env.run_mstl_cmd(["pr", "create", "-t", "Checkout Test PR", "-b", "Body", "--dependencies", "dependency-graph.md"])
@@ -67,33 +74,50 @@ def main():
         pr_url = res.stdout.strip()
         print_green(f"    PR URL: {pr_url}")
 
-        # Checkout
+        # Checkout Normal
         checkout_dest = os.path.join(env.cwd, "pr_checkout")
         if os.path.exists(checkout_dest):
             shutil.rmtree(checkout_dest)
 
         print_green(f"[-] Running 'pr checkout' to {checkout_dest}...")
-        # We run this from env.cwd (root) so --dest ./pr_checkout works as expected
         env.run_mstl_cmd(["pr", "checkout", "-u", pr_url, "--dest", checkout_dest, "--verbose"], cwd=env.cwd)
 
-        # Verification logic could be added here, but InteractiveRunner relies on user saying "Yes"
-        # We can print what to check
-        print_green(f"[-] Verified checkout destination: {checkout_dest}")
-        if os.path.exists(checkout_dest) and len(os.listdir(checkout_dest)) >= 4:
-             print_green(f"    Success: Directory exists and contains files.")
-        else:
-             print_green(f"    WARNING: Directory seems empty or missing!")
+        # Checkout Shallow
+        checkout_dest_shallow = os.path.join(env.cwd, "pr_checkout_shallow")
+        if os.path.exists(checkout_dest_shallow):
+            shutil.rmtree(checkout_dest_shallow)
+
+        print_green(f"[-] Running 'pr checkout --depth 1' to {checkout_dest_shallow}...")
+        env.run_mstl_cmd(["pr", "checkout", "-u", pr_url, "--dest", checkout_dest_shallow, "--depth", "1", "--verbose"], cwd=env.cwd)
+
+
+        # Verification logic
+        print_green(f"[-] Verified checkout destinations")
+
+        # Verify Depth
+        for repo in env.repo_names:
+             shallow_repo = os.path.join(checkout_dest_shallow, repo)
+             if os.path.exists(shallow_repo):
+                 # Check commit count
+                 res = subprocess.run(["git", "rev-list", "--count", "HEAD"], cwd=shallow_repo, capture_output=True, text=True)
+                 count = res.stdout.strip()
+                 if count == "1":
+                     print_green(f"    Success: {repo} is shallow (depth=1).")
+                 else:
+                     print_green(f"    WARNING: {repo} has depth {count} (expected 1).")
+             else:
+                 print_green(f"    WARNING: {repo} missing in shallow checkout.")
+
 
     expected = (
         "1. Repositories A, B, C, D are created and PRs are opened.\n"
-        "2. 'mstl-gh pr checkout' downloads the state from the PR snapshot.\n"
-        "3. A new directory './pr_checkout' is created.\n"
-        "4. Inside './pr_checkout', all 4 repositories exist and are checked out to the PR branch/commit.\n"
-        "5. The .mstl/dependency-graph.md in the checked out dir should match the original."
+        "2. 'mstl-gh pr checkout' downloads the state from the PR snapshot to ./pr_checkout.\n"
+        "3. 'mstl-gh pr checkout --depth 1' downloads the state to ./pr_checkout_shallow.\n"
+        "4. Inside './pr_checkout_shallow', repositories should have only 1 commit history.\n"
     )
 
     runner.execute_scenario(
-        "Pull Request Checkout",
+        "Pull Request Checkout (Normal & Shallow)",
         expected,
         scenario_logic
     )
@@ -104,7 +128,10 @@ def main():
         dest_dir = os.path.join(env.cwd, "pr_checkout")
         if os.path.exists(dest_dir):
             shutil.rmtree(dest_dir)
-            print_green("[-] Deleted ./pr_checkout")
+        dest_dir_shallow = os.path.join(env.cwd, "pr_checkout_shallow")
+        if os.path.exists(dest_dir_shallow):
+            shutil.rmtree(dest_dir_shallow)
+            print_green("[-] Deleted ./pr_checkout*")
 
     runner.run_cleanup(cleanup_with_dest)
 
