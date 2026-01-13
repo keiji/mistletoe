@@ -133,6 +133,8 @@ func GenerateMistletoeBody(snapshotData string, snapshotFilename string, current
 			for _, item := range flatList {
 				sb.WriteString(fmt.Sprintf(" * %s\n", item.URL))
 			}
+		} else {
+			sb.WriteString("None\n")
 		}
 	} else {
 		if len(dependencies) > 0 {
@@ -162,6 +164,10 @@ func GenerateMistletoeBody(snapshotData string, snapshotFilename string, current
 					sb.WriteString(fmt.Sprintf(" * %s\n", item.URL))
 				}
 			}
+		}
+
+		if len(dependencies) == 0 && len(dependents) == 0 && len(others) == 0 {
+			sb.WriteString("None\n")
 		}
 	}
 	sb.WriteString("\n")
