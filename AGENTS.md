@@ -19,6 +19,13 @@
 *   **Testability**:
     *   Design code to be testable. Use dependency injection or mockable variables (like `ExecCommand`) for external interactions (Git, filesystem, etc.).
     *   Ensure tests cover edge cases and error conditions.
+*   **Unit Tests (Git Configuration)**:
+    *   **Must Configure Git User**: When writing unit tests that involve Git operations (even mocked or local), you **must** explicitly configure `user.email` and `user.name` to ensure reproducible behavior across environments.
+    *   Example:
+        ```go
+        exec.Command("git", "-C", dir, "config", "user.email", "test@example.com").Run()
+        exec.Command("git", "-C", dir, "config", "user.name", "Test User").Run()
+        ```
 *   **Manual Tests**:
     *   Refer to `manual_tests/index.md` for manual test implementation guidelines.
 *   **Code Comments**:
