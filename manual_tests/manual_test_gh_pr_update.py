@@ -32,7 +32,7 @@ def main():
         env.create_config_and_graph() # Creates A->B->C
 
         print_green(f"[-] Initializing...")
-        env.run_mstl_cmd(["init", "-f", "mistletoe.json"])
+        env.run_mstl_cmd(["init", "-f", "mistletoe.json", "--verbose"])
 
         print_green("[-] Configuring git user...")
         for repo in env.repo_names:
@@ -41,7 +41,7 @@ def main():
              subprocess.run(["git", "config", "user.name", "Test User"], cwd=r_dir, check=True, stdout=subprocess.DEVNULL)
 
         print_green("[-] Switching to feature/update-test...")
-        env.run_mstl_cmd(["switch", "-c", "feature/update-test"])
+        env.run_mstl_cmd(["switch", "-c", "feature/update-test", "--verbose"])
 
         print_green("[-] Making commits...")
         for repo in env.repo_names:
@@ -52,7 +52,7 @@ def main():
             subprocess.run(["git", "commit", "-m", "Add test.txt"], cwd=r_dir, check=True, stdout=subprocess.DEVNULL)
 
         print_green("[-] Running 'pr create'...")
-        env.run_mstl_cmd(["pr", "create", "-t", "Update Test PR", "-b", "Body", "--dependencies", "dependency-graph.md"])
+        env.run_mstl_cmd(["pr", "create", "-t", "Update Test PR", "-b", "Body", "--dependencies", "dependency-graph.md", "--verbose"])
 
         print_green("[-] Modifying dependency-graph.md (Adding D --> A)...")
         # Read existing graph

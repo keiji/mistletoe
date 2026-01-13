@@ -15,11 +15,7 @@ import atexit
 
 # Add current directory to sys.path to import interactive_runner
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-from interactive_runner import InteractiveRunner, print_green
-
-# Use ANSI codes for fail since interactive_runner doesn't export red
-FAIL_COLOR = '\033[91m'
-ENDC = '\033[0m'
+from interactive_runner import InteractiveRunner, print_green, print_red
 
 def log_header(msg):
     print_green(f"=== {msg} ===")
@@ -28,11 +24,15 @@ def log_pass(msg):
     print_green(f"[PASS] {msg}")
 
 def log_fail(msg):
-    print(f"{FAIL_COLOR}[FAIL] {msg}{ENDC}")
+    print_red(f"[FAIL] {msg}")
     sys.exit(1)
 
 def run_command(cmd, cwd=None, expect_error=False):
     """Runs a shell command and returns the exit code and output."""
+    # Ensure --verbose is present for mstl commands
+    if os.path.basename(cmd[0]).startswith('mstl') and "--verbose" not in cmd:
+        cmd = cmd + ["--verbose"]
+
     try:
         result = subprocess.run(
             cmd,

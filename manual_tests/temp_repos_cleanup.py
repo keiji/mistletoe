@@ -2,6 +2,11 @@
 import subprocess
 import json
 import sys
+import os
+
+# Add current directory to sys.path to import interactive_runner
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+from interactive_runner import print_green, print_red
 
 def run_command(args):
     try:
@@ -13,7 +18,7 @@ def run_command(args):
         )
         return result.stdout.strip()
     except subprocess.CalledProcessError as e:
-        print(f"Error running command {' '.join(args)}: {e.stderr}")
+        print_red(f"Error running command {' '.join(args)}: {e.stderr}")
         sys.exit(1)
 
 def get_current_user():
@@ -35,42 +40,42 @@ def list_temp_repos(user):
 
 def delete_repo(user, repo_name):
     full_name = f"{user}/{repo_name}"
-    print(f"Deleting {full_name}...")
+    print_green(f"Deleting {full_name}...")
     try:
         subprocess.run(["gh", "repo", "delete", full_name, "--yes"], check=True)
-        print(f"Deleted {full_name}")
+        print_green(f"Deleted {full_name}")
     except subprocess.CalledProcessError:
-        print(f"Failed to delete {full_name}")
+        print_red(f"Failed to delete {full_name}")
 
 def main():
-    print("Checking for 'mistletoe-test-*' repositories...")
+    print_green("Checking for 'mistletoe-test-*' repositories...")
 
     try:
         user = get_current_user()
     except Exception:
-        print("Failed to get GitHub user. Ensure 'gh' is authenticated.")
+        print_red("Failed to get GitHub user. Ensure 'gh' is authenticated.")
         sys.exit(1)
 
     temp_repos = list_temp_repos(user)
 
     if not temp_repos:
-        print("No 'mistletoe-test-*' repositories found.")
+        print_green("No 'mistletoe-test-*' repositories found.")
         return
 
-    print(f"\nFound {len(temp_repos)} repository(s):")
+    print_green(f"\nFound {len(temp_repos)} repository(s):")
     for repo in temp_repos:
-        print(f" - {repo}")
+        print_green(f" - {repo}")
 
-    print("\nDo you want to DELETE all these repositories? (yes/no)")
+    print_green("\nDo you want to DELETE all these repositories? (yes/no)")
     choice = input("> ").lower().strip()
 
     if choice == "yes":
-        print("\nStarting cleanup...")
+        print_green("\nStarting cleanup...")
         for repo in temp_repos:
             delete_repo(user, repo)
-        print("\nCleanup complete.")
+        print_green("\nCleanup complete.")
     else:
-        print("Operation cancelled.")
+        print_green("Operation cancelled.")
 
 if __name__ == "__main__":
     main()

@@ -8,18 +8,13 @@ import atexit
 
 # Add current directory to sys.path to import interactive_runner
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-from interactive_runner import InteractiveRunner, print_green
-
-# Colors
-GREEN = '\033[0;32m'
-RED = '\033[0;31m'
-NC = '\033[0m'
+from interactive_runner import InteractiveRunner, print_green, print_red
 
 def log(msg):
     print_green(f"[TEST] {msg}")
 
 def fail(msg):
-    print(f"{RED}[FAIL]{NC} {msg}")
+    print_red(f"[FAIL] {msg}")
     sys.exit(1)
 
 class MstlManualTest:
@@ -69,6 +64,11 @@ class MstlManualTest:
                 log("Skipped cleanup.")
 
     def run_cmd(self, cmd, cwd=None, check=True, input_str=None):
+        # Ensure --verbose is present for mstl commands
+        # Note: cmd[0] is self.bin_path, so check if cmd[0] ends with 'mstl' or 'mstl.exe'
+        if os.path.basename(cmd[0]).startswith('mstl') and "--verbose" not in cmd:
+            cmd = cmd + ["--verbose"]
+
         print_green(f"[CMD] {' '.join(cmd)}")
         try:
             result = subprocess.run(
@@ -166,7 +166,7 @@ class MstlManualTest:
         log("Testing 'init --depth 1'...")
         shallow_dir = os.path.join(self.test_dir, "repos_shallow")
         os.makedirs(shallow_dir, exist_ok=True)
-        self.run_cmd([self.bin_path, "init", "-f", self.config_file, "--depth", "1", "--verbose", "--ignore-stdin", "--dest", shallow_dir], cwd=self.test_dir)
+        self.run_cmd([self.bin_path, "init", "-f", self.config_file, "--depth", "1", "--ignore-stdin", "--dest", shallow_dir], cwd=self.test_dir)
 
         # Verify commit count
         repo1_path = os.path.join(shallow_dir, "repo1")
@@ -197,7 +197,7 @@ class MstlManualTest:
         config_json = json.dumps(config)
 
         log("Running mstl init with piped input...")
-        self.run_cmd([self.bin_path, "init", "--dest", stdin_test_dir, "--verbose"], cwd=self.test_dir, input_str=config_json)
+        self.run_cmd([self.bin_path, "init", "--dest", stdin_test_dir], cwd=self.test_dir, input_str=config_json)
 
         # Verify
         if not os.path.isdir(os.path.join(stdin_test_dir, "repo1")):

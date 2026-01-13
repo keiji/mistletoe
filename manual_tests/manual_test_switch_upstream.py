@@ -8,18 +8,13 @@ import atexit
 
 # Add current directory to sys.path to import interactive_runner
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-from interactive_runner import InteractiveRunner, print_green
-
-# Colors
-GREEN = '\033[0;32m'
-RED = '\033[0;31m'
-NC = '\033[0m'
+from interactive_runner import InteractiveRunner, print_green, print_red
 
 def log(msg):
     print_green(f"[TEST] {msg}")
 
 def fail(msg):
-    print(f"{RED}[FAIL]{NC} {msg}")
+    print_red(f"[FAIL] {msg}")
     sys.exit(1)
 
 class SwitchUpstreamTest:
@@ -66,6 +61,10 @@ class SwitchUpstreamTest:
                 log(f"Skipped cleanup. Directory: {self.test_dir}")
 
     def run_cmd(self, cmd, cwd=None, check=True):
+        # Ensure --verbose is present for mstl commands
+        if os.path.basename(cmd[0]).startswith('mstl') and "--verbose" not in cmd:
+            cmd = cmd + ["--verbose"]
+
         print_green(f"[CMD] {' '.join(cmd)}")
         try:
             result = subprocess.run(

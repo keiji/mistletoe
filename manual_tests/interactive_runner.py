@@ -4,10 +4,14 @@ import datetime
 import traceback
 
 GREEN = '\033[92m'
+RED = '\033[91m'
 RESET = '\033[0m'
 
 def print_green(text):
     print(f"{GREEN}{text}{RESET}")
+
+def print_red(text):
+    print(f"{RED}{text}{RESET}")
 
 class InteractiveRunner:
     def __init__(self, description):
@@ -28,7 +32,11 @@ class InteractiveRunner:
         if status:
             line += f" - {status}"
 
-        print_green(line)
+        if status == "FAILED":
+            print_red(line)
+        else:
+            print_green(line)
+
         if self.log_file:
             with open(self.log_file, "a") as f:
                 f.write(line + "\n")

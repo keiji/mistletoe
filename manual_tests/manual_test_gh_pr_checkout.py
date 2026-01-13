@@ -35,7 +35,7 @@ def main():
         env.create_config_and_graph()
 
         print_green(f"[-] Initializing in {env.test_dir}...")
-        env.run_mstl_cmd(["init", "-f", "mistletoe.json"])
+        env.run_mstl_cmd(["init", "-f", "mistletoe.json", "--verbose"])
 
         print_green("[-] Configuring dummy git user...")
         for repo in env.repo_names:
@@ -44,7 +44,7 @@ def main():
              subprocess.run(["git", "config", "user.name", "Test User"], cwd=r_dir, check=True, stdout=subprocess.DEVNULL)
 
         print_green("[-] Switching to feature/checkout-test...")
-        env.run_mstl_cmd(["switch", "-c", "feature/checkout-test"])
+        env.run_mstl_cmd(["switch", "-c", "feature/checkout-test", "--verbose"])
 
         print_green("[-] Making commits...")
         for repo in env.repo_names:
@@ -63,7 +63,7 @@ def main():
 
         print_green("[-] Running 'pr create' to setup PRs...")
         # Manual input for creation
-        env.run_mstl_cmd(["pr", "create", "-t", "Checkout Test PR", "-b", "Body", "--dependencies", "dependency-graph.md"])
+        env.run_mstl_cmd(["pr", "create", "-t", "Checkout Test PR", "-b", "Body", "--dependencies", "dependency-graph.md", "--verbose"])
 
         # Retrieve PR URL for Repo A
         print_green(f"[-] retrieving PR URL for {repo_a}...")

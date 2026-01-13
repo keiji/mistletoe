@@ -8,18 +8,13 @@ import atexit
 
 # Add current directory to sys.path to import interactive_runner
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-from interactive_runner import InteractiveRunner, print_green
-
-# Colors - Use interactive_runner's where possible, but keep local for helpers if needed
-# Actually, interactive_runner doesn't export colors, only print_green.
-# We will rely on print_green for logs.
+from interactive_runner import InteractiveRunner, print_green, print_red
 
 def log(msg):
     print_green(f"[TEST] {msg}")
 
 def fail(msg):
-    # Use ANSI codes for red directly since interactive_runner doesn't export print_red
-    print(f"\033[0;31m[FAIL]\033[0m {msg}")
+    print_red(f"[FAIL] {msg}")
     sys.exit(1)
 
 class MstlManualTestSyncConflict:
@@ -67,6 +62,10 @@ class MstlManualTestSyncConflict:
                 print(f"Cleanup failed: {e}")
 
     def run_cmd(self, cmd, cwd=None, check=True, input_str=None):
+        # Ensure --verbose is present for mstl commands
+        if os.path.basename(cmd[0]).startswith('mstl') and "--verbose" not in cmd:
+            cmd = cmd + ["--verbose"]
+
         try:
             result = subprocess.run(
                 cmd,
