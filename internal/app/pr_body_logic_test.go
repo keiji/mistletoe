@@ -346,3 +346,25 @@ func TestDependencyCategorization_Verification(t *testing.T) {
 		})
 	}
 }
+
+func TestGenerateMistletoeBody_WithDeps_NoMatches(t *testing.T) {
+	snapshot := "{}"
+	filename := "test.json"
+	currentID := "repo-a"
+
+	// Only self exists in PRs
+	allPRs := map[string][]PrInfo{
+		"repo-a": {{URL: "url-a", State: "OPEN"}},
+	}
+
+	deps := &DependencyGraph{
+		Forward: map[string][]string{"repo-a": {"repo-b"}},
+	}
+
+	body := GenerateMistletoeBody(snapshot, filename, currentID, allPRs, deps, "")
+
+	// Check for "None"
+	if !strings.Contains(body, "### Related Pull Request(s)\n\nNone\n") {
+		t.Errorf("Expected 'None' when no related PRs found, got: %q", body)
+	}
+}
