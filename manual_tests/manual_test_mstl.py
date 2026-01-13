@@ -133,10 +133,14 @@ class MstlManualTest:
 
     def create_config(self):
         log("Creating mstl configuration...")
+        # Use file:// protocol to support --depth in local clones
+        repo1_url = "file://" + os.path.join(self.remote_dir, "repo1.git")
+        repo2_url = "file://" + os.path.join(self.remote_dir, "repo2.git")
+
         config = {
             "repositories": [
-                {"url": os.path.join(self.remote_dir, "repo1.git")},
-                {"url": os.path.join(self.remote_dir, "repo2.git")}
+                {"url": repo1_url},
+                {"url": repo2_url}
             ]
         }
         with open(self.config_file, "w") as f:
@@ -184,9 +188,10 @@ class MstlManualTest:
         os.makedirs(stdin_test_dir, exist_ok=True)
 
         # Prepare Config JSON for Repo 1 Only (Reuse existing remote)
+        repo1_url = "file://" + os.path.join(self.remote_dir, "repo1.git")
         config = {
             "repositories": [
-                {"url": os.path.join(self.remote_dir, "repo1.git")}
+                {"url": repo1_url}
             ]
         }
         config_json = json.dumps(config)
