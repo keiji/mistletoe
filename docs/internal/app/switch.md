@@ -4,6 +4,8 @@
 
 `switch` サブコマンドは、設定ファイルで定義されたすべてのリポジトリに対して、指定されたブランチへの切り替えを行います。既存のブランチへの切り替えと、新規ブランチの作成・切り替えの両方をサポートし、リポジトリ群全体でのブランチ状態の同期を容易にします。
 
+また、ブランチ切り替え（または作成）後、リモートリポジトリに同名のブランチが存在し、かつ安全（コンフリクトなし）に追跡可能であれば、自動的にそのリモートブランチを Upstream として設定します。
+
 ## 2. 使用方法 (Usage)
 
 ### 既存ブランチへの切り替え (Switch to existing branch)
@@ -64,6 +66,7 @@ flowchart TD
 
     subgraph "実行: 切り替えモード"
         ExecLoopSwitch --> GitCheckout["git checkout branch"]
+        GitCheckout --> SetUpstream["Upstream設定処理"]
     end
 
     CheckMode -- Yes (Create Mode) --> ExecLoopCreate["実行ループ (並列)"]
@@ -72,11 +75,11 @@ flowchart TD
         ExecLoopCreate --> CheckMap{"マップ確認: 存在?"}
         CheckMap -- Yes --> SwitchOnly["git checkout branch"]
         CheckMap -- No --> CreateAndSwitch["git checkout -b branch"]
+        SwitchOnly --> SetUpstream
+        CreateAndSwitch --> SetUpstream
     end
 
-    GitCheckout --> WaitExec["完了待機"]
-    SwitchOnly --> WaitExec
-    CreateAndSwitch --> WaitExec
+    SetUpstream --> WaitExec["完了待機"]
     WaitExec --> Stop(["終了"])
 ```
 
@@ -92,14 +95,22 @@ flowchart TD
 **1. 既存ブランチ切り替えモード (位置引数指定)**
 *   **アトミック性チェック**: 保存された結果を確認し、**いずれか一つでも**リポジトリに対象ブランチが存在しない場合、処理の中断。不足しているすべてのリポジトリをリストアップしてエラー表示。これにより、「一部だけ切り替わってしまった」という不整合の防止。
 *   **実行**: すべてのリポジトリでブランチが存在することを確認した後、並列で `git checkout <branch>` の実行。
+*   **Upstream設定**: 切り替え後、リモートブランチ（`origin/<branch>`）が存在し、コンフリクトがない場合は Upstream に設定します。
 
 **2. 作成モード (`--create` 指定)**
 *   厳密な存在チェックは行わず、リポジトリごとの状態に合わせて処理を行います。
 *   **実行**:
     *   ブランチが既に存在する場合: `git checkout <branch>` を実行し、そのブランチへの切り替え。
     *   ブランチが存在しない場合: `git checkout -b <branch>` を実行し、新規作成して切り替え。
-    *   **どちらもなし**: クローン後、何もしない（デフォルトブランチのまま）
+    *   **Upstream設定**: 切り替え後、リモートブランチ（`origin/<branch>`）が存在し、コンフリクトがない場合は Upstream に設定します。
 
-### 3.3. デバッグ (Debugging)
+### 3.3. Upstream設定ロジック (Upstream Logic)
+ブランチ切り替え後、以下の手順で自動設定を試みます：
+1. `git fetch origin <branch>` を実行し、リモートの状態を更新。
+2. リモートブランチ `refs/remotes/origin/<branch>` が存在するか確認。存在しなければ終了。
+3. ローカルブランチとリモートブランチの間にコンフリクトがないか確認（Merge Tree等の手法を使用）。コンフリクトがある場合は設定をスキップ。
+4. `git branch --set-upstream-to=origin/<branch>` を実行。
+
+### 3.4. デバッグ (Debugging)
 
 `--verbose` オプションが指定された場合、実行される `git` コマンドが標準エラー出力に出力されます。

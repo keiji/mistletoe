@@ -387,7 +387,7 @@ func executePush(repos []conf.Repository, baseDir string, rows []StatusRow, jobs
 			}
 
 			fmt.Printf("[%s] Pushing to origin/%s...\n", repoName, branchName)
-			if _, err := RunGit(repoDir, gitPath, verbose, "push", "origin", branchName); err != nil {
+			if _, err := RunGit(repoDir, gitPath, verbose, "push", "-u", "origin", branchName); err != nil {
 				mu.Lock()
 				errs = append(errs, fmt.Sprintf("[%s] push failed: %v", repoName, err))
 				mu.Unlock()

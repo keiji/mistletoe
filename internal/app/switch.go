@@ -8,12 +8,57 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strings"
 	"sync"
 )
 
 func branchExists(dir, branch, gitPath string, verbose bool) bool {
 	_, err := RunGit(dir, gitPath, verbose, "show-ref", "--verify", "--quiet", "refs/heads/"+branch)
 	return err == nil
+}
+
+func configureUpstreamIfSafe(dir, branch, gitPath string, verbose bool) {
+	// 1. Fetch
+	_, err := RunGit(dir, gitPath, verbose, "fetch", "origin", branch)
+	if err != nil {
+		return // Remote likely doesn't exist or fetch failed
+	}
+
+	// 2. Check remote existence
+	_, err = RunGit(dir, gitPath, verbose, "show-ref", "--verify", "--quiet", "refs/remotes/origin/"+branch)
+	if err != nil {
+		return // Remote branch doesn't exist
+	}
+
+	// 3. Check for conflict
+	// Get SHAs
+	localHead, err := RunGit(dir, gitPath, verbose, "rev-parse", "HEAD")
+	if err != nil {
+		return
+	}
+	remoteHead, err := RunGit(dir, gitPath, verbose, "rev-parse", "refs/remotes/origin/"+branch)
+	if err != nil {
+		return
+	}
+
+	// If same, safe.
+	if localHead == remoteHead {
+		_ = RunGitInteractive(dir, gitPath, verbose, "branch", "--set-upstream-to=origin/"+branch, branch)
+		return
+	}
+
+	// Merge base
+	base, err := RunGit(dir, gitPath, verbose, "merge-base", localHead, remoteHead)
+	if err != nil || base == "" {
+		return // Unrelated histories?
+	}
+
+	// Merge tree to check conflict
+	out, err := RunGit(dir, gitPath, verbose, "merge-tree", base, localHead, remoteHead)
+	if err == nil && !strings.Contains(out, "<<<<<<<") {
+		// Safe!
+		_ = RunGitInteractive(dir, gitPath, verbose, "branch", "--set-upstream-to=origin/"+branch, branch)
+	}
 }
 
 func handleSwitch(args []string, opts GlobalOptions) {
@@ -195,6 +240,7 @@ func handleSwitch(args []string, opts GlobalOptions) {
 					osExit(1)
 					return
 				}
+				configureUpstreamIfSafe(dir, branchName, opts.GitPath, verbose)
 			}(repo)
 		}
 		wg.Wait()
@@ -227,6 +273,7 @@ func handleSwitch(args []string, opts GlobalOptions) {
 						return
 					}
 				}
+				configureUpstreamIfSafe(dir, branchName, opts.GitPath, verbose)
 			}(repo)
 		}
 		wg.Wait()
