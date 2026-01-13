@@ -44,7 +44,15 @@ class InteractiveRunner:
 
         while True:
             sys.stdout.write(question + prompt + ": ")
-            choice = input().lower()
+            try:
+                choice = input().lower()
+            except EOFError:
+                if default is not None:
+                    print(default)
+                    return valid[default]
+                print("no")
+                return False
+
             if default is not None and choice == "":
                 return valid[default]
             elif choice in valid:

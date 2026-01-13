@@ -322,6 +322,18 @@ func TestHandleSwitch_ConfigureUpstream(t *testing.T) {
 
 	// So we must use `-c`.
 
+	// Explicitly verify remote URL before config to match config URL
+	out, err = exec.Command("git", "-C", localPath, "remote", "get-url", "origin").CombinedOutput()
+	if err != nil {
+		t.Fatalf("failed to get remote url: %v", err)
+	}
+	// Verify that upstream is NOT set before running the command
+	// This ensures the command actually performs the action.
+	cmdPre := exec.Command("git", "-C", localPath, "config", "--get", "branch.feature-up.remote")
+	if outPre, errPre := cmdPre.CombinedOutput(); errPre == nil && len(bytes.TrimSpace(outPre)) > 0 {
+		t.Fatalf("upstream should not be set yet, got: %s", outPre)
+	}
+
 	// Mock Stdin
 	Stdin = strings.NewReader("")
 
