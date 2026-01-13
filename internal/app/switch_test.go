@@ -236,14 +236,31 @@ func TestHandleSwitch_ConfigureUpstream(t *testing.T) {
 	if err := exec.Command("git", "clone", remotePath, seedPath).Run(); err != nil {
 		t.Fatalf("failed to clone seed: %v", err)
 	}
+	// Configure git user for seed
+	configGitUser := func(dir string) {
+		exec.Command("git", "-C", dir, "config", "user.email", "test@example.com").Run()
+		exec.Command("git", "-C", dir, "config", "user.name", "Test User").Run()
+	}
+	configGitUser(seedPath)
+
 	// Commit and push main
-	exec.Command("git", "-C", seedPath, "commit", "--allow-empty", "-m", "init").Run()
-	exec.Command("git", "-C", seedPath, "push", "origin", "master").Run() // use master for simplicity
+	if err := exec.Command("git", "-C", seedPath, "commit", "--allow-empty", "-m", "init").Run(); err != nil {
+		t.Fatalf("failed to commit init: %v", err)
+	}
+	if err := exec.Command("git", "-C", seedPath, "push", "origin", "master").Run(); err != nil {
+		t.Fatalf("failed to push master: %v", err)
+	}
 
 	// Create branch 'feature-up' on remote
-	exec.Command("git", "-C", seedPath, "checkout", "-b", "feature-up").Run()
-	exec.Command("git", "-C", seedPath, "commit", "--allow-empty", "-m", "feature").Run()
-	exec.Command("git", "-C", seedPath, "push", "origin", "feature-up").Run()
+	if err := exec.Command("git", "-C", seedPath, "checkout", "-b", "feature-up").Run(); err != nil {
+		t.Fatalf("failed to checkout feature-up: %v", err)
+	}
+	if err := exec.Command("git", "-C", seedPath, "commit", "--allow-empty", "-m", "feature").Run(); err != nil {
+		t.Fatalf("failed to commit feature: %v", err)
+	}
+	if err := exec.Command("git", "-C", seedPath, "push", "origin", "feature-up").Run(); err != nil {
+		t.Fatalf("failed to push feature-up: %v", err)
+	}
 
 	// Clone to local
 	if err := exec.Command("git", "clone", remotePath, localPath).Run(); err != nil {
