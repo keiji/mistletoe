@@ -11,7 +11,11 @@ import (
 func printCommonVersionInfo(opts GlobalOptions) {
 	v := AppVersion
 	if CommitHash != "" {
-		v = fmt.Sprintf("%s-%s", AppVersion, CommitHash)
+		hash := CommitHash
+		if len(hash) > 7 {
+			hash = hash[:7]
+		}
+		v = fmt.Sprintf("%s-%s", AppVersion, hash)
 	}
 	fmt.Printf("%s %s\n", AppName, v)
 	fmt.Println("Copyright 2025-2026 ARIYAMA Keiji")
