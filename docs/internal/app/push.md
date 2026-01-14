@@ -16,6 +16,7 @@ mstl push [options]
 | :--- | :--- | :--- | :--- |
 | `--file` | `-f` | 設定ファイル (JSON) のパス。 | `.mstl/config.json` |
 | `--jobs` | `-j` | 並列プロセス数。 | 1 |
+| `--yes` | `-y` | 実行前の確認プロンプトをスキップし、すべて `yes` として処理します。 | false |
 | `--ignore-stdin` | | 標準入力を無視する | false |
 | `--verbose` | `-v` | デバッグ用の詳細ログを出力（実行された git コマンドを表示） | false |
 
@@ -40,10 +41,13 @@ flowchart TD
     AnalyzeState -- "競合あり (Conflict)" --> ErrorConflict["エラー: 競合検出"]
     AnalyzeState -- "プルが必要 (Behind)" --> ErrorBehind["エラー: Syncが必要"]
     AnalyzeState -- "全てUp-to-date" --> InfoNothing["通知: プッシュ対象なし"]
-    AnalyzeState -- "プッシュ可能 (Aheadのみ)" --> Confirm["ユーザー確認 (Yes/No)"]
+    AnalyzeState -- "プッシュ可能 (Aheadのみ)" --> CheckYes{"--yes オプション?"}
+
+    CheckYes -- "Yes" --> PushLoop["並列プッシュ実行"]
+    CheckYes -- "No" --> Confirm["ユーザー確認 (Yes/No)"]
 
     Confirm -- "No" --> Stop(["終了"])
-    Confirm -- "Yes" --> PushLoop["並列プッシュ実行"]
+    Confirm -- "Yes" --> PushLoop
 
     subgraph "プッシュ実行"
         PushLoop --> GitPush["git push origin <branch>"]

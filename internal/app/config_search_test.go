@@ -36,7 +36,7 @@ func TestSearchParentConfig_CurrentDirDefaults(t *testing.T) {
 	defer os.Chdir(cwd)
 	os.Chdir(tmpDir)
 
-	got, err := SearchParentConfig(DefaultConfigFile, nil, "git")
+	got, err := SearchParentConfig(DefaultConfigFile, nil, "git", false)
 	if err != nil {
 		t.Errorf("SearchParentConfig returned error: %v", err)
 	}
@@ -47,7 +47,7 @@ func TestSearchParentConfig_CurrentDirDefaults(t *testing.T) {
 
 func TestSearchParentConfig_ExplicitFile(t *testing.T) {
 	// Test case: Explicit file provided. Should return it immediately.
-	got, err := SearchParentConfig("custom.json", nil, "git")
+	got, err := SearchParentConfig("custom.json", nil, "git", false)
 	if err != nil {
 		t.Errorf("SearchParentConfig returned error: %v", err)
 	}
@@ -58,7 +58,7 @@ func TestSearchParentConfig_ExplicitFile(t *testing.T) {
 
 func TestSearchParentConfig_Stdin(t *testing.T) {
 	// Test case: Stdin provided. Should return input path immediately.
-	got, err := SearchParentConfig(DefaultConfigFile, []byte("{}"), "git")
+	got, err := SearchParentConfig(DefaultConfigFile, []byte("{}"), "git", false)
 	if err != nil {
 		t.Errorf("SearchParentConfig returned error: %v", err)
 	}
@@ -86,7 +86,7 @@ func TestSearchParentConfig_NoGit(t *testing.T) {
 	// To be safe, we can mock RunGit or assume environment is clean.
 	// For now, let's assume real execution.
 
-	got, err := SearchParentConfig(DefaultConfigFile, nil, "git")
+	got, err := SearchParentConfig(DefaultConfigFile, nil, "git", false)
 	if err != nil {
 		// It might fail if git command is not found, but we expect it to return DefaultConfigFile regardless of error inside
 		// unless unexpected error.

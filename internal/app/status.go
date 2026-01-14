@@ -24,6 +24,9 @@ func handleStatus(args []string, opts GlobalOptions) {
 	fs.BoolVar(&ignoreStdin, "ignore-stdin", false, "Ignore standard input")
 	fs.BoolVar(&vLong, "verbose", false, "Enable verbose output")
 	fs.BoolVar(&vShort, "v", false, "Enable verbose output (shorthand)")
+	var yes, yesShort bool
+	fs.BoolVar(&yes, "yes", false, "Automatically answer 'yes' to all prompts")
+	fs.BoolVar(&yesShort, "y", false, "Automatically answer 'yes' to all prompts (shorthand)")
 
 	if err := ParseFlagsFlexible(fs, args); err != nil {
 		fmt.Fprintln(Stderr, "Error parsing flags:", err)
@@ -35,6 +38,7 @@ func handleStatus(args []string, opts GlobalOptions) {
 		{"file", "f"},
 		{"jobs", "j"},
 		{"verbose", "v"},
+		{"yes", "y"},
 	}); err != nil {
 		fmt.Fprintln(Stderr, "Error:", err)
 		osExit(1)
@@ -48,7 +52,8 @@ func handleStatus(args []string, opts GlobalOptions) {
 		return
 	}
 
-	configFile, err = SearchParentConfig(configFile, configData, opts.GitPath)
+	yesFlag := yes || yesShort
+	configFile, err = SearchParentConfig(configFile, configData, opts.GitPath, yesFlag)
 	if err != nil {
 		fmt.Fprintf(Stderr, "Error searching parent config: %v\n", err)
 	}

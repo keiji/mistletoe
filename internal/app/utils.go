@@ -2,6 +2,7 @@ package app
 
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"os"
@@ -30,6 +31,26 @@ func formatDuration(d time.Duration) string {
 	ms := d.Milliseconds()
 	p := message.NewPrinter(language.English)
 	return p.Sprintf("%dms", ms)
+}
+
+// AskForConfirmation prompts the user for a yes/no confirmation.
+// If yesFlag is true, it automatically assumes "yes" and returns true without prompting.
+// Returns true if the user enters 'y' or 'yes' (case-insensitive), false otherwise.
+func AskForConfirmation(reader *bufio.Reader, prompt string, yesFlag bool) (bool, error) {
+	fmt.Print(prompt)
+
+	if yesFlag {
+		fmt.Println("yes (assumed via flag)")
+		return true, nil
+	}
+
+	input, err := reader.ReadString('\n')
+	if err != nil {
+		return false, err
+	}
+
+	input = strings.TrimSpace(strings.ToLower(input))
+	return input == "y" || input == "yes", nil
 }
 
 // --- Git Helpers ---

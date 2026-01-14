@@ -35,6 +35,10 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 		vShort     bool
 	)
 
+	var yes, yesShort bool
+	fs.BoolVar(&yes, "yes", false, "Automatically answer 'yes' to all prompts")
+	fs.BoolVar(&yesShort, "y", false, "Automatically answer 'yes' to all prompts (shorthand)")
+
 	fs.StringVar(&fLong, "file", DefaultConfigFile, "Configuration file path")
 	fs.StringVar(&fShort, "f", DefaultConfigFile, "Configuration file path (shorthand)")
 	fs.IntVar(&jVal, "jobs", -1, "Number of concurrent jobs")
@@ -64,6 +68,7 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 		{"body", "b"},
 		{"overwrite", "w"},
 		{"verbose", "v"},
+		{"yes", "y"},
 	}); err != nil {
 		fmt.Println("Error:", err)
 		os.Exit(1)
@@ -76,7 +81,9 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 		os.Exit(1)
 	}
 
-	configPath, err = SearchParentConfig(configPath, configData, opts.GitPath)
+	yesFlag := yes || yesShort
+
+	configPath, err = SearchParentConfig(configPath, configData, opts.GitPath, yesFlag)
 	if err != nil {
 		fmt.Fprintf(Stderr, "Error searching parent config: %v\n", err)
 	}
@@ -339,23 +346,27 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 	// If ALL active repos are in updateList, prompt for description update only
 	allUpdates := len(createList) == 0
 
+	reader := bufio.NewReader(os.Stdin)
+
 	if allUpdates {
-		fmt.Print("No new Pull Requests to create. Update existing Pull Request descriptions? (yes/no): ")
-		reader := bufio.NewReader(os.Stdin)
-		input, _ := reader.ReadString('\n')
-		input = strings.TrimSpace(strings.ToLower(input))
-		if input == "y" || input == "yes" {
+		confirmed, err := AskForConfirmation(reader, "No new Pull Requests to create. Update existing Pull Request descriptions? (yes/no): ", yesFlag)
+		if err != nil {
+			fmt.Printf("Error reading input: %v\n", err)
+			os.Exit(1)
+		}
+		if confirmed {
 			skipEditor = true
 		} else {
 			fmt.Println("Aborted.")
 			os.Exit(1)
 		}
 	} else {
-		fmt.Print("Proceed with Push and Pull Request creation? (yes/no): ")
-		reader := bufio.NewReader(os.Stdin)
-		input, _ := reader.ReadString('\n')
-		input = strings.TrimSpace(strings.ToLower(input))
-		if input == "y" || input == "yes" {
+		confirmed, err := AskForConfirmation(reader, "Proceed with Push and Pull Request creation? (yes/no): ", yesFlag)
+		if err != nil {
+			fmt.Printf("Error reading input: %v\n", err)
+			os.Exit(1)
+		}
+		if confirmed {
 			skipEditor = false
 		} else {
 			fmt.Println("Aborted.")

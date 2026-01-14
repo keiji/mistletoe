@@ -34,6 +34,9 @@ func handlePrCheckout(args []string, opts GlobalOptions) {
 	fs.IntVar(&jValShort, "j", -1, "Number of concurrent jobs (shorthand)")
 	fs.BoolVar(&vLong, "verbose", false, "Enable verbose output")
 	fs.BoolVar(&vShort, "v", false, "Enable verbose output (shorthand)")
+	var yes, yesShort bool
+	fs.BoolVar(&yes, "yes", false, "Automatically answer 'yes' to all prompts")
+	fs.BoolVar(&yesShort, "y", false, "Automatically answer 'yes' to all prompts (shorthand)")
 
 	if err := ParseFlagsFlexible(fs, args); err != nil {
 		fmt.Println(err)
@@ -44,6 +47,7 @@ func handlePrCheckout(args []string, opts GlobalOptions) {
 		{"url", "u"},
 		{"jobs", "j"},
 		{"verbose", "v"},
+		{"yes", "y"},
 	}); err != nil {
 		fmt.Println("Error:", err)
 		os.Exit(1)
