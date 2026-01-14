@@ -65,9 +65,12 @@ func handlePrUpdate(args []string, opts GlobalOptions) {
 		os.Exit(1)
 	}
 
-	yesFlag := yes || yesShort
+	// yesFlag is not used here for parent search, but might be useful for other things?
+	// Actually pr update doesn't seem to have other confirmation prompts in this flow (only pr create/push do).
+	// But wait, ResolveCommonValues consumes arguments.
+	// yesFlag := yes || yesShort // Removing unused variable
 
-	configPath, err = SearchParentConfig(configPath, configData, opts.GitPath, yesFlag)
+	configPath, err = SearchParentConfig(configPath, configData, opts.GitPath)
 	if err != nil {
 		fmt.Fprintf(Stderr, "Error searching parent config: %v\n", err)
 	}

@@ -314,9 +314,7 @@ func handleInit(args []string, opts GlobalOptions) {
 		os.Exit(1)
 	}
 
-	yesFlag := yes || yesShort
-
-	configFile, err = SearchParentConfig(configFile, configData, opts.GitPath, yesFlag)
+	configFile, err = SearchParentConfig(configFile, configData, opts.GitPath)
 	if err != nil {
 		fmt.Fprintf(Stderr, "Error searching parent config: %v\n", err)
 	}

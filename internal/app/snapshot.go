@@ -76,9 +76,7 @@ func handleSnapshot(args []string, opts GlobalOptions) {
 		return
 	}
 
-	yesFlag := yes || yesShort
-
-	configPath, err = SearchParentConfig(configPath, configData, opts.GitPath, yesFlag)
+	configPath, err = SearchParentConfig(configPath, configData, opts.GitPath)
 	if err != nil {
 		fmt.Fprintf(Stderr, "Error searching parent config: %v\n", err)
 	}

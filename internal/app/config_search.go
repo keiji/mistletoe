@@ -11,7 +11,7 @@ import (
 // SearchParentConfig attempts to find a configuration file in the parent directory
 // of the current git repository if one is not found in the current directory.
 // It performs validation and prompts the user for confirmation.
-func SearchParentConfig(candidatePath string, configData []byte, gitPath string, yesFlag bool) (string, error) {
+func SearchParentConfig(candidatePath string, configData []byte, gitPath string) (string, error) {
 	// If configData is provided (stdin), or if candidatePath is NOT the default,
 	// we rely on existing logic (caller will attempt to load it and fail if missing).
 	// We only search if we are looking for the default config file.
