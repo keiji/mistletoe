@@ -10,4 +10,3 @@ coverage.out
 
 # Python
 __pycache__/
-temp_test_env/
