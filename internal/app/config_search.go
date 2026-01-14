@@ -1,7 +1,6 @@
 package app
 
 import (
-	"bufio"
 	"fmt"
 	conf "mistletoe/internal/config"
 	"os"
@@ -57,18 +56,12 @@ func SearchParentConfig(candidatePath string, configData []byte, gitPath string,
 		return candidatePath, nil
 	}
 
-	// 5. Prompt user
-	reader := bufio.NewReader(Stdin)
-	confirmed, err := AskForConfirmation(reader, fmt.Sprintf("Current directory does not have .mstl, but found one in %s/. Use this configuration? (yes/no): ", parentDir), yesFlag)
-	if err == nil && confirmed {
-		if err := os.Chdir(parentDir); err != nil {
-			return candidatePath, err
-		}
-		return parentConfigPath, nil
+	// 5. Notify user and switch
+	fmt.Printf("カレントディレクトリに.mstlが見つかりませんが、親ディレクトリ %s に発見しました。この設定を使用します。\n", parentDir)
+	if err := os.Chdir(parentDir); err != nil {
+		return candidatePath, err
 	}
-
-	// Default: return original (which will fail)
-	return candidatePath, nil
+	return parentConfigPath, nil
 }
 
 func validateParentConfig(configPath, parentDir, gitPath string) error {

@@ -154,9 +154,9 @@ func TestSearchParentConfig_ParentFound_SwitchContext(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Call SearchParentConfig with yesFlag=true
-	// It should find workspace/.mstl/config.json and switch CWD to workspaceDir
-	foundPath, err := SearchParentConfig(DefaultConfigFile, nil, "git", true)
+	// Call SearchParentConfig with yesFlag=false (flag is now ignored for this check)
+	// It should find workspace/.mstl/config.json and switch CWD to workspaceDir automatically without prompt
+	foundPath, err := SearchParentConfig(DefaultConfigFile, nil, "git", false)
 	if err != nil {
 		t.Fatalf("SearchParentConfig failed: %v", err)
 	}
