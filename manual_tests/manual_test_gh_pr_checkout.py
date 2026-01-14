@@ -15,6 +15,8 @@ def main():
     runner.parse_args()
 
     env = GhTestEnv()
+    if runner.args and runner.args.yes:
+        env.auto_yes = True
 
     # 1. Setup Phase (Automated)
     print_green("[-] Setting up test environment (generating names)...")

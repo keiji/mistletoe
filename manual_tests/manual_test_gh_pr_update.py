@@ -14,6 +14,8 @@ def main():
     runner.parse_args()
 
     env = GhTestEnv()
+    if runner.args and runner.args.yes:
+        env.auto_yes = True
 
     print_green("[-] Setting up test environment...")
     try:

@@ -64,6 +64,9 @@ class MstlManualTest:
                 log("Skipped cleanup.")
 
     def run_cmd(self, cmd, cwd=None, check=True, input_str=None):
+        if self.runner.args and self.runner.args.yes and cmd[0] == self.bin_path and "--yes" not in cmd:
+            cmd = list(cmd) + ["--yes"]
+
         print_green(f"[CMD] {' '.join(cmd)}")
         try:
             result = subprocess.run(

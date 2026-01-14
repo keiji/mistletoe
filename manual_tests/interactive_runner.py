@@ -17,6 +17,7 @@ class InteractiveRunner:
     def __init__(self, description):
         self.parser = argparse.ArgumentParser(description=description)
         self.parser.add_argument("-o", "--output", help="Path to append test results")
+        self.parser.add_argument("--yes", action="store_true", help="Automatically answer yes to all prompts and pass --yes to mstl commands")
         self.args = None
         self.log_file = None
         self.test_name = description
@@ -47,6 +48,10 @@ class InteractiveRunner:
         print_green("="*60)
 
     def ask_yes_no(self, question, default="yes"):
+        if self.args and self.args.yes:
+            print(f"{question} [Y/n] (Auto-Yes): yes")
+            return True
+
         valid = {"yes": True, "y": True, "ye": True, "no": False, "n": False}
         prompt = f" [Y/n]" if default == "yes" else f" [y/N]"
 

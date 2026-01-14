@@ -16,6 +16,7 @@ class GhTestEnv:
         self.cwd = root_dir if root_dir else os.getcwd()
         self.user = self.get_gh_user()
         self.uuid = str(uuid.uuid4())[:8]
+        self.auto_yes = False
 
         # Determine paths
         script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -185,6 +186,9 @@ class GhTestEnv:
     def run_mstl_cmd(self, args, cwd=None):
         if cwd is None:
             cwd = self.test_dir
+
+        if self.auto_yes and "--yes" not in args:
+            args = list(args) + ["--yes"]
 
         cmd = [self.mstl_bin] + args
         try:
