@@ -1,7 +1,9 @@
 package app
 
 import (
+	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 )
@@ -93,5 +95,101 @@ func TestSearchParentConfig_NoGit(t *testing.T) {
 	}
 	if got != DefaultConfigFile {
 		t.Errorf("SearchParentConfig = %s, want %s", got, DefaultConfigFile)
+	}
+}
+
+func TestSearchParentConfig_ParentFound_SwitchContext(t *testing.T) {
+	// 1. Setup Workspace Dir (Parent of repo)
+	workspaceDir, err := os.MkdirTemp("", "mstl-test-workspace")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(workspaceDir)
+
+	// 2. Create .mstl/config.json in workspace
+	// Define a repo 'repo-a' which we will run from.
+	repoName := "repo-a"
+	repoUrl := "https://example.com/repo-a.git"
+
+	configContent := fmt.Sprintf(`{
+		"repositories": [
+			{
+				"id": "%s",
+				"url": "%s"
+			}
+		]
+	}`, repoName, repoUrl)
+
+	mstlDir := filepath.Join(workspaceDir, ".mstl")
+	if err := os.Mkdir(mstlDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	configPath := filepath.Join(mstlDir, "config.json")
+	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// 3. Create repo-a inside workspace
+	repoPath := filepath.Join(workspaceDir, repoName)
+	if err := os.Mkdir(repoPath, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	// Init git in repo-a
+	runGitCmd(t, repoPath, "init")
+	runGitCmd(t, repoPath, "config", "user.email", "test@example.com")
+	runGitCmd(t, repoPath, "config", "user.name", "Test User")
+	runGitCmd(t, repoPath, "remote", "add", "origin", repoUrl)
+
+	// 4. Run SearchParentConfig from inside repo-a
+	// Save original CWD to restore later
+	originalWd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Chdir(originalWd)
+
+	// Change to repo-a
+	if err := os.Chdir(repoPath); err != nil {
+		t.Fatal(err)
+	}
+
+	// Call SearchParentConfig with yesFlag=true
+	// It should find workspace/.mstl/config.json and switch CWD to workspaceDir
+	foundPath, err := SearchParentConfig(DefaultConfigFile, nil, "git", true)
+	if err != nil {
+		t.Fatalf("SearchParentConfig failed: %v", err)
+	}
+
+	// 5. Verification
+	// Verify path returned is absolute path to workspace/.mstl/config.json
+	expectedConfigPath := filepath.Join(workspaceDir, DefaultConfigFile)
+	if foundPath != expectedConfigPath {
+		t.Errorf("Expected config path %s, got %s", expectedConfigPath, foundPath)
+	}
+
+	// Verify CWD switched
+	currentWd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Resolve symlinks just in case
+	evalWorkspaceDir, _ := filepath.EvalSymlinks(workspaceDir)
+	evalCurrentWd, _ := filepath.EvalSymlinks(currentWd)
+
+	if evalCurrentWd != evalWorkspaceDir {
+		t.Errorf("Expected CWD to switch to %s, but is %s", evalWorkspaceDir, evalCurrentWd)
+	}
+}
+
+func runGitCmd(t *testing.T, dir string, args ...string) {
+	t.Helper()
+	cmd := exec.Command("git", args...)
+	cmd.Dir = dir
+	cmd.Stdout = nil
+	cmd.Stderr = nil
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("git command %v failed in %s: %v", args, dir, err)
 	}
 }
