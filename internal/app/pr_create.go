@@ -157,10 +157,16 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 	// 6.5 Categorize Repositories
 	fmt.Println("Analyzing repository states...")
 
+	var catPushCreate []conf.Repository   // Cat 1
+	var catNoPushCreate []conf.Repository // Cat 2
+	var catPushUpdate []conf.Repository   // Cat 3
+	var catNoPushUpdate []conf.Repository // Cat 4
+	var skippedRepos []string
+
+	// Final functional lists
 	var pushList []conf.Repository
 	var createList []conf.Repository
 	var updateList []conf.Repository
-	var skippedRepos []string
 
 	repoMap := make(map[string]conf.Repository)
 	for _, r := range *config.Repositories {
@@ -189,20 +195,26 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 			continue
 		}
 
-		isOpen := false
+		hasPr := false
 		if items, ok := prExistsMap[repoName]; ok {
 			for _, item := range items {
 				if strings.EqualFold(item.State, GitHubPrStateOpen) {
-					isOpen = true
+					hasPr = true
 					break
 				}
 			}
 		}
 
-		if isOpen {
-			pushList = append(pushList, repo)
-			updateList = append(updateList, repo)
+		if hasPr {
+			if status.HasUnpushed {
+				// Cat 3: Push + Update
+				catPushUpdate = append(catPushUpdate, repo)
+			} else {
+				// Cat 4: No Push + Update
+				catNoPushUpdate = append(catNoPushUpdate, repo)
+			}
 		} else {
+			// No PR
 			if status.HasUnpushed {
 				// Special Case: If remote branch doesn't exist, check if local branch is identical to base branch.
 				// If so, skip (branch created but no commits).
@@ -229,17 +241,77 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 				if skipNewBranch {
 					skippedRepos = append(skippedRepos, repoName)
 				} else {
-					pushList = append(pushList, repo)
-					createList = append(createList, repo)
+					// Cat 1: Push + Create
+					catPushCreate = append(catPushCreate, repo)
 				}
 			} else {
-				skippedRepos = append(skippedRepos, repoName)
+				// !HasUnpushed && !HasPr
+				// Cat 2: No Push + Create
+				// We must check if we are on the base branch (e.g. main).
+				// If local branch == base branch, we skip.
+				baseBranch := "main"
+				if repo.BaseBranch != nil && *repo.BaseBranch != "" {
+					baseBranch = *repo.BaseBranch
+				} else if repo.Branch != nil && *repo.Branch != "" {
+					baseBranch = *repo.Branch
+				}
+
+				// If the current branch name matches the base branch, we skip creating a PR
+				// because you don't typically create a PR from main to main.
+				if status.BranchName == baseBranch {
+					skippedRepos = append(skippedRepos, repoName)
+				} else {
+					catNoPushCreate = append(catNoPushCreate, repo)
+				}
 			}
 		}
 	}
 
+	// Reconstruct functional lists
+	pushList = append(pushList, catPushCreate...)
+	pushList = append(pushList, catPushUpdate...)
+
+	createList = append(createList, catPushCreate...)
+	createList = append(createList, catNoPushCreate...)
+
+	updateList = append(updateList, catPushUpdate...)
+	updateList = append(updateList, catNoPushUpdate...)
+
+	// Display Categories
+	if len(catPushCreate) > 0 {
+		fmt.Println("Repositories to Push and Create Pull Request:")
+		for _, r := range catPushCreate {
+			fmt.Printf(" - %s\n", getRepoName(r))
+		}
+		fmt.Println()
+	}
+
+	if len(catNoPushCreate) > 0 {
+		fmt.Println("Repositories to Create Pull Request (No Push):")
+		for _, r := range catNoPushCreate {
+			fmt.Printf(" - %s\n", getRepoName(r))
+		}
+		fmt.Println()
+	}
+
+	if len(catPushUpdate) > 0 {
+		fmt.Println("Repositories to Push (Pull Request already exists):")
+		for _, r := range catPushUpdate {
+			fmt.Printf(" - %s\n", getRepoName(r))
+		}
+		fmt.Println()
+	}
+
+	if len(catNoPushUpdate) > 0 {
+		fmt.Println("Repositories with no action (Pull Request already exists):")
+		for _, r := range catNoPushUpdate {
+			fmt.Printf(" - %s\n", getRepoName(r))
+		}
+		fmt.Println()
+	}
+
 	if len(skippedRepos) > 0 {
-		fmt.Println("The following repositories will be skipped (no changes and no existing PR):")
+		fmt.Println("The following repositories will be skipped:")
 		for _, r := range skippedRepos {
 			fmt.Printf(" - %s\n", r)
 		}

@@ -49,10 +49,11 @@ flowchart TD
     CheckBehind -- "Yes" --> ErrorAbort["エラー停止: Pullが必要です"]
 
     CheckBehind -- "No" --> Categorize[["アクション分類"]]
-    Categorize --> CatPushNeed["Push必要リスト\n(Ahead or PR更新)"]
-    Categorize --> CatCreateNeed["PR作成必要リスト\n(Ahead & PRなし)"]
-    Categorize --> CatUpdateNeed["PR更新必要リスト\n(PRあり)"]
-    Categorize --> CatSkip["スキップリスト\n(Equal or NewBranchNoCommit)"]
+    Categorize --> CatPushCreate["Push & Create PR\n(No PR & Unpushed)"]
+    Categorize --> CatNoPushCreate["Create PR (No Push)\n(No PR & Pushed)"]
+    Categorize --> CatPushUpdate["Push & Update\n(PR exists & Unpushed)"]
+    Categorize --> CatNoPushUpdate["No Action (Update desc)\n(PR exists & Pushed)"]
+    Categorize --> CatSkip["スキップリスト\n(Equal or NewBranchNoCommit\nor NoPushCreate on BaseBranch)"]
 
     CatSkip --> CheckWorkable{"処理対象リポジトリがあるか？\n(Create or Update)"}
     CheckWorkable -- "No" --> Stop(["終了"])
@@ -101,21 +102,21 @@ flowchart TD
 
 2.  **Pull Requestの更新 (Update PR)**:
     *   **条件**: リモートからBaseブランチへの有効な（Open状態の）Pull Requestが既に存在する。
-    *   **アクション**:
-        *   **Push**: ローカルがリモートより進んでいる場合 (`Ahead`) はPushリストに追加します。進んでいない場合 (`Equal`) はPush不要ですが、実装上はPushリストに含めても安全です（No-op）。
-        *   **Update**: 最終工程でPR本文（Mistletoeブロック）を更新します。
+    *   **分類**:
+        *   **Push & Update**: ローカルに未プッシュの変更がある場合 (`HasUnpushed`)。PushリストとUpdateリストに追加します。
+        *   **No Action (Update desc)**: ローカルに変更がない場合。Updateリストのみに追加します（PR本文の更新のみ行います）。
 
 3.  **Pull Requestの作成 (Create PR)**:
-    *   **条件**: 有効なPRが存在せず、かつローカルブランチがリモートブランチより進んでいる (`Ahead`)。
-    *   **アクション**:
-        *   **Push**: Pushリストに追加します。
-        *   **Create**: PR作成リストに追加します。
-        *   **Update**: 作成後の最終工程でPR本文を更新します。
+    *   **条件**: 有効なPRが存在しない。
+    *   **分類**:
+        *   **Push & Create PR**: ローカルに未プッシュの変更がある場合 (`HasUnpushed`)。ただし、新規ブランチでコミットが一つもない（BaseBranchとHEADが同一）場合はスキップされます。PushリストとCreateリストに追加します。
+        *   **Create PR (No Push)**: ローカルに変更がない（既にPush済み）場合。ただし、現在のブランチがBaseBranch（例: main）と同一の場合はスキップされます。Createリストのみに追加します。
 
-4.  **スキップ (No Action)**:
-    *   **条件A**: 有効なPRが存在せず、かつローカルブランチとリモートブランチが同期している (`Equal`)。
-    *   **条件B**: 有効なPRが存在せず、ローカルブランチと同名のリモートブランチが存在せず、かつローカルブランチのリビジョンがBaseブランチのリビジョンと一致している（「ブランチは作成したがコミットはしていない」状態）。
-    *   **アクション**: PushもPR作成もしません。メモリ上で「PR不要」として保持し、後続の処理から除外します。
+4.  **スキップ (Skipped)**:
+    *   **条件**: 上記のいずれにも該当しない場合。
+        *   例: 新規ブランチだがコミットがない。
+        *   例: 既にPush済みだが、現在BaseBranch上にいるためPR作成対象外。
+    *   **アクション**: 何もしません。
 
 ### 3.3. 既存PRの権限確認と上書きルール (Permission Check & Overwrite Rules)
 
