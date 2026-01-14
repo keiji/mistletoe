@@ -25,6 +25,7 @@ mstl switch --create <branch_name> --file <path> [options]
 | `--file` | `-f` | 設定ファイル (JSON) のパス。未指定の場合は標準入力からの読み込みを試みます。 | `.mstl/config.json` |
 | `--create` | `-c` | 指定された名前でブランチを作成（存在しない場合）し、切り替えます。 | - |
 | `--jobs` | `-j` | 処理に使用する並列プロセス数。 | 1 |
+| `--yes` | `-y` | プロンプト（設定ファイルの自動検索時など）を自動承諾します。 | false |
 | `--ignore-stdin` | | 標準入力を無視する | false |
 | `--verbose` | `-v` | デバッグ用の詳細ログを出力（実行された git コマンドを表示） | false |
 

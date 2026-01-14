@@ -21,6 +21,7 @@ cat config.json | mstl init [options]
 | `--dependencies` | | 依存関係グラフ（Mermaid形式）を含むMarkdownファイルのパス | なし |
 | `--depth` | | 指定されたコミット数に履歴を切り詰めてシャロークローンを作成 | 0 (フルクローン) |
 | `--jobs` | `-j` | クローン/チェックアウトに使用する並列プロセス数 | 1 |
+| `--yes` | `-y` | プロンプト（設定ファイルの自動検索時など）を自動承諾します。 | false |
 | `--ignore-stdin` | | 標準入力を無視する | false |
 | `--verbose` | `-v` | デバッグ用の詳細ログを出力（実行された git コマンドを表示） | false |
 

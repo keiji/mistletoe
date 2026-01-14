@@ -22,6 +22,7 @@ mstl-gh pr create [options]
 | `--draft` | | ドラフトPRとして作成（リポジトリが対応している場合）。 | false |
 | `--jobs` | `-j` | 並列実行数。 | 1 |
 | `--overwrite` | `-w` | 既存PRの作成者が自分以外で、Mistletoeブロックがない場合でも上書きを許可する。 | false |
+| `--yes` | `-y` | 実行前の確認プロンプトをスキップし、すべて `yes` として処理します。 | false |
 | `--ignore-stdin` | | 標準入力を無視する | false |
 | `--verbose` | `-v` | デバッグ用の詳細ログを出力（実行された git/gh コマンドを表示） | false |
 
@@ -66,11 +67,15 @@ flowchart TD
     CheckDraft -- "No" --> CheckAllPRs{"処理対象全リポジトリに\n既存PRが存在するか？"}
     MarkDraft --> CheckAllPRs
 
-    CheckAllPRs -- "Yes (Updateのみ)" --> PromptUpdate["プロンプト: 説明を更新しますか？"]
+    CheckAllPRs -- "Yes (Updateのみ)" --> CheckYesUpdate{"--yes オプション?"}
+    CheckYesUpdate -- "No" --> PromptUpdate["プロンプト: 説明を更新しますか？"]
+    CheckYesUpdate -- "Yes" --> SetSkipEditor
     PromptUpdate -- "No" --> Stop
     PromptUpdate -- "Yes" --> SetSkipEditor["エディタ起動スキップ"]
 
-    CheckAllPRs -- "No (Create含む)" --> PromptCreate["プロンプト: 作成しますか？"]
+    CheckAllPRs -- "No (Create含む)" --> CheckYesCreate{"--yes オプション?"}
+    CheckYesCreate -- "No" --> PromptCreate["プロンプト: 作成しますか？"]
+    CheckYesCreate -- "Yes" --> SetNoSkip
     PromptCreate -- "No" --> Stop
     PromptCreate -- "Yes" --> SetNoSkip["エディタ起動有効"]
 

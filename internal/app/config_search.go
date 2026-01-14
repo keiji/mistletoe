@@ -12,7 +12,7 @@ import (
 // SearchParentConfig attempts to find a configuration file in the parent directory
 // of the current git repository if one is not found in the current directory.
 // It performs validation and prompts the user for confirmation.
-func SearchParentConfig(candidatePath string, configData []byte, gitPath string) (string, error) {
+func SearchParentConfig(candidatePath string, configData []byte, gitPath string, yesFlag bool) (string, error) {
 	// If configData is provided (stdin), or if candidatePath is NOT the default,
 	// we rely on existing logic (caller will attempt to load it and fail if missing).
 	// We only search if we are looking for the default config file.
@@ -58,15 +58,10 @@ func SearchParentConfig(candidatePath string, configData []byte, gitPath string)
 	}
 
 	// 5. Prompt user
-	fmt.Printf("Current directory does not have .mstl, but found one in %s/. Use this configuration? (yes/no): ", parentDir)
-
-	// Read user input
-	scanner := bufio.NewScanner(Stdin)
-	if scanner.Scan() {
-		input := strings.TrimSpace(strings.ToLower(scanner.Text()))
-		if input == "yes" || input == "y" {
-			return parentConfigPath, nil
-		}
+	reader := bufio.NewReader(Stdin)
+	confirmed, err := AskForConfirmation(reader, fmt.Sprintf("Current directory does not have .mstl, but found one in %s/. Use this configuration? (yes/no): ", parentDir), yesFlag)
+	if err == nil && confirmed {
+		return parentConfigPath, nil
 	}
 
 	// Default: return original (which will fail)

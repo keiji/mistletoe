@@ -12,9 +12,12 @@ import (
 )
 
 func handleSync(args []string, opts GlobalOptions) {
-	var fShort, fLong string
-	var jVal, jValShort int
-	var vLong, vShort bool
+	var (
+		fShort, fLong string
+		jVal, jValShort int
+		vLong, vShort bool
+		yes, yesShort bool
+	)
 
 	fs := flag.NewFlagSet("sync", flag.ContinueOnError)
 	fs.SetOutput(Stderr)
@@ -26,6 +29,8 @@ func handleSync(args []string, opts GlobalOptions) {
 	fs.BoolVar(&ignoreStdin, "ignore-stdin", false, "Ignore standard input")
 	fs.BoolVar(&vLong, "verbose", false, "Enable verbose output")
 	fs.BoolVar(&vShort, "v", false, "Enable verbose output (shorthand)")
+	fs.BoolVar(&yes, "yes", false, "Automatically answer 'yes' to all prompts")
+	fs.BoolVar(&yesShort, "y", false, "Automatically answer 'yes' to all prompts (shorthand)")
 
 	if err := ParseFlagsFlexible(fs, args); err != nil {
 		fmt.Fprintln(Stderr, "Error parsing flags:", err)
@@ -37,6 +42,7 @@ func handleSync(args []string, opts GlobalOptions) {
 		{"file", "f"},
 		{"jobs", "j"},
 		{"verbose", "v"},
+		{"yes", "y"},
 	}); err != nil {
 		fmt.Fprintln(Stderr, "Error:", err)
 		osExit(1)
@@ -50,7 +56,8 @@ func handleSync(args []string, opts GlobalOptions) {
 		return
 	}
 
-	configFile, err = SearchParentConfig(configFile, configData, opts.GitPath)
+	yesFlag := yes || yesShort
+	configFile, err = SearchParentConfig(configFile, configData, opts.GitPath, yesFlag)
 	if err != nil {
 		fmt.Fprintf(Stderr, "Error searching parent config: %v\n", err)
 	}
@@ -123,29 +130,34 @@ func handleSync(args []string, opts GlobalOptions) {
 	if needsPull {
 		if needsStrategy {
 			fmt.Fprintln(Stdout, "Updates available.")
-			fmt.Fprint(Stdout, "Merge, rebase, or abort? [merge/rebase/abort]: ")
 
-			scanner := bufio.NewScanner(Stdin)
-			if scanner.Scan() {
-				input := strings.ToLower(strings.TrimSpace(scanner.Text()))
-				switch input {
-				case "merge", "m":
-					argsPull = append(argsPull, "--no-rebase")
-				case "rebase", "r":
-					argsPull = append(argsPull, "--rebase")
-				case "abort", "a", "q":
-					fmt.Fprintln(Stdout, "Aborted.")
-					osExit(0)
-					return
-				default:
-					fmt.Fprintln(Stdout, "Invalid input. Aborted.")
+			if yesFlag {
+				fmt.Fprintln(Stdout, "Using default strategy (merge) due to --yes flag.")
+				argsPull = append(argsPull, "--no-rebase")
+			} else {
+				fmt.Fprint(Stdout, "Merge, rebase, or abort? [merge/rebase/abort]: ")
+				scanner := bufio.NewScanner(Stdin)
+				if scanner.Scan() {
+					input := strings.ToLower(strings.TrimSpace(scanner.Text()))
+					switch input {
+					case "merge", "m":
+						argsPull = append(argsPull, "--no-rebase")
+					case "rebase", "r":
+						argsPull = append(argsPull, "--rebase")
+					case "abort", "a", "q":
+						fmt.Fprintln(Stdout, "Aborted.")
+						osExit(0)
+						return
+					default:
+						fmt.Fprintln(Stdout, "Invalid input. Aborted.")
+						osExit(1)
+						return
+					}
+				} else {
+					// EOF or error
 					osExit(1)
 					return
 				}
-			} else {
-				// EOF or error
-				osExit(1)
-				return
 			}
 		} else {
 			fmt.Fprintln(Stdout, "Updates available. Pulling...")

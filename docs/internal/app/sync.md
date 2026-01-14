@@ -16,6 +16,7 @@ mstl sync --file <path> [options]
 | :--- | :--- | :--- | :--- |
 | `--file` | `-f` | 設定ファイル (JSON) のパス。未指定の場合は標準入力からの読み込みを試みます。 | `.mstl/config.json` |
 | `--jobs` | `-j` | ステータス確認（`git fetch` 等）に使用する並列プロセス数。 | 1 |
+| `--yes` | `-y` | 競合時の戦略選択プロンプトをスキップし、デフォルト戦略（Merge）を使用します。 | false |
 | `--ignore-stdin` | | 標準入力を無視する | false |
 | `--verbose` | `-v` | デバッグ用の詳細ログを出力（実行された git コマンドを表示） | false |
 
@@ -42,9 +43,12 @@ flowchart TD
 
     CollectStatus --> Analyze{"競合判定"}
 
-    Analyze -- "Pull可能 かつ 未Push (競合)" --> Prompt["戦略選択プロンプト"]
+    Analyze -- "Pull可能 かつ 未Push (競合)" --> CheckYes{"--yes オプション?"}
     Analyze -- "Pull可能のみ (Fast-forward)" --> AutoPull["自動 Pull モード"]
     Analyze -- "更新なし" --> AutoPull
+
+    CheckYes -- "Yes" --> SetMerge
+    CheckYes -- "No" --> Prompt["戦略選択プロンプト"]
 
     Prompt -- "Abort / Invalid" --> Stop(["終了"])
     Prompt -- "Merge" --> SetMerge["Merge オプション設定"]

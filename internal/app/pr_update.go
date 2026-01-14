@@ -24,6 +24,8 @@ func handlePrUpdate(args []string, opts GlobalOptions) {
 		wShort     bool
 		vLong     bool
 		vShort    bool
+		yes       bool
+		yesShort  bool
 	)
 
 	fs.StringVar(&fLong, "file", DefaultConfigFile, "Configuration file path")
@@ -37,6 +39,8 @@ func handlePrUpdate(args []string, opts GlobalOptions) {
 	fs.BoolVar(&ignoreStdin, "ignore-stdin", false, "Ignore standard input")
 	fs.BoolVar(&vLong, "verbose", false, "Enable verbose output")
 	fs.BoolVar(&vShort, "v", false, "Enable verbose output (shorthand)")
+	fs.BoolVar(&yes, "yes", false, "Automatically answer 'yes' to all prompts")
+	fs.BoolVar(&yesShort, "y", false, "Automatically answer 'yes' to all prompts (shorthand)")
 
 	if err := ParseFlagsFlexible(fs, args); err != nil {
 		fmt.Println(err)
@@ -48,6 +52,7 @@ func handlePrUpdate(args []string, opts GlobalOptions) {
 		{"jobs", "j"},
 		{"overwrite", "w"},
 		{"verbose", "v"},
+		{"yes", "y"},
 	}); err != nil {
 		fmt.Println("Error:", err)
 		os.Exit(1)
@@ -60,7 +65,9 @@ func handlePrUpdate(args []string, opts GlobalOptions) {
 		os.Exit(1)
 	}
 
-	configPath, err = SearchParentConfig(configPath, configData, opts.GitPath)
+	yesFlag := yes || yesShort
+
+	configPath, err = SearchParentConfig(configPath, configData, opts.GitPath, yesFlag)
 	if err != nil {
 		fmt.Fprintf(Stderr, "Error searching parent config: %v\n", err)
 	}

@@ -72,6 +72,7 @@ mstl-gh <command> [options] [arguments]
 Global options for most commands:
 *   `-f, --file <path>`: Path to the configuration file (e.g., `config.json`).
 *   `-j, --jobs <int>`: Number of concurrent jobs to use (default: 1, or value from config).
+*   `-y, --yes`: Automatically answer "yes" to all prompts.
 *   `-v, --verbose`: Enable verbose output (shows executed git/gh commands).
 
 Configuration loading priority:
@@ -105,6 +106,7 @@ mstl init -f <config_file> [options]
 *   `--dependencies <path>`: Path to a Markdown file containing a Mermaid dependency graph.
 *   `--depth <int>`: Create a shallow clone with a history truncated to the specified number of commits.
 *   `-j, --jobs <int>`: Number of concurrent jobs to use (default: 1).
+*   `-y, --yes`: Automatically answer "yes" to all prompts (e.g. parent config confirmation).
 *   `-v, --verbose`: Enable verbose output.
 
 #### `status`
@@ -118,6 +120,7 @@ mstl status -f <config_file> [options]
 
 **Options:**
 *   `-j, --jobs <int>`: Number of concurrent jobs to use (default: 1).
+*   `-y, --yes`: Automatically answer "yes" to all prompts.
 *   `-v, --verbose`: Enable verbose output.
 
 **Status Indicators:**
@@ -137,6 +140,7 @@ mstl push -f <config_file> [options]
 
 **Options:**
 *   `-j, --jobs <int>`: Number of concurrent jobs to use (default: 1).
+*   `-y, --yes`: Automatically answer "yes" to all prompts (skip confirmation).
 *   `-v, --verbose`: Enable verbose output.
 
 #### `sync`
@@ -152,6 +156,7 @@ mstl sync -f <config_file> [options]
 
 **Options:**
 *   `-j, --jobs <int>`: Number of concurrent jobs to use (default: 1).
+*   `-y, --yes`: Skip strategy prompt and use default (merge).
 *   `-v, --verbose`: Enable verbose output.
 
 #### `switch`
@@ -170,6 +175,7 @@ mstl switch -f <config_file> -c <branch_name>
 **Options:**
 *   `-c, --create <branch_name>`: Create a new branch with the specified name and switch to it.
 *   `-j, --jobs <int>`: Number of concurrent jobs to use (default: 1).
+*   `-y, --yes`: Automatically answer "yes" to all prompts.
 *   `-v, --verbose`: Enable verbose output.
 
 #### `snapshot`
@@ -229,6 +235,7 @@ mstl-gh pr create -f <config_file> [options]
 *   `--draft`: Create the Pull Request as a draft if supported by the repository.
 *   `-w, --overwrite`: Overwrite existing Pull Request description if creator matches or forced.
 *   `-j, --jobs <int>`: Number of concurrent jobs to use (default: 1).
+*   `-y, --yes`: Automatically answer "yes" to all prompts.
 *   `-v, --verbose`: Enable verbose output.
 *   If title/body are omitted, the default editor is opened.
 
@@ -273,6 +280,7 @@ mstl-gh pr update -f <config_file> [options]
 *   `--dependencies <path>`: Path to a Markdown file containing a Mermaid dependency graph.
 *   `-w, --overwrite`: Overwrite existing Pull Request description if creator matches or forced.
 *   `-j, --jobs <int>`: Number of concurrent jobs to use (default: 1).
+*   `-y, --yes`: Automatically answer "yes" to all prompts.
 *   `-v, --verbose`: Enable verbose output.
 
 #### `pr checkout`
@@ -288,6 +296,7 @@ mstl-gh pr checkout -u <PR_URL> [options]
 *   `-u, --url <string>`: The URL of the Pull Request containing the snapshot (Required).
 *   `--dest <path>`: Destination directory (default: current directory).
 *   `-j, --jobs <int>`: Number of concurrent jobs to use (default: 1).
+*   `-y, --yes`: Automatically answer "yes" to all prompts.
 *   `-v, --verbose`: Enable verbose output.
 
 #### `pr status`

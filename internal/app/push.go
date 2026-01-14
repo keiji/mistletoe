@@ -8,13 +8,15 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
-	"strings"
 )
 
 func handlePush(args []string, opts GlobalOptions) {
-	var fShort, fLong string
-	var jVal, jValShort int
-	var vLong, vShort bool
+	var (
+		fShort, fLong string
+		jVal, jValShort int
+		vLong, vShort bool
+		yes, yesShort bool
+	)
 
 	fs := flag.NewFlagSet("push", flag.ContinueOnError)
 	fs.SetOutput(Stderr)
@@ -26,6 +28,8 @@ func handlePush(args []string, opts GlobalOptions) {
 	fs.BoolVar(&ignoreStdin, "ignore-stdin", false, "Ignore standard input")
 	fs.BoolVar(&vLong, "verbose", false, "Enable verbose output")
 	fs.BoolVar(&vShort, "v", false, "Enable verbose output (shorthand)")
+	fs.BoolVar(&yes, "yes", false, "Automatically answer 'yes' to all prompts")
+	fs.BoolVar(&yesShort, "y", false, "Automatically answer 'yes' to all prompts (shorthand)")
 
 	if err := ParseFlagsFlexible(fs, args); err != nil {
 		fmt.Fprintln(Stderr, "error parsing flags:", err)
@@ -37,6 +41,7 @@ func handlePush(args []string, opts GlobalOptions) {
 		{"file", "f"},
 		{"jobs", "j"},
 		{"verbose", "v"},
+		{"yes", "y"},
 	}); err != nil {
 		fmt.Fprintln(Stderr, "Error:", err)
 		osExit(1)
@@ -50,7 +55,8 @@ func handlePush(args []string, opts GlobalOptions) {
 		return
 	}
 
-	configFile, err = SearchParentConfig(configFile, configData, opts.GitPath)
+	yesFlag := yes || yesShort
+	configFile, err = SearchParentConfig(configFile, configData, opts.GitPath, yesFlag)
 	if err != nil {
 		fmt.Fprintf(Stderr, "Error searching parent config: %v\n", err)
 	}
@@ -122,13 +128,14 @@ func handlePush(args []string, opts GlobalOptions) {
 		return
 	}
 
-	fmt.Fprint(Stdout, "Push updates? (yes/no): ")
 	reader := bufio.NewReader(Stdin)
-	input, _ := reader.ReadString('\n')
-	fmt.Fprintln(Stdout)
-	input = strings.TrimSpace(strings.ToLower(input))
-
-	if input == "y" || input == "yes" {
+	confirmed, err := AskForConfirmation(reader, "Push updates? (yes/no): ", yesFlag)
+	if err != nil {
+		fmt.Fprintf(Stderr, "Error reading input: %v\n", err)
+		osExit(1)
+		return
+	}
+	if confirmed {
 		for _, row := range pushable {
 			fmt.Fprintf(Stdout, "Pushing %s (branch: %s)...\n", row.Repo, row.BranchName)
 			// git push -u origin [branchname]
