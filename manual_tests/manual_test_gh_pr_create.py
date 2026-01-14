@@ -12,6 +12,8 @@ def main():
     runner.parse_args()
 
     env = GhTestEnv()
+    if runner.args and runner.args.yes:
+        env.auto_yes = True
 
     # 1. Setup Phase (Automated)
     print_green("[-] Setting up test environment (generating names)...")
@@ -67,9 +69,8 @@ def main():
 
         # Execute pr create interactively
         # We allow stdin to pass through to the user
-        cmd = [env.mstl_bin, "pr", "create", "-t", "Interactive Test PR", "-b", "Testing interactive script", "--dependencies", "dependency-graph.md", "--verbose"]
-        import subprocess
-        subprocess.run(cmd, cwd=env.test_dir)
+        cmd = ["pr", "create", "-t", "Interactive Test PR", "-b", "Testing interactive script", "--dependencies", "dependency-graph.md", "--verbose"]
+        env.run_mstl_cmd(cmd, cwd=env.test_dir)
 
     # Expected result text
     expected = (

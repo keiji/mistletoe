@@ -172,6 +172,17 @@ sys.exit(0)
 
         cmd = [mstl_gh_bin, "pr", "create", "-f", config_path, "--title", "Test PR", "--body", "Body", "--verbose"]
 
+        # NOTE: This test intentionally does NOT support auto-yes because it relies on timing a race condition during the prompt.
+        # If we added --yes, the prompt would be skipped instantly and we couldn't inject the change in time.
+        # However, to avoid breaking the full runner with --yes, we warn if yes is set.
+        if runner.args and runner.args.yes:
+             print_green("[WARNING] This safety test relies on interactive timing and cannot fully automate the race condition injection with --yes.")
+             # We assume --yes implies we want automation, but here automation defeats the test purpose unless we used pexpect or similar.
+             # For now, we proceed but the test might fail or behave unexpectedly if it skips the prompt.
+             # Actually, if we pass --yes to mstl-gh, it won't prompt, so we can't inject.
+             # So we DO NOT pass --yes to the cmd here, even if runner has it.
+             pass
+
         # Fork PTY
         master_fd, slave_fd = pty.openpty()
 
