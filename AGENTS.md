@@ -3,6 +3,7 @@
 *   **Language**:
     *   Prioritize **Japanese** for basic interactions, and include **English** as well.
     *   For **Pull Requests and Comments**, all interactions must be in **Japanese**.
+    *   **CLI Output Messages**: All application output messages (stdout/stderr) must be in **English**.
 
 # Development Guidelines
 

@@ -110,8 +110,7 @@ func handleSwitch(args []string, opts GlobalOptions) {
 		return
 	}
 
-	yesFlag := yes || yesShort
-	configFile, err = SearchParentConfig(configFile, configData, opts.GitPath, yesFlag)
+	configFile, err = SearchParentConfig(configFile, configData, opts.GitPath)
 	if err != nil {
 		fmt.Fprintf(Stderr, "Error searching parent config: %v\n", err)
 	}

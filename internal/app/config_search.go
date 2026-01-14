@@ -1,7 +1,6 @@
 package app
 
 import (
-	"bufio"
 	"fmt"
 	conf "mistletoe/internal/config"
 	"os"
@@ -12,7 +11,7 @@ import (
 // SearchParentConfig attempts to find a configuration file in the parent directory
 // of the current git repository if one is not found in the current directory.
 // It performs validation and prompts the user for confirmation.
-func SearchParentConfig(candidatePath string, configData []byte, gitPath string, yesFlag bool) (string, error) {
+func SearchParentConfig(candidatePath string, configData []byte, gitPath string) (string, error) {
 	// If configData is provided (stdin), or if candidatePath is NOT the default,
 	// we rely on existing logic (caller will attempt to load it and fail if missing).
 	// We only search if we are looking for the default config file.
@@ -57,18 +56,12 @@ func SearchParentConfig(candidatePath string, configData []byte, gitPath string,
 		return candidatePath, nil
 	}
 
-	// 5. Prompt user
-	reader := bufio.NewReader(Stdin)
-	confirmed, err := AskForConfirmation(reader, fmt.Sprintf("Current directory does not have .mstl, but found one in %s/. Use this configuration? (yes/no): ", parentDir), yesFlag)
-	if err == nil && confirmed {
-		if err := os.Chdir(parentDir); err != nil {
-			return candidatePath, err
-		}
-		return parentConfigPath, nil
+	// 5. Notify user and switch
+	fmt.Printf("No .mstl found in current directory, but found one in %s. Using that configuration.\n", parentDir)
+	if err := os.Chdir(parentDir); err != nil {
+		return candidatePath, err
 	}
-
-	// Default: return original (which will fail)
-	return candidatePath, nil
+	return parentConfigPath, nil
 }
 
 func validateParentConfig(configPath, parentDir, gitPath string) error {
