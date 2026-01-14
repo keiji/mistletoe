@@ -61,6 +61,9 @@ func SearchParentConfig(candidatePath string, configData []byte, gitPath string,
 	reader := bufio.NewReader(Stdin)
 	confirmed, err := AskForConfirmation(reader, fmt.Sprintf("Current directory does not have .mstl, but found one in %s/. Use this configuration? (yes/no): ", parentDir), yesFlag)
 	if err == nil && confirmed {
+		if err := os.Chdir(parentDir); err != nil {
+			return candidatePath, err
+		}
 		return parentConfigPath, nil
 	}
 
