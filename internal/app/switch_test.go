@@ -389,3 +389,125 @@ func verifyBranch(t *testing.T, repoPath, expectedBranch string) {
 		t.Errorf("repo %s is on %s, expected %s", repoPath, actual, expectedBranch)
 	}
 }
+
+func TestHandleSwitch_Conflict(t *testing.T) {
+	// 1. Setup Environment
+	tmpDir, err := os.MkdirTemp("", "mstl-switch-conflict-test")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	cwd, _ := os.Getwd()
+	defer func() { _ = os.Chdir(cwd) }()
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("failed to chdir: %v", err)
+	}
+
+	// 2. Setup Remote Bare Repo
+	remotePath := filepath.Join(tmpDir, "remote.git")
+	if err := exec.Command("git", "init", "--bare", remotePath).Run(); err != nil {
+		t.Fatalf("failed to init remote: %v", err)
+	}
+
+	// 3. Setup Seed Repo to create common history
+	seedPath := filepath.Join(tmpDir, "seed")
+	if err := exec.Command("git", "clone", remotePath, seedPath).Run(); err != nil {
+		t.Fatalf("failed to clone seed: %v", err)
+	}
+	configGitUser := func(dir string) {
+		exec.Command("git", "-C", dir, "config", "user.email", "test@example.com").Run()
+		exec.Command("git", "-C", dir, "config", "user.name", "Test User").Run()
+	}
+	configGitUser(seedPath)
+
+	// Create file 'conflict.txt' with content 'base'
+	os.WriteFile(filepath.Join(seedPath, "conflict.txt"), []byte("base\n"), 0644)
+	exec.Command("git", "-C", seedPath, "add", "conflict.txt").Run()
+	exec.Command("git", "-C", seedPath, "commit", "-m", "init").Run()
+	exec.Command("git", "-C", seedPath, "push", "origin", "master").Run()
+
+	// Create branch 'conflict-branch'
+	exec.Command("git", "-C", seedPath, "checkout", "-b", "conflict-branch").Run()
+	exec.Command("git", "-C", seedPath, "push", "origin", "conflict-branch").Run()
+
+	// 4. Modify Remote 'conflict-branch' (via seed)
+	os.WriteFile(filepath.Join(seedPath, "conflict.txt"), []byte("remote change\n"), 0644)
+	exec.Command("git", "-C", seedPath, "commit", "-am", "remote change").Run()
+	exec.Command("git", "-C", seedPath, "push", "origin", "conflict-branch").Run()
+
+	// 5. Setup Local Repo
+	localPath := filepath.Join(tmpDir, "local")
+	exec.Command("git", "clone", remotePath, localPath).Run()
+	configGitUser(localPath)
+
+	// Checkout 'conflict-branch' at 'init' (tracking conflict-branch but reset or branched from master)
+	// We want to simulate that we have a local branch named 'conflict-branch' that has DIVERGED from remote.
+	exec.Command("git", "-C", localPath, "checkout", "-b", "conflict-branch", "origin/master").Run()
+	// Unset upstream to ensure clean state
+	exec.Command("git", "-C", localPath, "branch", "--unset-upstream", "conflict-branch").Run()
+	// Modify locally
+	os.WriteFile(filepath.Join(localPath, "conflict.txt"), []byte("local change\n"), 0644)
+	exec.Command("git", "-C", localPath, "commit", "-am", "local change").Run()
+	// Now local conflict-branch and remote conflict-branch have diverged and conflict on 'conflict.txt'.
+
+	// 6. Create Config
+	out, _ := exec.Command("git", "-C", localPath, "remote", "get-url", "origin").CombinedOutput()
+	remoteURL := strings.TrimSpace(string(out))
+	localRel := "local"
+	config := conf.Config{
+		Repositories: &[]conf.Repository{
+			{URL: &remoteURL, ID: &localRel},
+		},
+	}
+	configData, _ := json.Marshal(config)
+	configPath := filepath.Join(tmpDir, "mstl.json")
+	os.WriteFile(configPath, configData, 0644)
+
+	// 7. Mock Globals & Run HandleSwitch
+	var stdoutBuf, stderrBuf bytes.Buffer
+	originalStdout, originalStderr := Stdout, Stderr
+	originalOsExit := osExit
+	defer func() {
+		Stdout, Stderr = originalStdout, originalStderr
+		osExit = originalOsExit
+	}()
+	Stdout = &stdoutBuf
+	Stderr = &stderrBuf
+	osExit = func(c int) { panic(c) }
+
+	Stdin = strings.NewReader("")
+
+	// We run switch to 'conflict-branch'. It exists locally.
+	// mstl should see it exists, checkout it (already checked out or switch to it).
+	// Then it calls `configureUpstreamIfSafe`.
+	// It should DETECT conflict and NOT set upstream.
+
+	// Pre-verify: upstream not set (because we created it off master manually)
+	cmdPre := exec.Command("git", "-C", localPath, "config", "--get", "branch.conflict-branch.remote")
+	if outPre, errPre := cmdPre.CombinedOutput(); errPre == nil && len(bytes.TrimSpace(outPre)) > 0 {
+		t.Fatalf("upstream should not be set yet, got: %s", outPre)
+	}
+
+	defer func() {
+		if r := recover(); r != nil {
+			t.Errorf("panicked with %v", r)
+		}
+	}()
+
+	// -c needed? No, branch exists locally. But switch requires -c to create if not exists?
+	// If it exists, simple `switch conflict-branch` works if we don't pass -c?
+	// Looking at `handleSwitch`:
+	// If !create (no -c): check dirExists. If exists, checkout.
+	// So `-c` is not needed if it exists.
+	args := []string{"conflict-branch", "--file", configPath, "--ignore-stdin"}
+	handleSwitch(args, GlobalOptions{GitPath: "git"})
+
+	// 8. Verify Upstream is NOT set
+	cmd := exec.Command("git", "-C", localPath, "config", "--get", "branch.conflict-branch.remote")
+	out, err = cmd.CombinedOutput()
+	// If err == nil, it found something. We expect err != nil (exit code 1) or empty output.
+	if err == nil && len(bytes.TrimSpace(out)) > 0 {
+		t.Errorf("upstream WAS set (unsafe!), got: %s", out)
+	}
+}
