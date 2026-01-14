@@ -57,7 +57,7 @@ func SearchParentConfig(candidatePath string, configData []byte, gitPath string,
 	}
 
 	// 5. Notify user and switch
-	fmt.Printf("カレントディレクトリに.mstlが見つかりませんが、親ディレクトリ %s に発見しました。この設定を使用します。\n", parentDir)
+	fmt.Printf("No .mstl found in current directory, but found one in %s. Using that configuration.\n", parentDir)
 	if err := os.Chdir(parentDir); err != nil {
 		return candidatePath, err
 	}
