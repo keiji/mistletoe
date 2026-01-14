@@ -26,10 +26,6 @@ def log_fail(msg):
     sys.exit(1)
 
 def run_command(cmd, cwd=None, expect_error=False):
-    # Ensure --verbose is present for mstl commands
-    if os.path.basename(cmd[0]).startswith('mstl') and "--verbose" not in cmd:
-        cmd = cmd + ["--verbose"]
-
     """Runs a shell command and returns the exit code and output."""
     try:
         result = subprocess.run(
@@ -112,7 +108,8 @@ class InitDependenciesTest:
             "-f", config_path,
             "--dependencies", dep_path,
             "--dest", dest_dir_valid,
-            "--ignore-stdin"
+            "--ignore-stdin",
+            "--verbose"
         ]
 
         code, out, err = run_command(cmd)
@@ -140,7 +137,8 @@ class InitDependenciesTest:
             "-f", config_path,
             "--dependencies", invalid_dep_path,
             "--dest", dest_dir_invalid,
-            "--ignore-stdin"
+            "--ignore-stdin",
+            "--verbose"
         ]
 
         code, out, err = run_command(cmd)
@@ -158,7 +156,8 @@ class InitDependenciesTest:
             "-f", config_path,
             "--dependencies", os.path.join(self.root_dir, "does_not_exist.md"),
             "--dest", dest_dir_missing,
-            "--ignore-stdin"
+            "--ignore-stdin",
+            "--verbose"
         ]
 
         code, out, err = run_command(cmd)

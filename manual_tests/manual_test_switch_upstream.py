@@ -61,10 +61,6 @@ class SwitchUpstreamTest:
                 log(f"Skipped cleanup. Directory: {self.test_dir}")
 
     def run_cmd(self, cmd, cwd=None, check=True):
-        # Ensure --verbose is present for mstl commands
-        if os.path.basename(cmd[0]).startswith('mstl') and "--verbose" not in cmd:
-            cmd = cmd + ["--verbose"]
-
         print_green(f"[CMD] {' '.join(cmd)}")
         try:
             result = subprocess.run(
@@ -127,7 +123,7 @@ class SwitchUpstreamTest:
 
         # Run mstl switch -c feature/upstream-test
         # Note: We must use -c (create) because mstl switch (without -c) fails if local branch is missing.
-        self.run_cmd([self.bin_path, "switch", "-c", "feature/upstream-test", "-f", self.config_file, "--ignore-stdin"], cwd=self.repos_dir)
+        self.run_cmd([self.bin_path, "switch", "-c", "feature/upstream-test", "-f", self.config_file, "--ignore-stdin", "--verbose"], cwd=self.repos_dir)
 
         # Verify Upstream
         res_remote = self.run_cmd(["git", "config", "branch.feature/upstream-test.remote"], cwd=repo1_dir, check=False)
@@ -144,7 +140,7 @@ class SwitchUpstreamTest:
     def test_no_upstream(self):
         log("Testing No Upstream (Non-existent remote branch)...")
 
-        self.run_cmd([self.bin_path, "switch", "-c", "feature/no-remote", "-f", self.config_file, "--ignore-stdin"], cwd=self.repos_dir)
+        self.run_cmd([self.bin_path, "switch", "-c", "feature/no-remote", "-f", self.config_file, "--ignore-stdin", "--verbose"], cwd=self.repos_dir)
 
         repo1_dir = os.path.join(self.repos_dir, "repo1")
         res_remote = self.run_cmd(["git", "config", "branch.feature/no-remote.remote"], cwd=repo1_dir, check=False)

@@ -29,10 +29,6 @@ def log_fail(msg):
 
 def run_command(cmd, cwd=None, expect_error=False):
     """Runs a shell command and returns the exit code and output."""
-    # Ensure --verbose is present for mstl commands
-    if os.path.basename(cmd[0]).startswith('mstl') and "--verbose" not in cmd:
-        cmd = cmd + ["--verbose"]
-
     try:
         result = subprocess.run(
             cmd,
@@ -106,7 +102,7 @@ class InitDestTest:
         with open(dest_file, "w") as f:
             f.write("I am a file")
 
-        code, out, err = run_command([mstl_bin, "init", "-f", config_file, "--dest", dest_file, "--ignore-stdin"], cwd=self.root_dir)
+        code, out, err = run_command([mstl_bin, "init", "-f", config_file, "--dest", dest_file, "--ignore-stdin", "--verbose"], cwd=self.root_dir)
         if code != 0 and "specified path is a file" in out + err: # checking combined output just in case
             log_pass("Correctly failed when dest is a file")
         else:
@@ -115,7 +111,7 @@ class InitDestTest:
         # Test Case 2: Destination does not exist, parent does not exist -> Fail
         log_header("Test Case 2: Parent directory missing")
         dest_deep = os.path.join(self.root_dir, "missing_parent", "target")
-        code, out, err = run_command([mstl_bin, "init", "-f", config_file, "--dest", dest_deep, "--ignore-stdin"], cwd=self.root_dir)
+        code, out, err = run_command([mstl_bin, "init", "-f", config_file, "--dest", dest_deep, "--ignore-stdin", "--verbose"], cwd=self.root_dir)
         if code != 0 and "does not exist" in out + err:
             log_pass("Correctly failed when parent directory is missing")
         else:
@@ -131,7 +127,7 @@ class InitDestTest:
         with open(os.path.join(conflict_repo, "junk.txt"), "w") as f:
             f.write("junk")
 
-        code, out, err = run_command([mstl_bin, "init", "-f", config_file, "--dest", dest_not_empty, "--ignore-stdin"], cwd=self.root_dir)
+        code, out, err = run_command([mstl_bin, "init", "-f", config_file, "--dest", dest_not_empty, "--ignore-stdin", "--verbose"], cwd=self.root_dir)
         if code != 0 and "directory myrepo exists, is not empty" in out + err:
             log_pass("Correctly failed when repo target is not empty and ineligible")
         else:
@@ -142,7 +138,7 @@ class InitDestTest:
         dest_empty = os.path.join(self.root_dir, "empty_dir")
         os.makedirs(dest_empty)
 
-        code, out, err = run_command([mstl_bin, "init", "-f", config_file, "--dest", dest_empty, "--ignore-stdin"], cwd=self.root_dir)
+        code, out, err = run_command([mstl_bin, "init", "-f", config_file, "--dest", dest_empty, "--ignore-stdin", "--verbose"], cwd=self.root_dir)
         if code == 0:
             if os.path.exists(os.path.join(dest_empty, "myrepo", ".git")):
                 log_pass("Success: Repository cloned into empty destination")
@@ -155,7 +151,7 @@ class InitDestTest:
         log_header("Test Case 5: Create new destination")
         dest_new = os.path.join(self.root_dir, "new_dest")
 
-        code, out, err = run_command([mstl_bin, "init", "-f", config_file, "--dest", dest_new, "--ignore-stdin"], cwd=self.root_dir)
+        code, out, err = run_command([mstl_bin, "init", "-f", config_file, "--dest", dest_new, "--ignore-stdin", "--verbose"], cwd=self.root_dir)
         if code == 0:
             if os.path.isdir(dest_new) and os.path.exists(os.path.join(dest_new, "myrepo", ".git")):
                 log_pass("Success: Directory created and repository cloned")
@@ -170,7 +166,7 @@ class InitDestTest:
         run_subdir = os.path.join(self.root_dir, "run_subdir")
         os.makedirs(run_subdir)
 
-        code, out, err = run_command([mstl_bin, "init", "-f", config_file, "--ignore-stdin"], cwd=run_subdir)
+        code, out, err = run_command([mstl_bin, "init", "-f", config_file, "--ignore-stdin", "--verbose"], cwd=run_subdir)
         if code == 0:
              if os.path.exists(os.path.join(run_subdir, "myrepo", ".git")):
                 log_pass("Success: Cloned into current directory by default")
