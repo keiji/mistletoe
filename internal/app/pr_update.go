@@ -24,6 +24,8 @@ func handlePrUpdate(args []string, opts GlobalOptions) {
 		wShort     bool
 		vLong     bool
 		vShort    bool
+		yes       bool
+		yesShort  bool
 	)
 
 	fs.StringVar(&fLong, "file", DefaultConfigFile, "Configuration file path")
@@ -37,7 +39,6 @@ func handlePrUpdate(args []string, opts GlobalOptions) {
 	fs.BoolVar(&ignoreStdin, "ignore-stdin", false, "Ignore standard input")
 	fs.BoolVar(&vLong, "verbose", false, "Enable verbose output")
 	fs.BoolVar(&vShort, "v", false, "Enable verbose output (shorthand)")
-	var yes, yesShort bool
 	fs.BoolVar(&yes, "yes", false, "Automatically answer 'yes' to all prompts")
 	fs.BoolVar(&yesShort, "y", false, "Automatically answer 'yes' to all prompts (shorthand)")
 

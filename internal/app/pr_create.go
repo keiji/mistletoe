@@ -33,11 +33,9 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 		draft      bool
 		vLong      bool
 		vShort     bool
+		yes        bool
+		yesShort   bool
 	)
-
-	var yes, yesShort bool
-	fs.BoolVar(&yes, "yes", false, "Automatically answer 'yes' to all prompts")
-	fs.BoolVar(&yesShort, "y", false, "Automatically answer 'yes' to all prompts (shorthand)")
 
 	fs.StringVar(&fLong, "file", DefaultConfigFile, "Configuration file path")
 	fs.StringVar(&fShort, "f", DefaultConfigFile, "Configuration file path (shorthand)")
@@ -55,6 +53,8 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 	fs.BoolVar(&ignoreStdin, "ignore-stdin", false, "Ignore standard input")
 	fs.BoolVar(&vLong, "verbose", false, "Enable verbose output")
 	fs.BoolVar(&vShort, "v", false, "Enable verbose output (shorthand)")
+	fs.BoolVar(&yes, "yes", false, "Automatically answer 'yes' to all prompts")
+	fs.BoolVar(&yesShort, "y", false, "Automatically answer 'yes' to all prompts (shorthand)")
 
 	if err := ParseFlagsFlexible(fs, args); err != nil {
 		fmt.Println(err)

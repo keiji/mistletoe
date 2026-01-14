@@ -268,12 +268,15 @@ func validateAndPrepareInitDest(dest string) error {
 }
 
 func handleInit(args []string, opts GlobalOptions) {
-	var fShort, fLong string
-	var destLong string
-	var dependenciesLong string
-	var depth int
-	var jVal, jValShort int
-	var vLong, vShort bool
+	var (
+		fShort, fLong    string
+		destLong         string
+		dependenciesLong string
+		depth            int
+		jVal, jValShort  int
+		vLong, vShort    bool
+		yes, yesShort    bool
+	)
 
 	fs := flag.NewFlagSet("init", flag.ExitOnError)
 	fs.StringVar(&fLong, "file", DefaultConfigFile, "configuration file")
@@ -287,7 +290,6 @@ func handleInit(args []string, opts GlobalOptions) {
 	fs.BoolVar(&ignoreStdin, "ignore-stdin", false, "Ignore standard input")
 	fs.BoolVar(&vLong, "verbose", false, "Enable verbose output")
 	fs.BoolVar(&vShort, "v", false, "Enable verbose output (shorthand)")
-	var yes, yesShort bool
 	fs.BoolVar(&yes, "yes", false, "Automatically answer 'yes' to all prompts")
 	fs.BoolVar(&yesShort, "y", false, "Automatically answer 'yes' to all prompts (shorthand)")
 
