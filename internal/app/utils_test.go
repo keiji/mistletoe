@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"bufio"
 
 	conf "mistletoe/internal/config"
 )
@@ -380,6 +381,87 @@ func TestDetermineJobs(t *testing.T) {
 			}
 			if got != tt.want {
 				t.Errorf("DetermineJobs() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestAskForConfirmation(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		yesFlag bool
+		want    bool
+		wantErr bool
+	}{
+		{
+			name:    "YesFlag True",
+			input:   "",
+			yesFlag: true,
+			want:    true,
+			wantErr: false,
+		},
+		{
+			name:    "Input y",
+			input:   "y\n",
+			yesFlag: false,
+			want:    true,
+			wantErr: false,
+		},
+		{
+			name:    "Input yes",
+			input:   "yes\n",
+			yesFlag: false,
+			want:    true,
+			wantErr: false,
+		},
+		{
+			name:    "Input YES",
+			input:   "YES\n",
+			yesFlag: false,
+			want:    true,
+			wantErr: false,
+		},
+		{
+			name:    "Input n",
+			input:   "n\n",
+			yesFlag: false,
+			want:    false,
+			wantErr: false,
+		},
+		{
+			name:    "Input no",
+			input:   "no\n",
+			yesFlag: false,
+			want:    false,
+			wantErr: false,
+		},
+		{
+			name:    "Input random",
+			input:   "random\n",
+			yesFlag: false,
+			want:    false, // Only y/yes returns true
+			wantErr: false,
+		},
+		{
+			name:    "Input EOF",
+			input:   "", // Empty reader returns EOF
+			yesFlag: false,
+			want:    false,
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reader := bufio.NewReader(strings.NewReader(tt.input))
+			got, err := AskForConfirmation(reader, "Prompt? ", tt.yesFlag)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("AskForConfirmation() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("AskForConfirmation() = %v, want %v", got, tt.want)
 			}
 		})
 	}
