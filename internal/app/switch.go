@@ -104,6 +104,11 @@ func handleSwitch(args []string, opts GlobalOptions) {
 		return
 	}
 
+	configFile, err = SearchParentConfig(configFile, configData, opts.GitPath)
+	if err != nil {
+		fmt.Fprintf(Stderr, "Error searching parent config: %v\n", err)
+	}
+
 	createBranchName := createLong
 	if createShort != "" {
 		createBranchName = createShort

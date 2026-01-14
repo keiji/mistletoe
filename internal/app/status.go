@@ -48,6 +48,17 @@ func handleStatus(args []string, opts GlobalOptions) {
 		return
 	}
 
+	configFile, err = SearchParentConfig(configFile, configData, opts.GitPath)
+	if err != nil {
+		fmt.Fprintf(Stderr, "Error searching parent config: %v\n", err)
+		// Don't exit? Or treat as fatal?
+		// If validation fails inside SearchParentConfig, it returns original path and no error (unless unexpected error).
+		// If SearchParentConfig returns error, it's likely something we should report.
+		// However, my implementation of SearchParentConfig swallows validation errors and returns candidatePath.
+		// So err here would only be unexpected errors.
+		// Let's assume we proceed.
+	}
+
 	var config *conf.Config
 	if configFile != "" {
 		config, err = conf.LoadConfigFile(configFile)
