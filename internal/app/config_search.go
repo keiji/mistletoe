@@ -74,8 +74,6 @@ func SearchParentConfig(candidatePath string, configData []byte, gitPath string)
 }
 
 func validateParentConfig(configPath, parentDir, gitPath string) error {
-	// Load config without validation first? Or use standard loader?
-	// Use standard loader.
 	config, err := conf.LoadConfigFile(configPath)
 	if err != nil {
 		return err
