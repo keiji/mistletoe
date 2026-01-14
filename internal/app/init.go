@@ -308,6 +308,11 @@ func handleInit(args []string, opts GlobalOptions) {
 		os.Exit(1)
 	}
 
+	configFile, err = SearchParentConfig(configFile, configData, opts.GitPath)
+	if err != nil {
+		fmt.Fprintf(Stderr, "Error searching parent config: %v\n", err)
+	}
+
 	// Resolve absolute path for config file before any directory change
 	if configFile != "" {
 		absPath, err := filepath.Abs(configFile)

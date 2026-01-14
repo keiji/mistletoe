@@ -71,6 +71,11 @@ func handleSnapshot(args []string, opts GlobalOptions) {
 		return
 	}
 
+	configPath, err = SearchParentConfig(configPath, configData, opts.GitPath)
+	if err != nil {
+		fmt.Fprintf(Stderr, "Error searching parent config: %v\n", err)
+	}
+
 	if configPath != "" || len(configData) > 0 {
 		if configPath != "" {
 			config, err = conf.LoadConfigFile(configPath)

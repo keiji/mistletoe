@@ -76,6 +76,11 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 		os.Exit(1)
 	}
 
+	configPath, err = SearchParentConfig(configPath, configData, opts.GitPath)
+	if err != nil {
+		fmt.Fprintf(Stderr, "Error searching parent config: %v\n", err)
+	}
+
 	// Resolve title, body, dependency file
 	prTitle := tLong
 	if prTitle == "" {
