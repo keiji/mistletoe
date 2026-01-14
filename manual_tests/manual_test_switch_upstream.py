@@ -8,18 +8,13 @@ import atexit
 
 # Add current directory to sys.path to import interactive_runner
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-from interactive_runner import InteractiveRunner, print_green
-
-# Colors
-GREEN = '\033[0;32m'
-RED = '\033[0;31m'
-NC = '\033[0m'
+from interactive_runner import InteractiveRunner, print_green, print_red
 
 def log(msg):
     print_green(f"[TEST] {msg}")
 
 def fail(msg):
-    print(f"{RED}[FAIL]{NC} {msg}")
+    print_red(f"[FAIL] {msg}")
     sys.exit(1)
 
 class SwitchUpstreamTest:
@@ -128,7 +123,7 @@ class SwitchUpstreamTest:
 
         # Run mstl switch -c feature/upstream-test
         # Note: We must use -c (create) because mstl switch (without -c) fails if local branch is missing.
-        self.run_cmd([self.bin_path, "switch", "-c", "feature/upstream-test", "-f", self.config_file, "--ignore-stdin"], cwd=self.repos_dir)
+        self.run_cmd([self.bin_path, "switch", "-c", "feature/upstream-test", "-f", self.config_file, "--ignore-stdin", "--verbose"], cwd=self.repos_dir)
 
         # Verify Upstream
         res_remote = self.run_cmd(["git", "config", "branch.feature/upstream-test.remote"], cwd=repo1_dir, check=False)
@@ -145,7 +140,7 @@ class SwitchUpstreamTest:
     def test_no_upstream(self):
         log("Testing No Upstream (Non-existent remote branch)...")
 
-        self.run_cmd([self.bin_path, "switch", "-c", "feature/no-remote", "-f", self.config_file, "--ignore-stdin"], cwd=self.repos_dir)
+        self.run_cmd([self.bin_path, "switch", "-c", "feature/no-remote", "-f", self.config_file, "--ignore-stdin", "--verbose"], cwd=self.repos_dir)
 
         repo1_dir = os.path.join(self.repos_dir, "repo1")
         res_remote = self.run_cmd(["git", "config", "branch.feature/no-remote.remote"], cwd=repo1_dir, check=False)

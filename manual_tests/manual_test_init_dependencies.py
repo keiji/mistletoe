@@ -13,11 +13,7 @@ import atexit
 
 # Add current directory to sys.path to import interactive_runner
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-from interactive_runner import InteractiveRunner, print_green
-
-# Use ANSI codes for fail since interactive_runner doesn't export red
-FAIL_COLOR = '\033[91m'
-ENDC = '\033[0m'
+from interactive_runner import InteractiveRunner, print_green, print_red
 
 def log_header(msg):
     print_green(f"=== {msg} ===")
@@ -26,7 +22,7 @@ def log_pass(msg):
     print_green(f"[PASS] {msg}")
 
 def log_fail(msg):
-    print(f"{FAIL_COLOR}[FAIL] {msg}{ENDC}")
+    print_red(f"[FAIL] {msg}")
     sys.exit(1)
 
 def run_command(cmd, cwd=None, expect_error=False):
@@ -112,7 +108,8 @@ class InitDependenciesTest:
             "-f", config_path,
             "--dependencies", dep_path,
             "--dest", dest_dir_valid,
-            "--ignore-stdin"
+            "--ignore-stdin",
+            "--verbose"
         ]
 
         code, out, err = run_command(cmd)
@@ -140,7 +137,8 @@ class InitDependenciesTest:
             "-f", config_path,
             "--dependencies", invalid_dep_path,
             "--dest", dest_dir_invalid,
-            "--ignore-stdin"
+            "--ignore-stdin",
+            "--verbose"
         ]
 
         code, out, err = run_command(cmd)
@@ -158,7 +156,8 @@ class InitDependenciesTest:
             "-f", config_path,
             "--dependencies", os.path.join(self.root_dir, "does_not_exist.md"),
             "--dest", dest_dir_missing,
-            "--ignore-stdin"
+            "--ignore-stdin",
+            "--verbose"
         ]
 
         code, out, err = run_command(cmd)

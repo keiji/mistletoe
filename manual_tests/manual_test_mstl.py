@@ -8,18 +8,13 @@ import atexit
 
 # Add current directory to sys.path to import interactive_runner
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-from interactive_runner import InteractiveRunner, print_green
-
-# Colors
-GREEN = '\033[0;32m'
-RED = '\033[0;31m'
-NC = '\033[0m'
+from interactive_runner import InteractiveRunner, print_green, print_red
 
 def log(msg):
     print_green(f"[TEST] {msg}")
 
 def fail(msg):
-    print(f"{RED}[FAIL]{NC} {msg}")
+    print_red(f"[FAIL] {msg}")
     sys.exit(1)
 
 class MstlManualTest:
@@ -166,7 +161,7 @@ class MstlManualTest:
         log("Testing 'init --depth 1'...")
         shallow_dir = os.path.join(self.test_dir, "repos_shallow")
         os.makedirs(shallow_dir, exist_ok=True)
-        self.run_cmd([self.bin_path, "init", "-f", self.config_file, "--depth", "1", "--verbose", "--ignore-stdin", "--dest", shallow_dir], cwd=self.test_dir)
+        self.run_cmd([self.bin_path, "init", "-f", self.config_file, "--depth", "1", "--ignore-stdin", "--dest", shallow_dir, "--verbose"], cwd=self.test_dir)
 
         # Verify commit count
         repo1_path = os.path.join(shallow_dir, "repo1")
@@ -257,7 +252,7 @@ class MstlManualTest:
         log("Testing 'sync'...")
         # Switch back to main
         log("Switching back to main for sync test...")
-        self.run_cmd([self.bin_path, "switch", "main", "--ignore-stdin"], cwd=self.repos_dir)
+        self.run_cmd([self.bin_path, "switch", "main", "--ignore-stdin", "--verbose"], cwd=self.repos_dir)
 
         # Update remote repo2
         repo2_seed = os.path.join(self.seed_dir, "repo2")
@@ -285,7 +280,7 @@ class MstlManualTest:
 
     def test_snapshot(self):
         log("Testing 'snapshot'...")
-        self.run_cmd([self.bin_path, "snapshot", "--ignore-stdin"], cwd=self.repos_dir)
+        self.run_cmd([self.bin_path, "snapshot", "--ignore-stdin", "--verbose"], cwd=self.repos_dir)
 
         # Check file
         files = os.listdir(self.repos_dir)

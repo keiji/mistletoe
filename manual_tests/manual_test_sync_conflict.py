@@ -8,18 +8,13 @@ import atexit
 
 # Add current directory to sys.path to import interactive_runner
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-from interactive_runner import InteractiveRunner, print_green
-
-# Colors - Use interactive_runner's where possible, but keep local for helpers if needed
-# Actually, interactive_runner doesn't export colors, only print_green.
-# We will rely on print_green for logs.
+from interactive_runner import InteractiveRunner, print_green, print_red
 
 def log(msg):
     print_green(f"[TEST] {msg}")
 
 def fail(msg):
-    # Use ANSI codes for red directly since interactive_runner doesn't export print_red
-    print(f"\033[0;31m[FAIL]\033[0m {msg}")
+    print_red(f"[FAIL] {msg}")
     sys.exit(1)
 
 class MstlManualTestSyncConflict:
@@ -126,7 +121,7 @@ class MstlManualTestSyncConflict:
         log("Initializing local environment...")
         os.makedirs(self.repos_dir, exist_ok=True)
         # Use --ignore-stdin to prevent mstl from treating piped env/execution as config input
-        self.run_cmd([self.bin_path, "init", "-f", self.config_file, "--ignore-stdin"], cwd=self.repos_dir)
+        self.run_cmd([self.bin_path, "init", "-f", self.config_file, "--ignore-stdin", "--verbose"], cwd=self.repos_dir)
 
         # 1. Create a conflict scenario
         log("Creating conflict scenario...")
@@ -149,7 +144,7 @@ class MstlManualTestSyncConflict:
         # 2. Check Status
         log("Checking status (should show conflict or divergence)...")
         # Use --ignore-stdin just in case
-        res = self.run_cmd([self.bin_path, "status", "--ignore-stdin"], cwd=self.repos_dir)
+        res = self.run_cmd([self.bin_path, "status", "--ignore-stdin", "--verbose"], cwd=self.repos_dir)
         print(res.stdout)
 
         if "!" not in res.stdout:
@@ -159,7 +154,7 @@ class MstlManualTestSyncConflict:
         log("Running sync (expecting failure or conflict)...")
 
         # Pass "merge" to prompts, but use --ignore-stdin so ResolveCommonValues doesn't eat it as config
-        res = self.run_cmd([self.bin_path, "sync", "--ignore-stdin"], cwd=self.repos_dir, input_str="merge\n", check=False)
+        res = self.run_cmd([self.bin_path, "sync", "--ignore-stdin", "--verbose"], cwd=self.repos_dir, input_str="merge\n", check=False)
 
         # It should NOT succeed. 'git pull --no-rebase' returns 1 on conflict.
         if res.returncode == 0:
