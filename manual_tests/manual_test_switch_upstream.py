@@ -13,10 +13,6 @@ from interactive_runner import InteractiveRunner, print_green, print_red
 def log(msg):
     print_green(f"[TEST] {msg}")
 
-def fail(msg):
-    print_red(f"[FAIL] {msg}")
-    sys.exit(1)
-
 class SwitchUpstreamTest:
     def __init__(self, runner):
         self.root_dir = os.getcwd()
@@ -60,6 +56,9 @@ class SwitchUpstreamTest:
             else:
                 log(f"Skipped cleanup. Directory: {self.test_dir}")
 
+    def fail(self, msg):
+        self.runner.fail(msg)
+
     def run_cmd(self, cmd, cwd=None, check=True):
         if self.runner.args and self.runner.args.yes and cmd[0] == self.bin_path and "--yes" not in cmd:
             cmd = list(cmd) + ["--yes"]
@@ -80,7 +79,7 @@ class SwitchUpstreamTest:
             return result
         except subprocess.CalledProcessError as e:
             if check:
-                fail(f"Command failed: {' '.join(cmd)}\nStderr: {e.stderr}\nStdout: {e.stdout}")
+                self.fail(f"Command failed: {' '.join(cmd)}\nStderr: {e.stderr}\nStdout: {e.stdout}")
             return e
 
     def setup_repo(self):
@@ -98,6 +97,9 @@ class SwitchUpstreamTest:
         self.run_cmd(["git", "commit", "--allow-empty", "-m", "init"], cwd=seed_path)
         self.run_cmd(["git", "branch", "-M", "master"], cwd=seed_path)
         self.run_cmd(["git", "push", "origin", "master"], cwd=seed_path)
+
+        # Fix bare repo HEAD to point to master (avoids warning on subsequent clones)
+        self.run_cmd(["git", "--git-dir", remote_path, "symbolic-ref", "HEAD", "refs/heads/master"])
 
         # 3. Create 'feature/upstream-test' on remote
         self.run_cmd(["git", "checkout", "-b", "feature/upstream-test"], cwd=seed_path)
@@ -123,7 +125,7 @@ class SwitchUpstreamTest:
         repo1_dir = os.path.join(self.repos_dir, "repo1")
         res = self.run_cmd(["git", "branch", "--list", "feature/upstream-test"], cwd=repo1_dir)
         if "feature/upstream-test" in res.stdout:
-            fail("Branch feature/upstream-test should not exist locally yet")
+            self.fail("Branch feature/upstream-test should not exist locally yet")
 
         # Run mstl switch -c feature/upstream-test
         # Note: We must use -c (create) because mstl switch (without -c) fails if local branch is missing.
@@ -134,10 +136,10 @@ class SwitchUpstreamTest:
         res_merge = self.run_cmd(["git", "config", "branch.feature/upstream-test.merge"], cwd=repo1_dir, check=False)
 
         if res_remote.stdout.strip() != "origin":
-            fail(f"Upstream remote not set to origin. Got: {res_remote.stdout.strip()}")
+            self.fail(f"Upstream remote not set to origin. Got: {res_remote.stdout.strip()}")
 
         if res_merge.stdout.strip() != "refs/heads/feature/upstream-test":
-             fail(f"Upstream merge ref not set correctly. Got: {res_merge.stdout.strip()}")
+             self.fail(f"Upstream merge ref not set correctly. Got: {res_merge.stdout.strip()}")
 
         log("Success: Upstream set correctly.")
 
@@ -150,7 +152,7 @@ class SwitchUpstreamTest:
         res_remote = self.run_cmd(["git", "config", "branch.feature/no-remote.remote"], cwd=repo1_dir, check=False)
 
         if res_remote.returncode == 0 and res_remote.stdout.strip() != "":
-             fail(f"Upstream should NOT be set for feature/no-remote. Got: {res_remote.stdout.strip()}")
+             self.fail(f"Upstream should NOT be set for feature/no-remote. Got: {res_remote.stdout.strip()}")
 
         log("Success: Upstream not set for local-only branch.")
 

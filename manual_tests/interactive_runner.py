@@ -21,6 +21,7 @@ class InteractiveRunner:
         self.args = None
         self.log_file = None
         self.test_name = description
+        self.failed = False
 
     def parse_args(self):
         self.args = self.parser.parse_args()
@@ -42,13 +43,18 @@ class InteractiveRunner:
             with open(self.log_file, "a") as f:
                 f.write(line + "\n")
 
+    def fail(self, message):
+        self.log(message, status="FAILED")
+        self.failed = True
+        sys.exit(1)
+
     def print_section(self, title):
         print_green("\n" + "="*60)
         print_green(title)
         print_green("="*60)
 
-    def ask_yes_no(self, question, default="yes"):
-        if self.args and self.args.yes:
+    def ask_yes_no(self, question, default="yes", force_interactive=False):
+        if self.args and self.args.yes and not self.failed and not force_interactive:
             print(f"{question} [Y/n] (Auto-Yes): yes")
             return True
 
@@ -90,6 +96,7 @@ class InteractiveRunner:
             print(f"Error during execution: {e}")
             traceback.print_exc()
             self.log(f"Test '{title}' FAILED (Exception)", status="FAILED")
+            self.failed = True
             return
 
         print("\n[Verification]")
