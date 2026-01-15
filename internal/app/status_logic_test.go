@@ -180,6 +180,12 @@ func TestCollectStatus(t *testing.T) {
 }
 
 func TestCollectStatus_UpstreamFix(t *testing.T) {
+	// Capture Stderr
+	originalStderr := Stderr
+	var stderrBuf bytes.Buffer
+	Stderr = &stderrBuf
+	defer func() { Stderr = originalStderr }()
+
 	tmpDir := t.TempDir()
 	cwd, _ := os.Getwd()
 	defer os.Chdir(cwd)
@@ -215,12 +221,18 @@ func TestCollectStatus_UpstreamFix(t *testing.T) {
 	}
 
 	// Run Status
+	stderrBuf.Reset()
 	CollectStatus(&config, 1, "git", false, false)
 
 	// Verify upstream unset
 	err := exec.Command("git", "-C", localDir, "rev-parse", "--abbrev-ref", "@{u}").Run()
 	if err == nil {
 		t.Error("Scenario 1: Upstream should be unset")
+	}
+
+	// Verify message
+	if !strings.Contains(stderrBuf.String(), "upstream の設定が不正なため") {
+		t.Errorf("Scenario 1: Expected message not found in stderr. Got: %s", stderrBuf.String())
 	}
 
 	// Scenario 2: Remote Gone
@@ -237,12 +249,18 @@ func TestCollectStatus_UpstreamFix(t *testing.T) {
 	exec.Command("git", "-C", remoteDir, "branch", "-D", "feature").Run()
 
 	// Run Status
+	stderrBuf.Reset()
 	CollectStatus(&config, 1, "git", false, false)
 
 	// Verify upstream unset
 	err = exec.Command("git", "-C", localDir, "rev-parse", "--abbrev-ref", "@{u}").Run()
 	if err == nil {
 		t.Error("Scenario 2: Upstream should be unset")
+	}
+
+	// Verify message
+	if !strings.Contains(stderrBuf.String(), "リモートブランチが存在しないため") {
+		t.Errorf("Scenario 2: Expected message not found in stderr. Got: %s", stderrBuf.String())
 	}
 }
 
