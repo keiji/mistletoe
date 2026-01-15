@@ -96,8 +96,8 @@ func TestHandleSync(t *testing.T) {
 		if code != 0 {
 			t.Errorf("expected exit code 0, got %d", code)
 		}
-		if !strings.Contains(out, fmt.Sprintf("Syncing %s...", repo1Rel)) {
-			t.Errorf("Expected Syncing repo1 output. Got: %s", out)
+		if !strings.Contains(out, fmt.Sprintf("Skipping %s: Already up to date.", repo1Rel)) {
+			t.Errorf("Expected Skipping repo1 output. Got: %s", out)
 		}
 	})
 

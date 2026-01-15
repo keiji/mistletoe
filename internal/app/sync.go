@@ -172,6 +172,20 @@ func handleSync(args []string, opts GlobalOptions) {
 			continue
 		}
 
+		// Check if we can skip pulling.
+		// We skip if:
+		// 1. IsPullable is false (not strictly behind according to config)
+		// 2. AND Local matches Remote (no difference)
+		//
+		// Note: If IsPullable is false but Local != Remote, it could mean:
+		// - We are Ahead (Unpushed) -> Pull is no-op, but we let it run (or could optimize later).
+		// - We are Behind but 'repo.Branch' config doesn't match current branch -> IsPullable is false (gated).
+		//   In this case, we MUST run pull (which behaves like standard git pull).
+		if !row.IsPullable && row.LocalHeadFull == row.RemoteHeadFull {
+			fmt.Fprintf(Stdout, "Skipping %s: Already up to date.\n", row.Repo)
+			continue
+		}
+
 		fmt.Fprintf(Stdout, "Syncing %s...\n", row.Repo)
 		if err := RunGitInteractive(row.RepoDir, opts.GitPath, verbose, argsPull...); err != nil {
 			fmt.Fprintf(Stderr, "Error pulling %s: %v\n", row.Repo, err)
