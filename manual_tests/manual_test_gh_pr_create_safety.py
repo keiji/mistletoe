@@ -229,6 +229,10 @@ sys.exit(0)
                                     print_green("[TEST] Change injected. PLEASE TYPE 'yes' TO CONTINUE.")
                                     injected = True
 
+                                    if runner.args and runner.args.yes:
+                                        print_green("[AUTO-YES] Sending 'yes' to PTY...")
+                                        os.write(master_fd, b"yes\n")
+
                     except OSError:
                         break # Process closed
 

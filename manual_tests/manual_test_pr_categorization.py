@@ -106,6 +106,8 @@ def main():
 
         # Execute pr create interactively
         cmd = [env.mstl_bin, "pr", "create", "-f", "mistletoe.json", "--verbose"]
+        if runner.args.yes:
+            cmd.append("--yes")
         subprocess.run(cmd, cwd=env.test_dir)
 
     # Expected result text
