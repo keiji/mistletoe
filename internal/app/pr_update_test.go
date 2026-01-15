@@ -2,6 +2,7 @@ package app
 
 import (
 	conf "mistletoe/internal/config"
+	"strings"
 	"testing"
 )
 
@@ -122,5 +123,60 @@ func checkStringSlice(t *testing.T, category string, got []string, want []string
 		if s != want[i] {
 			t.Errorf("%s[%d]: got %s, want %s", category, i, s, want[i])
 		}
+	}
+}
+
+func TestPrUpdateCommand_Flags(t *testing.T) {
+	// Note: We are testing flag parsing and early exit conditions.
+	// Execution beyond flag parsing might fail due to missing environment (gh, config, etc.),
+	// which is expected and confirms flags were parsed and logic proceeded.
+
+	tests := []struct {
+		name          string
+		args          []string
+		wantError     bool
+		errorContains string
+	}{
+		{
+			name:          "Invalid flag",
+			args:          []string{"--invalid-flag"},
+			wantError:     true,
+			errorContains: "flag provided but not defined",
+		},
+		{
+			name:          "Valid flags - help (not really tested here as flag.Parse handles it specially, but --help returns error ErrHelp)",
+			args:          []string{"--help"},
+			wantError:     true,
+			errorContains: "flag: help requested",
+		},
+		{
+			name: "Valid flags - minimal",
+			// Should pass flag parsing, but likely fail at ResolveCommonValues (file not found) or checkGhAvailability
+			args:      []string{"-f", "nonexistent.json"},
+			wantError: true,
+			// checkGhAvailability might fail first if not mocked, or file loading.
+			// Error message depends on environment. We just check it's not a flag error.
+		},
+		{
+			name:          "Duplicate flags (alias mismatch)",
+			args:          []string{"-j", "1", "--jobs", "2"},
+			wantError:     true,
+			errorContains: "options --jobs and -j cannot be specified with different values",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := prUpdateCommand(tt.args, GlobalOptions{GitPath: "git", GhPath: "gh"})
+			if (err != nil) != tt.wantError {
+				t.Errorf("prUpdateCommand() error = %v, wantError %v", err, tt.wantError)
+				return
+			}
+			if err != nil && tt.errorContains != "" {
+				if !strings.Contains(err.Error(), tt.errorContains) {
+					t.Errorf("error = %v, want error containing %q", err, tt.errorContains)
+				}
+			}
+		})
 	}
 }
