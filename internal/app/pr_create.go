@@ -83,7 +83,7 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 
 	yesFlag := yes || yesShort
 
-	configPath, err = SearchParentConfig(configPath, configData, opts.GitPath)
+	configPath, err = SearchParentConfig(configPath, configData, opts.GitPath, yesFlag)
 	if err != nil {
 		fmt.Fprintf(Stderr, "Error searching parent config: %v\n", err)
 	}

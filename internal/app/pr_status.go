@@ -57,7 +57,8 @@ func handlePrStatus(args []string, opts GlobalOptions) {
 		os.Exit(1)
 	}
 
-	configPath, err = SearchParentConfig(configPath, configData, opts.GitPath)
+	yesFlag := yes || yesShort
+	configPath, err = SearchParentConfig(configPath, configData, opts.GitPath, yesFlag)
 	if err != nil {
 		fmt.Fprintf(Stderr, "Error searching parent config: %v\n", err)
 	}

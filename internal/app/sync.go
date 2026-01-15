@@ -58,7 +58,7 @@ func handleSync(args []string, opts GlobalOptions) {
 
 	yesFlag := yes || yesShort
 
-	configFile, err = SearchParentConfig(configFile, configData, opts.GitPath)
+	configFile, err = SearchParentConfig(configFile, configData, opts.GitPath, yesFlag)
 	if err != nil {
 		fmt.Fprintf(Stderr, "Error searching parent config: %v\n", err)
 	}
