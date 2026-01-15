@@ -1,0 +1,11 @@
+========================================================
+Full Manual Test Started at Thu Jan 15 15:55:26 UTC 2026
+========================================================
+[2026-01-15 15:55:30] Test 'Core Feature Check' PASSED - SUCCESS
+[2026-01-15 15:55:32] Test 'Config Search Verification' PASSED - SUCCESS
+[2026-01-15 15:55:32] Test 'CWD Switch Verification' PASSED - SUCCESS
+[2026-01-15 15:55:33] Test 'Destination Logic Check' PASSED - SUCCESS
+[2026-01-15 15:55:33] Test 'Dependencies Flag Check' PASSED - SUCCESS
+[2026-01-15 15:55:34] Test 'Simulate Conflict' PASSED - SUCCESS
+[2026-01-15 15:55:35] Test 'Switch Upstream' PASSED - SUCCESS
+[2026-01-15 15:55:35] Test 'Upstream Validation' PASSED - SUCCESS
