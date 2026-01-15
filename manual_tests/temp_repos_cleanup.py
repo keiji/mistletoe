@@ -3,6 +3,7 @@ import subprocess
 import json
 import sys
 import os
+import argparse
 
 # Add current directory to sys.path to import interactive_runner
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -48,6 +49,10 @@ def delete_repo(user, repo_name):
         print_red(f"Failed to delete {full_name}")
 
 def main():
+    parser = argparse.ArgumentParser(description="Cleanup temporary repositories starting with 'mistletoe-test-'")
+    parser.add_argument("--yes", action="store_true", help="Automatically confirm deletion without prompting")
+    args = parser.parse_args()
+
     print_green("Checking for 'mistletoe-test-*' repositories...")
 
     try:
@@ -66,8 +71,12 @@ def main():
     for repo in temp_repos:
         print_green(f" - {repo}")
 
-    print_green("\nDo you want to DELETE all these repositories? (yes/no)")
-    choice = input("> ").lower().strip()
+    if args.yes:
+        print_green("\nDo you want to DELETE all these repositories? (yes/no) [Auto-Yes]: yes")
+        choice = "yes"
+    else:
+        print_green("\nDo you want to DELETE all these repositories? (yes/no)")
+        choice = input("> ").lower().strip()
 
     if choice == "yes":
         print_green("\nStarting cleanup...")
