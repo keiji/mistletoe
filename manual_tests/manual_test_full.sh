@@ -25,6 +25,12 @@ echo "Building binaries..."
 echo "Running manual_test_mstl.py..."
 python3 "$SCRIPT_DIR/manual_test_mstl.py" --output "$OUTPUT_FILE" $YES_FLAG
 
+echo "Running manual_test_config_search.py..."
+python3 "$SCRIPT_DIR/manual_test_config_search.py" --output "$OUTPUT_FILE" $YES_FLAG
+
+echo "Running manual_test_parent_config_switch.py..."
+python3 "$SCRIPT_DIR/manual_test_parent_config_switch.py" --output "$OUTPUT_FILE" $YES_FLAG
+
 echo "Running manual_test_init_dest.py..."
 python3 "$SCRIPT_DIR/manual_test_init_dest.py" --output "$OUTPUT_FILE" $YES_FLAG
 
@@ -33,6 +39,15 @@ python3 "$SCRIPT_DIR/manual_test_init_dependencies.py" --output "$OUTPUT_FILE" $
 
 echo "Running manual_test_sync_conflict.py..."
 python3 "$SCRIPT_DIR/manual_test_sync_conflict.py" --output "$OUTPUT_FILE" $YES_FLAG
+
+echo "Running manual_test_switch_upstream.py..."
+python3 "$SCRIPT_DIR/manual_test_switch_upstream.py" --output "$OUTPUT_FILE" $YES_FLAG
+
+echo "Running manual_test_upstream_safety.py..."
+python3 "$SCRIPT_DIR/manual_test_upstream_safety.py" --output "$OUTPUT_FILE" $YES_FLAG
+
+echo "Running manual_test_pr_categorization.py..."
+python3 "$SCRIPT_DIR/manual_test_pr_categorization.py" --output "$OUTPUT_FILE" $YES_FLAG
 
 echo "Running manual_test_gh_pr_create.py..."
 python3 "$SCRIPT_DIR/manual_test_gh_pr_create.py" --output "$OUTPUT_FILE" $YES_FLAG
