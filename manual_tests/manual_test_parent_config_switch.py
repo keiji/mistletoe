@@ -4,15 +4,9 @@ import subprocess
 import sys
 import json
 
-GREEN = '\033[92m'
-RED = '\033[91m'
-RESET = '\033[0m'
-
-def print_green(text):
-    print(f"{GREEN}{text}{RESET}")
-
-def print_red(text):
-    print(f"{RED}{text}{RESET}")
+# Add current directory to sys.path to import interactive_runner
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+from interactive_runner import InteractiveRunner, print_green, print_red
 
 def setup_local_repos(base_dir):
     repo_names = ["repo-a", "repo-b"]
@@ -49,7 +43,7 @@ def setup_local_repos(base_dir):
 
     return repos
 
-def run_test():
+def run_test_logic():
     script_dir = os.path.dirname(os.path.abspath(__file__))
     project_root = os.path.dirname(script_dir)
     main_go_path = os.path.join(project_root, "cmd", "mstl", "main.go")
@@ -59,27 +53,27 @@ def run_test():
         shutil.rmtree(test_workspace)
     os.makedirs(test_workspace)
 
-    print_green("Setting up local test environment...")
-    repos = setup_local_repos(test_workspace)
-
-    # Create .mstl config
-    mstl_dir = os.path.join(test_workspace, ".mstl")
-    os.makedirs(mstl_dir, exist_ok=True)
-
-    config_repos = []
-    for r in repos:
-        config_repos.append({
-            "id": r["id"],
-            "url": r["url"],
-            "branch": "master"
-        })
-
-    config = {"repositories": config_repos}
-    config_path = os.path.join(mstl_dir, "config.json")
-    with open(config_path, "w") as f:
-        json.dump(config, f, indent=2)
-
     try:
+        print_green("Setting up local test environment...")
+        repos = setup_local_repos(test_workspace)
+
+        # Create .mstl config
+        mstl_dir = os.path.join(test_workspace, ".mstl")
+        os.makedirs(mstl_dir, exist_ok=True)
+
+        config_repos = []
+        for r in repos:
+            config_repos.append({
+                "id": r["id"],
+                "url": r["url"],
+                "branch": "master"
+            })
+
+        config = {"repositories": config_repos}
+        config_path = os.path.join(mstl_dir, "config.json")
+        with open(config_path, "w") as f:
+            json.dump(config, f, indent=2)
+
         cmd_base = ["go", "run", main_go_path]
 
         # We run from repo-a.
@@ -104,21 +98,34 @@ def run_test():
         stdout, stderr = process.communicate(input="yes\n")
 
         print("STDOUT:\n" + stdout)
-        print("STDERR:\n" + stderr)
+        # print("STDERR:\n" + stderr)
 
         # Check if repo-b is mentioned in stdout table
         if "repo-b" in stdout and "master" in stdout:
              print_green("repo-b found in status output.")
         else:
-             print_red("repo-b NOT found in status output. FAILURE.")
-             return False
-
-        return True
+             print("STDERR:\n" + stderr)
+             raise Exception("repo-b NOT found in status output. The CWD switch might have failed.")
 
     finally:
         if os.path.exists(test_workspace):
             shutil.rmtree(test_workspace)
 
+def main():
+    runner = InteractiveRunner("Parent Config CWD Switch Test")
+    runner.parse_args()
+
+    description = (
+        "This test verifies that when 'mstl' finds a config in a parent directory,\n"
+        "it effectively switches its working context to that parent directory.\n"
+        "Specifically, if running from 'repo-a', it should correctly find and status sibling 'repo-b'."
+    )
+
+    runner.execute_scenario(
+        "CWD Switch Verification",
+        description,
+        run_test_logic
+    )
+
 if __name__ == "__main__":
-    if not run_test():
-        sys.exit(1)
+    main()
