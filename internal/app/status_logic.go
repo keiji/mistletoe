@@ -160,7 +160,7 @@ func getRepoStatus(repo conf.Repository, baseDir, gitPath string, verbose bool, 
 	// 3. Construct LocalBranchRev
 	localBranchRev := ""
 	if branchName != "" && shortSHA != "" {
-		localBranchRev = fmt.Sprintf("%s:%s", branchName, shortSHA)
+		localBranchRev = fmt.Sprintf("%s %s", branchName, shortSHA)
 	} else if shortSHA != "" {
 		localBranchRev = shortSHA
 	} else if branchName != "" {
@@ -229,7 +229,7 @@ func getRepoStatus(repo conf.Repository, baseDir, gitPath string, verbose bool, 
 			} else {
 				shortRemote = remoteHeadFull
 			}
-			remoteDisplay = fmt.Sprintf("%s:%s", branchName, shortRemote)
+			remoteDisplay = fmt.Sprintf("%s %s", branchName, shortRemote)
 
 			if localHeadFull != "" {
 				count, err := RunGit(targetDir, gitPath, verbose, "rev-list", "--count", localHeadFull+".."+remoteHeadFull)
