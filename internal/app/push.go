@@ -113,7 +113,10 @@ func handlePush(args []string, opts GlobalOptions) {
 	RenderStatusTable(Stdout, rows)
 
 	// Validate status
-	ValidateStatusForAction(rows, true)
+	if err := ValidateStatusForAction(rows, true); err != nil {
+		fail("%v\n", err)
+		return
+	}
 
 	// Identify repositories to push
 	var pushable []StatusRow

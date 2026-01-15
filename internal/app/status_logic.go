@@ -355,28 +355,27 @@ func RenderStatusTable(w io.Writer, rows []StatusRow) {
 }
 
 // ValidateStatusForAction checks if repositories are in a safe state for operations.
-func ValidateStatusForAction(rows []StatusRow, checkPullable bool) {
+func ValidateStatusForAction(rows []StatusRow, checkPullable bool) error {
 	var behindRepos []string
 	for _, row := range rows {
 		if checkPullable && row.IsPullable {
 			behindRepos = append(behindRepos, row.Repo)
 		}
 		if row.HasConflict {
-			fmt.Fprintf(Stderr, "error: repository '%s' has conflicts. Cannot proceed.\n", row.Repo)
-			osExit(1)
+			return fmt.Errorf("error: repository '%s' has conflicts. Cannot proceed", row.Repo)
 		}
 		if row.BranchName == "HEAD" {
-			fmt.Fprintf(Stderr, "error: repository '%s' is in a detached HEAD state. Cannot proceed.\n", row.Repo)
-			osExit(1)
+			return fmt.Errorf("error: repository '%s' is in a detached HEAD state. Cannot proceed", row.Repo)
 		}
 	}
 
 	if len(behindRepos) > 0 {
-		fmt.Fprintf(Stderr, "error: the following repositories are behind remote and require a pull:\n")
+		msg := "error: the following repositories are behind remote and require a pull:\n"
 		for _, r := range behindRepos {
-			fmt.Fprintf(Stderr, " - %s\n", r)
+			msg += fmt.Sprintf(" - %s\n", r)
 		}
-		fmt.Fprintln(Stderr, "Please pull changes before proceeding.")
-		osExit(1)
+		msg += "Please pull changes before proceeding."
+		return fmt.Errorf("%s", msg)
 	}
+	return nil
 }
