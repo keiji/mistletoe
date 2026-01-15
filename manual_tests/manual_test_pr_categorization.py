@@ -106,6 +106,10 @@ def main():
 
         # Execute pr create interactively
         cmd = [env.mstl_bin, "pr", "create", "-f", "mistletoe.json", "--verbose"]
+
+        # Add title and body to avoid editor prompt in non-interactive mode
+        cmd.extend(["--title", "Test PR Categorization", "--body", "Testing categorization logic"])
+
         if runner.args.yes:
             cmd.append("--yes")
         subprocess.run(cmd, cwd=env.test_dir)
