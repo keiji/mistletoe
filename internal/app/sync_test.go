@@ -168,4 +168,65 @@ func TestHandleSync(t *testing.T) {
 			t.Logf("Stdout: %s\nStderr: %s", out, stderr)
 		}
 	})
+
+	// Scenario 5: Flag Unknown
+	t.Run("Flag_Unknown", func(t *testing.T) {
+		out, stderr, code := runHandleSync("", "--unknown")
+		if code != 1 {
+			t.Errorf("expected exit code 1, got %d", code)
+		}
+		if !strings.Contains(stderr, "flag provided but not defined") {
+			t.Errorf("Expected flag error. Got: %s", stderr)
+		}
+		_ = out
+	})
+
+	// Scenario 6: Flag Duplicate
+	t.Run("Flag_Duplicate", func(t *testing.T) {
+		out, stderr, code := runHandleSync("", "-j", "1", "--jobs", "2")
+		if code != 1 {
+			t.Errorf("expected exit code 1, got %d", code)
+		}
+		// The error message format depends on CheckFlagDuplicates implementation:
+		// "options --%s and -%s cannot be specified with different values"
+		if !strings.Contains(stderr, "cannot be specified with different values") {
+			t.Errorf("Expected duplicate flag error. Got: %s", stderr)
+		}
+		_ = out
+	})
+
+	// Scenario 7: Diverged (Yes Flag - Auto Merge)
+	t.Run("Diverged_YesFlag", func(t *testing.T) {
+		// Reset repo1 state to be diverged again
+		// (Assuming we are reusing the setup, but repo1 was modified in previous tests.
+		// It is safer to re-setup or ensure we are clean. The previous tests ran sequentially.)
+
+		// Let's create a NEW repo/setup for this specific test to avoid side effects
+		// or just perform new operations on the existing one if we track state.
+		// "Diverged" test left repo1 in a synced state?
+		// No, "Diverged" test ran "merge" and presumably succeeded?
+		// It calls RunGitInteractive with "pull --no-rebase".
+		// We need to create a new divergence.
+
+		// Create a new file for divergence
+		divergeFile2 := filepath.Join(contentDir, "file-diverge2.txt")
+		os.WriteFile(divergeFile2, []byte("remote change 2"), 0644)
+		exec.Command("git", "-C", contentDir, "add", ".").Run()
+		exec.Command("git", "-C", contentDir, "commit", "-m", "Remote Diverge 2").Run()
+		exec.Command("git", "-C", contentDir, "push", "origin", "master").Run()
+
+		localDiverge2 := filepath.Join(repo1, "file-local2.txt")
+		os.WriteFile(localDiverge2, []byte("local change 2"), 0644)
+		exec.Command("git", "-C", repo1, "add", ".").Run()
+		exec.Command("git", "-C", repo1, "commit", "-m", "Local Diverge 2").Run()
+
+		// Run with -y (and no input needed)
+		out, _, code := runHandleSync("", "-y", "--ignore-stdin")
+		if code != 0 {
+			t.Errorf("expected exit code 0, got %d", code)
+		}
+		if !strings.Contains(out, "Using default strategy (merge) due to --yes flag") {
+			t.Errorf("Expected auto-merge message. Got: %s", out)
+		}
+	})
 }

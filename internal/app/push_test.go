@@ -164,4 +164,52 @@ func TestHandlePush(t *testing.T) {
 			t.Logf("Stdout: %s\nStderr: %s", out, stderr)
 		}
 	})
+
+	// Scenario 5: Flag Unknown
+	t.Run("Flag_Unknown", func(t *testing.T) {
+		out, stderr, code := runHandlePush("", "--unknown")
+		if code != 1 {
+			t.Errorf("expected exit code 1, got %d", code)
+		}
+		if !strings.Contains(stderr, "flag provided but not defined") {
+			t.Errorf("Expected flag error. Got: %s", stderr)
+		}
+		_ = out
+	})
+
+	// Scenario 6: Flag Duplicate
+	t.Run("Flag_Duplicate", func(t *testing.T) {
+		out, stderr, code := runHandlePush("", "-j", "1", "--jobs", "2")
+		if code != 1 {
+			t.Errorf("expected exit code 1, got %d", code)
+		}
+		if !strings.Contains(stderr, "cannot be specified with different values") {
+			t.Errorf("Expected duplicate flag error. Got: %s", stderr)
+		}
+		_ = out
+	})
+
+	// Scenario 7: Push Yes Flag (Skip Prompt)
+	t.Run("Push_YesFlag", func(t *testing.T) {
+		// Reset repo1 state to avoid conflict from previous scenarios
+		// Re-clone to be safe
+		os.RemoveAll(repoPath)
+		exec.Command("git", "clone", remoteURL, repoPath).Run()
+		configureGitUser(t, repoPath)
+
+		// Create unpushed commit
+		fname := filepath.Join(repoPath, "new3.txt")
+		os.WriteFile(fname, []byte("new3"), 0644)
+		exec.Command("git", "-C", repoPath, "add", ".").Run()
+		exec.Command("git", "-C", repoPath, "commit", "-m", "unpushed3").Run()
+
+		// Run with -y and empty input (would fail if it asked for prompt)
+		out, _, code := runHandlePush("", "-y", "--ignore-stdin")
+		if code != 0 {
+			t.Errorf("expected exit code 0, got %d", code)
+		}
+		if !strings.Contains(out, "Pushing repo1") {
+			t.Errorf("Expected Pushing repo1. Got: %s", out)
+		}
+	})
 }
