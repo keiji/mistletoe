@@ -268,6 +268,13 @@ func validateAndPrepareInitDest(dest string) error {
 }
 
 func handleInit(args []string, opts GlobalOptions) {
+	if err := initCommand(args, opts); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+}
+
+func initCommand(args []string, opts GlobalOptions) error {
 	var (
 		fShort, fLong    string
 		destLong         string
@@ -278,7 +285,7 @@ func handleInit(args []string, opts GlobalOptions) {
 		yes, yesShort    bool
 	)
 
-	fs := flag.NewFlagSet("init", flag.ExitOnError)
+	fs := flag.NewFlagSet("init", flag.ContinueOnError)
 	fs.StringVar(&fLong, "file", DefaultConfigFile, "configuration file")
 	fs.StringVar(&fShort, "f", DefaultConfigFile, "configuration file (shorthand)")
 	fs.StringVar(&destLong, "dest", "", "destination directory")
@@ -294,8 +301,7 @@ func handleInit(args []string, opts GlobalOptions) {
 	fs.BoolVar(&yesShort, "y", false, "Automatically answer 'yes' to all prompts (shorthand)")
 
 	if err := ParseFlagsFlexible(fs, args); err != nil {
-		fmt.Println("Error parsing flags:", err)
-		os.Exit(1)
+		return fmt.Errorf("Error parsing flags: %w", err)
 	}
 
 	if err := CheckFlagDuplicates(fs, [][2]string{
@@ -304,14 +310,12 @@ func handleInit(args []string, opts GlobalOptions) {
 		{"verbose", "v"},
 		{"yes", "y"},
 	}); err != nil {
-		fmt.Println("Error:", err)
-		os.Exit(1)
+		return fmt.Errorf("Error: %w", err)
 	}
 
 	configFile, jobsFlag, configData, err := ResolveCommonValues(fLong, fShort, jVal, jValShort, ignoreStdin)
 	if err != nil {
-		fmt.Printf("Error: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("Error: %w", err)
 	}
 
 	configFile, err = SearchParentConfig(configFile, configData, opts.GitPath)
@@ -335,15 +339,13 @@ func handleInit(args []string, opts GlobalOptions) {
 	}
 
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		return err
 	}
 
 	// Resolve Jobs
 	jobs, err := DetermineJobs(jobsFlag, config)
 	if err != nil {
-		fmt.Printf("Error: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("Error: %w", err)
 	}
 
 	// Verbose Override
@@ -359,8 +361,7 @@ func handleInit(args []string, opts GlobalOptions) {
 	}
 
 	if err := validateAndPrepareInitDest(dest); err != nil {
-		fmt.Println("Error:", err)
-		os.Exit(1)
+		return fmt.Errorf("Error: %w", err)
 	}
 
 	// Validate dependency file if provided
@@ -379,20 +380,17 @@ func handleInit(args []string, opts GlobalOptions) {
 		// Since ParseDependencies takes string, we read file first.
 		rawContent, err := os.ReadFile(dependenciesLong)
 		if err != nil {
-			fmt.Printf("Error reading dependency file: %v\n", err)
-			os.Exit(1)
+			return fmt.Errorf("Error reading dependency file: %w", err)
 		}
 		depContent = rawContent
 
 		if _, err := ParseDependencies(string(depContent), allIDs); err != nil {
-			fmt.Printf("Error validating dependency graph: %v\n", err)
-			os.Exit(1)
+			return fmt.Errorf("Error validating dependency graph: %w", err)
 		}
 	}
 
 	if err := PerformInit(*config.Repositories, "", opts.GitPath, jobs, depth, verbose); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		return err
 	}
 
 	// Post-init: Create .mstl directory and save config/dependencies
@@ -413,7 +411,7 @@ func handleInit(args []string, opts GlobalOptions) {
 		mstlDir := ".mstl"
 		if err := os.MkdirAll(mstlDir, 0755); err != nil {
 			fmt.Printf("Warning: Failed to create .mstl directory: %v\n", err)
-			return
+			return nil
 		}
 
 		// Filter config
@@ -463,4 +461,5 @@ func handleInit(args []string, opts GlobalOptions) {
 			fmt.Printf("Dependencies graph saved to %s\n", depPath)
 		}
 	}
+	return nil
 }
