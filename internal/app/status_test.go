@@ -261,9 +261,69 @@ func TestStatusCmd(t *testing.T) {
 			t.Errorf("Expected '>'")
 		}
 	})
+
+	// 7. Status Flag Errors and Logic
+	t.Run("Status Flag Errors", func(t *testing.T) {
+		// Invalid flag
+		_, stderr, code := runHandleStatusWithArgs(t, tmpDir, []string{"--invalid-flag"}, "")
+		if code != 1 {
+			t.Errorf("Expected exit code 1 for invalid flag, got %d", code)
+		}
+		if !strings.Contains(stderr, "flag provided but not defined") {
+			t.Errorf("Expected flag error, got: %s", stderr)
+		}
+
+		// Duplicate flags
+		_, stderr, code = runHandleStatusWithArgs(t, tmpDir, []string{"--file", "a", "-f", "b"}, "")
+		if code != 1 {
+			t.Errorf("Expected exit code 1 for duplicate flags, got %d", code)
+		}
+		if !strings.Contains(stderr, "cannot be specified with different values") {
+			t.Errorf("Expected conflicting values error, got: %s", stderr)
+		}
+
+		// Invalid jobs
+		_, stderr, code = runHandleStatusWithArgs(t, tmpDir, []string{"-j", "0"}, "")
+		if code != 1 {
+			t.Errorf("Expected exit code 1 for invalid jobs, got %d", code)
+		}
+		if !strings.Contains(stderr, "Jobs must be at least") {
+			t.Errorf("Expected jobs error, got: %s", stderr)
+		}
+	})
+
+	// 8. Status Verbose Overrides Jobs
+	t.Run("Status Verbose Overrides Jobs", func(t *testing.T) {
+		repoID := "repo-verbose"
+		repoPath := filepath.Join(tmpDir, repoID)
+		exec.Command("git", "init", repoPath).Run()
+		exec.Command("git", "-C", repoPath, "remote", "add", "origin", "https://example.com/repo.git").Run()
+
+		// Create config
+		config := conf.Config{
+			Repositories: &[]conf.Repository{
+				{ID: &repoID, URL: strPtr("https://example.com/repo.git")},
+			},
+		}
+		configFile := filepath.Join(tmpDir, "repos_verbose.json")
+		data, _ := json.Marshal(config)
+		os.WriteFile(configFile, data, 0644)
+
+		out, _, code := runHandleStatusWithArgs(t, tmpDir, []string{"--file", configFile, "-v", "-j", "10", "--ignore-stdin"}, "")
+		if code != 0 {
+			t.Errorf("Expected exit code 0, got %d", code)
+		}
+		if !strings.Contains(out, "Verbose is specified, so jobs is treated as 1") {
+			t.Errorf("Expected verbose override message")
+		}
+	})
 }
 
 func runHandleStatus(t *testing.T, configFile, workDir string) (stdout string, stderr string, exitCode int) {
+	return runHandleStatusWithArgs(t, workDir, []string{"--file", configFile, "--ignore-stdin"}, "")
+}
+
+func runHandleStatusWithArgs(t *testing.T, workDir string, args []string, stdinInput string) (stdout string, stderr string, exitCode int) {
 	var stdoutBuf, stderrBuf bytes.Buffer
 	originalStdout, originalStderr := Stdout, Stderr
 	originalOsExit := osExit
@@ -291,7 +351,12 @@ func runHandleStatus(t *testing.T, configFile, workDir string) (stdout string, s
 	os.Chdir(workDir)
 	defer os.Chdir(cwd)
 
-	handleStatus([]string{"--file", configFile, "--ignore-stdin"}, GlobalOptions{GitPath: "git"})
+	// Mock Stdin if provided
+	if stdinInput != "" {
+		Stdin = strings.NewReader(stdinInput)
+	}
+
+	handleStatus(args, GlobalOptions{GitPath: "git"})
 
 	stdout = stdoutBuf.String()
 	stderr = stderrBuf.String()
