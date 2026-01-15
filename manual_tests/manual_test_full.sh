@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Exit immediately if a command exits with a non-zero status.
+set -e
+
 # すべての手動テストケースを実行するスクリプト
 # 各テストの結果は result_full.txt に追記される
 
