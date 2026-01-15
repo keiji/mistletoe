@@ -243,8 +243,6 @@ func TestSnapshot_FileExists(t *testing.T) {
 
 // Keep TestGenerateSnapshot_ExcludesJobs as is (it calls GenerateSnapshotVerbose directly)
 func TestGenerateSnapshot_ExcludesJobs(t *testing.T) {
-	// ... (Existing implementation was correct, calling exported function)
-
 	tmpDir, err := os.MkdirTemp("", "mstl-gen-snapshot-test")
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
@@ -283,5 +281,175 @@ func TestGenerateSnapshot_ExcludesJobs(t *testing.T) {
 
 	if _, ok := result["jobs"]; ok {
 		t.Errorf("generated snapshot contains 'jobs' key, but it should be excluded")
+	}
+}
+
+func TestSnapshot_FlagErrors(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "mstl-snapshot-flag-err")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	_, stderr, code := runHandleSnapshot(t, []string{"--invalid-flag"}, tmpDir)
+
+	if code != 1 {
+		t.Errorf("Expected exit code 1 for invalid flag, got %d", code)
+	}
+	if !strings.Contains(stderr, "flag provided but not defined") {
+		t.Errorf("Expected flag error in stderr, got: %s", stderr)
+	}
+}
+
+func TestSnapshot_DuplicateFlags(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "mstl-snapshot-dup-flag")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// Use two different output files to ensure conflict
+	_, stderr, code := runHandleSnapshot(t, []string{"-o", "out1.json", "--output-file", "out2.json"}, tmpDir)
+
+	if code != 1 {
+		t.Errorf("Expected exit code 1 for duplicate flags, got %d", code)
+	}
+	if !strings.Contains(stderr, "duplicate flags") && !strings.Contains(stderr, "Error:") {
+		t.Errorf("Expected duplicate flag error in stderr, got: %s", stderr)
+	}
+}
+
+func TestSnapshot_VerboseOverride(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "mstl-snapshot-verbose")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	repo1Dir := filepath.Join(tmpDir, "repo1")
+	setupDummyRepo(t, repo1Dir, "url", "main")
+
+	// We expect 0 exit code, but we check Stdout for the warning.
+	stdout, _, code := runHandleSnapshot(t, []string{"-v", "-j", "5", "-f", ""}, tmpDir)
+
+	if code != 0 {
+		t.Errorf("Expected exit code 0, got %d", code)
+	}
+	if !strings.Contains(stdout, "Verbose is specified, so jobs is treated as 1") {
+		t.Errorf("Expected verbose warning in stdout, got: %s", stdout)
+	}
+}
+
+func TestSnapshot_ConfigError(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "mstl-snapshot-config-err")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	_, stderr, code := runHandleSnapshot(t, []string{"-f", "nonexistent.json"}, tmpDir)
+
+	if code != 1 {
+		t.Errorf("Expected exit code 1 for missing config, got %d", code)
+	}
+	if !strings.Contains(stderr, "Configuration file nonexistent.json not found") {
+		t.Errorf("Expected file error in stderr, got: %s", stderr)
+	}
+}
+
+func TestSnapshot_WriteError(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "mstl-snapshot-write-err")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// Use a directory that doesn't exist to avoid "os.Stat" returning success,
+	// but `os.WriteFile` failing because of missing parent dir.
+	outputFile := filepath.Join("missing_dir", "output.json")
+
+	_, stderr, code := runHandleSnapshot(t, []string{"-o", outputFile, "-f", ""}, tmpDir)
+
+	if code != 1 {
+		t.Errorf("Expected exit code 1 for write error, got %d", code)
+	}
+	if !strings.Contains(stderr, "Error writing to file") {
+		t.Errorf("Expected write error in stderr, got: %s", stderr)
+	}
+}
+
+func TestSnapshot_GitWarnings(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "mstl-snapshot-warnings")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// Repo without remote
+	noRemoteDir := filepath.Join(tmpDir, "no-remote")
+	if err := os.MkdirAll(noRemoteDir, 0755); err != nil {
+		t.Fatalf("failed to create no-remote dir: %v", err)
+	}
+	exec.Command("git", "init").Run()
+
+	stdout, _, code := runHandleSnapshot(t, []string{"-f", ""}, tmpDir)
+
+	if code != 0 {
+		t.Errorf("Expected exit code 0, got %d", code)
+	}
+
+	// We simply verify that we can run without panic and that output indicates completion.
+	if !strings.Contains(stdout, "Snapshot saved to") {
+		t.Errorf("Expected success message, got: %s", stdout)
+	}
+}
+
+func TestSnapshot_WithConfigBaseBranch(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "mstl-snapshot-base-branch")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// Create repo
+	repoDir := filepath.Join(tmpDir, "repo1")
+	setupDummyRepo(t, repoDir, "http://example.com/repo1.git", "feature")
+
+	// Create config file defining BaseBranch
+	configContent := `{
+		"repositories": [
+			{
+				"id": "repo1",
+				"url": "http://example.com/repo1.git",
+				"base-branch": "develop"
+			}
+		]
+	}`
+	configPath := filepath.Join(tmpDir, "config.json")
+	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+		t.Fatalf("failed to write config file: %v", err)
+	}
+
+	outputFile := "snapshot.json"
+	_, _, code := runHandleSnapshot(t, []string{"-f", "config.json", "-o", outputFile}, tmpDir)
+
+	if code != 0 {
+		t.Errorf("Expected exit code 0, got %d", code)
+	}
+
+	// Read output
+	data, _ := os.ReadFile(filepath.Join(tmpDir, outputFile))
+	config, _ := conf.ParseConfig(data)
+
+	if len(*config.Repositories) != 1 {
+		t.Fatalf("expected 1 repo")
+	}
+	r := (*config.Repositories)[0]
+	if r.BaseBranch == nil || *r.BaseBranch != "develop" {
+		got := "<nil>"
+		if r.BaseBranch != nil {
+			got = *r.BaseBranch
+		}
+		t.Errorf("Expected BaseBranch 'develop', got %v", got)
 	}
 }
