@@ -179,6 +179,73 @@ func TestCollectStatus(t *testing.T) {
 	}
 }
 
+func TestCollectStatus_UpstreamFix(t *testing.T) {
+	tmpDir := t.TempDir()
+	cwd, _ := os.Getwd()
+	defer os.Chdir(cwd)
+	os.Chdir(tmpDir)
+
+	remoteDir := filepath.Join(tmpDir, "remote")
+	localDir := filepath.Join(tmpDir, "local")
+
+	// Setup remote
+	createDummyGitRepo(t, remoteDir, "origin-url-ignored")
+	configureGitUser(t, remoteDir)
+	exec.Command("git", "-C", remoteDir, "commit", "--allow-empty", "-m", "init").Run()
+	// Create branch 'main' and 'feature'
+	exec.Command("git", "-C", remoteDir, "branch", "-M", "main").Run()
+	exec.Command("git", "-C", remoteDir, "branch", "feature").Run()
+
+	// Clone local
+	exec.Command("git", "clone", remoteDir, localDir).Run()
+	configureGitUser(t, localDir)
+
+	id := "local"
+	config := conf.Config{Repositories: &[]conf.Repository{{ID: &id, URL: &remoteDir}}}
+
+	// Scenario 1: Mismatch Name
+	// Local 'test-branch' tracking 'origin/main'
+	exec.Command("git", "-C", localDir, "checkout", "-b", "test-branch").Run()
+	exec.Command("git", "-C", localDir, "branch", "-u", "origin/main").Run()
+
+	// Verify setup
+	u, _ := exec.Command("git", "-C", localDir, "rev-parse", "--abbrev-ref", "@{u}").Output()
+	if strings.TrimSpace(string(u)) != "origin/main" {
+		t.Fatalf("Setup failed: upstream is %s", u)
+	}
+
+	// Run Status
+	CollectStatus(&config, 1, "git", false, false)
+
+	// Verify upstream unset
+	err := exec.Command("git", "-C", localDir, "rev-parse", "--abbrev-ref", "@{u}").Run()
+	if err == nil {
+		t.Error("Scenario 1: Upstream should be unset")
+	}
+
+	// Scenario 2: Remote Gone
+	// Local 'feature' tracking 'origin/feature'.
+	exec.Command("git", "-C", localDir, "checkout", "-b", "feature", "origin/feature").Run()
+
+	// Verify setup
+	u, _ = exec.Command("git", "-C", localDir, "rev-parse", "--abbrev-ref", "@{u}").Output()
+	if strings.TrimSpace(string(u)) != "origin/feature" {
+		t.Fatalf("Setup failed: upstream is %s", u)
+	}
+
+	// Delete 'feature' on remote
+	exec.Command("git", "-C", remoteDir, "branch", "-D", "feature").Run()
+
+	// Run Status
+	CollectStatus(&config, 1, "git", false, false)
+
+	// Verify upstream unset
+	err = exec.Command("git", "-C", localDir, "rev-parse", "--abbrev-ref", "@{u}").Run()
+	if err == nil {
+		t.Error("Scenario 2: Upstream should be unset")
+	}
+}
+
 func TestValidateStatusForAction(t *testing.T) {
 	// Mock osExit
 	oldOsExit := osExit

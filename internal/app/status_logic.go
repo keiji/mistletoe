@@ -186,8 +186,33 @@ func getRepoStatus(repo conf.Repository, baseDir, gitPath string, verbose bool, 
 	remoteColor := ColorNone
 
 	if !isDetached {
+		var fetchErr error
 		if !noFetch {
-			_, _ = RunGit(targetDir, gitPath, verbose, "fetch", "origin", branchName)
+			_, fetchErr = RunGit(targetDir, gitPath, verbose, "fetch", "origin", branchName)
+		}
+
+		// Check upstream configuration and unset if invalid
+		currentUpstream, err := RunGit(targetDir, gitPath, verbose, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}")
+		if err == nil {
+			currentUpstream = strings.TrimSpace(currentUpstream)
+			if currentUpstream != "" {
+				// Condition 1: Local branch name and upstream name are different
+				// We assume remote is always "origin" per ValidateRepositoriesIntegrity
+				if currentUpstream != "origin/"+branchName {
+					_, _ = RunGit(targetDir, gitPath, verbose, "branch", "--unset-upstream")
+				} else {
+					// Condition 2: Remote branch does not exist
+					// If fetch succeeded, the branch exists.
+					// If fetch failed, verify with ls-remote.
+					if fetchErr != nil {
+						lsOut, lsErr := RunGit(targetDir, gitPath, verbose, "ls-remote", "--heads", "origin", branchName)
+						// If ls-remote succeeded (network ok) but returned no output, branch is missing.
+						if lsErr == nil && lsOut == "" {
+							_, _ = RunGit(targetDir, gitPath, verbose, "branch", "--unset-upstream")
+						}
+					}
+				}
+			}
 		}
 
 		output, err := RunGit(targetDir, gitPath, verbose, "rev-parse", "refs/remotes/origin/"+branchName)
