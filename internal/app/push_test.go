@@ -191,6 +191,12 @@ func TestHandlePush(t *testing.T) {
 
 	// Scenario 7: Push Yes Flag (Skip Prompt)
 	t.Run("Push_YesFlag", func(t *testing.T) {
+		// Reset repo1 state to avoid conflict from previous scenarios
+		// Re-clone to be safe
+		os.RemoveAll(repoPath)
+		exec.Command("git", "clone", remoteURL, repoPath).Run()
+		configureGitUser(t, repoPath)
+
 		// Create unpushed commit
 		fname := filepath.Join(repoPath, "new3.txt")
 		os.WriteFile(fname, []byte("new3"), 0644)
