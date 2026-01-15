@@ -18,8 +18,9 @@ def fail(msg):
     sys.exit(1)
 
 class MstlManualTestSyncConflict:
-    def __init__(self):
+    def __init__(self, runner):
         self.root_dir = os.getcwd()
+        self.runner = runner
         self.test_dir = None # Created in setup
         self.bin_path = None
         self.repos_dir = None
@@ -62,6 +63,9 @@ class MstlManualTestSyncConflict:
                 print(f"Cleanup failed: {e}")
 
     def run_cmd(self, cmd, cwd=None, check=True, input_str=None):
+        if self.runner.args and self.runner.args.yes and cmd[0] == self.bin_path and "--yes" not in cmd:
+            cmd = list(cmd) + ["--yes"]
+
         try:
             result = subprocess.run(
                 cmd,
@@ -170,7 +174,7 @@ class MstlManualTestSyncConflict:
 def main():
     runner = InteractiveRunner("mstl sync Conflict Test")
     runner.parse_args()
-    test = MstlManualTestSyncConflict()
+    test = MstlManualTestSyncConflict(runner)
 
     description = (
         "This test verifies that 'mstl sync' correctly aborts when a merge conflict occurs.\n"

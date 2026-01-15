@@ -61,6 +61,9 @@ class SwitchUpstreamTest:
                 log(f"Skipped cleanup. Directory: {self.test_dir}")
 
     def run_cmd(self, cmd, cwd=None, check=True):
+        if self.runner.args and self.runner.args.yes and cmd[0] == self.bin_path and "--yes" not in cmd:
+            cmd = list(cmd) + ["--yes"]
+
         print_green(f"[CMD] {' '.join(cmd)}")
         try:
             result = subprocess.run(
@@ -93,6 +96,7 @@ class SwitchUpstreamTest:
         seed_path = os.path.join(self.test_dir, "seed")
         self.run_cmd(["git", "clone", remote_path, seed_path])
         self.run_cmd(["git", "commit", "--allow-empty", "-m", "init"], cwd=seed_path)
+        self.run_cmd(["git", "branch", "-M", "master"], cwd=seed_path)
         self.run_cmd(["git", "push", "origin", "master"], cwd=seed_path)
 
         # 3. Create 'feature/upstream-test' on remote

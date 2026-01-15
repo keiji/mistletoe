@@ -97,6 +97,7 @@ class UpstreamSafetyTest:
 
         repo1_local = os.path.join(self.repos_dir, "repo1")
         self.run_cmd(["git", "commit", "--allow-empty", "-m", "init"], cwd=repo1_local)
+        self.run_cmd(["git", "branch", "-M", "master"], cwd=repo1_local)
         self.run_cmd(["git", "push", "origin", "master"], cwd=repo1_local)
 
         # Repo 2
@@ -106,6 +107,7 @@ class UpstreamSafetyTest:
 
         repo2_local = os.path.join(self.repos_dir, "repo2")
         self.run_cmd(["git", "commit", "--allow-empty", "-m", "init"], cwd=repo2_local)
+        self.run_cmd(["git", "branch", "-M", "master"], cwd=repo2_local)
         self.run_cmd(["git", "push", "origin", "master"], cwd=repo2_local)
 
         # Config
