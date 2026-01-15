@@ -7,6 +7,10 @@
 OUTPUT_FILE="$(pwd)/result_full.txt"
 SCRIPT_DIR=$(dirname "$0")
 
+# 開始時間の記録
+START_TIME_SECONDS=$(date +%s)
+START_TIME_DISPLAY=$(date)
+
 # 引数解析
 YES_FLAG=""
 if [[ "$1" == "--yes" ]]; then
@@ -16,7 +20,7 @@ fi
 
 # 結果ファイルを初期化
 echo "========================================================" > "$OUTPUT_FILE"
-echo "Full Manual Test Started at $(date)" >> "$OUTPUT_FILE"
+echo "Full Manual Test Started at $START_TIME_DISPLAY" >> "$OUTPUT_FILE"
 echo "========================================================" >> "$OUTPUT_FILE"
 
 echo "Building binaries..."
@@ -68,3 +72,24 @@ echo "Running temp_repos_cleanup.py..."
 python3 "$SCRIPT_DIR/temp_repos_cleanup.py" $YES_FLAG
 
 echo "Full Manual Test Completed."
+
+# 終了時間の記録と計算
+END_TIME_SECONDS=$(date +%s)
+END_TIME_DISPLAY=$(date)
+DURATION_SECONDS=$((END_TIME_SECONDS - START_TIME_SECONDS))
+
+HOURS=$((DURATION_SECONDS / 3600))
+MINUTES=$(((DURATION_SECONDS % 3600) / 60))
+SECONDS=$((DURATION_SECONDS % 60))
+
+SUMMARY_MSG="
+========================================================
+Full Manual Test Execution Summary
+========================================================
+Start Time:     $START_TIME_DISPLAY
+End Time:       $END_TIME_DISPLAY
+Total Duration: ${HOURS}h ${MINUTES}m ${SECONDS}s
+========================================================"
+
+echo "$SUMMARY_MSG"
+echo "$SUMMARY_MSG" >> "$OUTPUT_FILE"
