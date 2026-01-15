@@ -331,8 +331,8 @@ func TestRenderStatusTable(t *testing.T) {
 		{
 			Repo:           "repo1",
 			ConfigRef:      "main",
-			LocalBranchRev: "main:1234567",
-			RemoteRev:      "main:1234567",
+			LocalBranchRev: "main 1234567",
+			RemoteRev:      "main 1234567",
 			RemoteColor:    ColorNone,
 			HasUnpushed:    false,
 			IsPullable:     false,
@@ -341,8 +341,8 @@ func TestRenderStatusTable(t *testing.T) {
 		{
 			Repo:           "repo2",
 			ConfigRef:      "dev",
-			LocalBranchRev: "dev:abcdef0",
-			RemoteRev:      "dev:abcdef0",
+			LocalBranchRev: "dev abcdef0",
+			RemoteRev:      "dev abcdef0",
 			RemoteColor:    ColorNone,
 			HasUnpushed:    true,
 			IsPullable:     false,
@@ -351,8 +351,8 @@ func TestRenderStatusTable(t *testing.T) {
 		{
 			Repo:           "repo3",
 			ConfigRef:      "feature",
-			LocalBranchRev: "feature:1111111",
-			RemoteRev:      "feature:2222222",
+			LocalBranchRev: "feature 1111111",
+			RemoteRev:      "feature 2222222",
 			RemoteColor:    ColorYellow,
 			HasUnpushed:    false,
 			IsPullable:     true,
@@ -361,8 +361,8 @@ func TestRenderStatusTable(t *testing.T) {
 		{
 			Repo:           "repo4",
 			ConfigRef:      "fix",
-			LocalBranchRev: "fix:aaaaaaa",
-			RemoteRev:      "fix:bbbbbbb",
+			LocalBranchRev: "fix aaaaaaa",
+			RemoteRev:      "fix bbbbbbb",
 			RemoteColor:    ColorYellow,
 			HasUnpushed:    false,
 			IsPullable:     true,
