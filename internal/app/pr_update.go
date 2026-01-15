@@ -5,6 +5,7 @@ import (
 )
 
 import (
+	"bufio"
 	"flag"
 	"fmt"
 	"os"
@@ -65,10 +66,7 @@ func handlePrUpdate(args []string, opts GlobalOptions) {
 		os.Exit(1)
 	}
 
-	// yesFlag is not used here for parent search, but might be useful for other things?
-	// Actually pr update doesn't seem to have other confirmation prompts in this flow (only pr create/push do).
-	// But wait, ResolveCommonValues consumes arguments.
-	// yesFlag := yes || yesShort // Removing unused variable
+	yesFlag := yes || yesShort
 
 	configPath, err = SearchParentConfig(configPath, configData, opts.GitPath)
 	if err != nil {
@@ -144,37 +142,32 @@ func handlePrUpdate(args []string, opts GlobalOptions) {
 	// 6. Check for Behind/Conflict/Detached
 	ValidateStatusForAction(rows, true)
 
-	// 7. Identify Active PRs to Update
-	targetPrMap := make(map[string][]PrInfo)
-	// We also need a map of ALL PRs for Related Links generation
-	allPrMap := make(map[string][]PrInfo)
+	// 7. Identify Active PRs to Update & Categorize
+	activeRepos, _, allPrMap, catPushUpdate, catNoPushUpdate, skippedRepos := categorizePrUpdate(config.Repositories, prRows, rows)
 
-	var activeRepos []conf.Repository
-	repoMap := make(map[string]conf.Repository)
-	for _, r := range *config.Repositories {
-		repoMap[getRepoName(r)] = r
+	// Display Categories
+	if len(catPushUpdate) > 0 {
+		fmt.Println("Repositories to Push and Update Pull Request:")
+		for _, r := range catPushUpdate {
+			fmt.Printf(" - %s\n", getRepoName(r))
+		}
+		fmt.Println()
 	}
 
-	for _, prRow := range prRows {
-		if len(prRow.PrItems) > 0 {
-			allPrMap[prRow.Repo] = prRow.PrItems
-
-			// Check if Open
-			hasOpen := false
-			for _, item := range prRow.PrItems {
-				if strings.EqualFold(item.State, GitHubPrStateOpen) {
-					hasOpen = true
-					break
-				}
-			}
-
-			if hasOpen {
-				targetPrMap[prRow.Repo] = prRow.PrItems
-				if r, ok := repoMap[prRow.Repo]; ok {
-					activeRepos = append(activeRepos, r)
-				}
-			}
+	if len(catNoPushUpdate) > 0 {
+		fmt.Println("Repositories to Update Pull Request description (No Push):")
+		for _, r := range catNoPushUpdate {
+			fmt.Printf(" - %s\n", getRepoName(r))
 		}
+		fmt.Println()
+	}
+
+	if len(skippedRepos) > 0 {
+		fmt.Println("The following repositories will be skipped (No active Pull Request):")
+		for _, r := range skippedRepos {
+			fmt.Printf(" - %s\n", r)
+		}
+		fmt.Println()
 	}
 
 	if len(activeRepos) == 0 {
@@ -182,25 +175,22 @@ func handlePrUpdate(args []string, opts GlobalOptions) {
 		return
 	}
 
-	// 7.5 Check for Push (Ahead)
-	var pushList []conf.Repository
-	statusMap := make(map[string]StatusRow)
-	for _, r := range rows {
-		statusMap[r.Repo] = r
+	// Prompt
+	reader := bufio.NewReader(os.Stdin)
+	confirmed, err := AskForConfirmation(reader, "Proceed with Push (if any) and Pull Request description update? (yes/no): ", yesFlag)
+	if err != nil {
+		fmt.Printf("Error reading input: %v\n", err)
+		os.Exit(1)
+	}
+	if !confirmed {
+		fmt.Println("Aborted.")
+		os.Exit(1)
 	}
 
-	for _, repo := range activeRepos {
-		repoName := getRepoName(repo)
-		if status, ok := statusMap[repoName]; ok {
-			if status.HasUnpushed {
-				pushList = append(pushList, repo)
-			}
-		}
-	}
-
-	if len(pushList) > 0 {
+	// Execution
+	if len(catPushUpdate) > 0 {
 		fmt.Println("Pushing changes for repositories with active Pull Requests...")
-		if err := executePush(pushList, config.BaseDir, rows, jobs, opts.GitPath, verbose); err != nil {
+		if err := executePush(catPushUpdate, config.BaseDir, rows, jobs, opts.GitPath, verbose); err != nil {
 			fmt.Printf("error during push: %v\n", err)
 			os.Exit(1)
 		}
@@ -242,4 +232,77 @@ func handlePrUpdate(args []string, opts GlobalOptions) {
 	RenderPrStatusTable(Stdout, displayRows)
 
 	fmt.Println("Done.")
+}
+
+func categorizePrUpdate(
+	repositories *[]conf.Repository,
+	prRows []PrStatusRow,
+	rows []StatusRow,
+) (
+	activeRepos []conf.Repository,
+	targetPrMap map[string][]PrInfo,
+	allPrMap map[string][]PrInfo,
+	catPushUpdate []conf.Repository,
+	catNoPushUpdate []conf.Repository,
+	skippedRepos []string,
+) {
+	targetPrMap = make(map[string][]PrInfo)
+	allPrMap = make(map[string][]PrInfo)
+	repoMap := make(map[string]conf.Repository)
+
+	for _, r := range *repositories {
+		repoMap[getRepoName(r)] = r
+	}
+
+	for _, prRow := range prRows {
+		if len(prRow.PrItems) > 0 {
+			allPrMap[prRow.Repo] = prRow.PrItems
+
+			// Check if Open
+			hasOpen := false
+			for _, item := range prRow.PrItems {
+				if strings.EqualFold(item.State, GitHubPrStateOpen) {
+					hasOpen = true
+					break
+				}
+			}
+
+			if hasOpen {
+				targetPrMap[prRow.Repo] = prRow.PrItems
+				if r, ok := repoMap[prRow.Repo]; ok {
+					activeRepos = append(activeRepos, r)
+				}
+			}
+		}
+	}
+
+	statusMap := make(map[string]StatusRow)
+	for _, r := range rows {
+		statusMap[r.Repo] = r
+	}
+
+	// Identify skipped repos
+	activeRepoNames := make(map[string]bool)
+	for _, r := range activeRepos {
+		activeRepoNames[getRepoName(r)] = true
+	}
+	for _, r := range *repositories {
+		if !activeRepoNames[getRepoName(r)] {
+			skippedRepos = append(skippedRepos, getRepoName(r))
+		}
+	}
+
+	// Categorize active repos
+	for _, repo := range activeRepos {
+		repoName := getRepoName(repo)
+		if status, ok := statusMap[repoName]; ok {
+			if status.HasUnpushed {
+				catPushUpdate = append(catPushUpdate, repo)
+			} else {
+				catNoPushUpdate = append(catNoPushUpdate, repo)
+			}
+		}
+	}
+
+	return
 }
