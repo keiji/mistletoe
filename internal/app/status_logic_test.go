@@ -231,7 +231,7 @@ func TestCollectStatus_UpstreamFix(t *testing.T) {
 	}
 
 	// Verify message
-	if !strings.Contains(stderrBuf.String(), "upstream の設定が不正なため") {
+	if !strings.Contains(stderrBuf.String(), "Unsetting upstream for") {
 		t.Errorf("Scenario 1: Expected message not found in stderr. Got: %s", stderrBuf.String())
 	}
 
@@ -259,7 +259,7 @@ func TestCollectStatus_UpstreamFix(t *testing.T) {
 	}
 
 	// Verify message
-	if !strings.Contains(stderrBuf.String(), "リモートブランチが存在しないため") {
+	if !strings.Contains(stderrBuf.String(), "because the remote branch does not exist") {
 		t.Errorf("Scenario 2: Expected message not found in stderr. Got: %s", stderrBuf.String())
 	}
 }
