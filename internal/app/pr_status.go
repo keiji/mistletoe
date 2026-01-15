@@ -12,7 +12,13 @@ import (
 
 // handlePrStatus handles 'pr status'.
 func handlePrStatus(args []string, opts GlobalOptions) {
-	fs := flag.NewFlagSet("pr status", flag.ExitOnError)
+	if err := prStatusCommand(args, opts); err != nil {
+		os.Exit(1)
+	}
+}
+
+func prStatusCommand(args []string, opts GlobalOptions) error {
+	fs := flag.NewFlagSet("pr status", flag.ContinueOnError)
 	var (
 		fLong     string
 		fShort    string
@@ -35,9 +41,11 @@ func handlePrStatus(args []string, opts GlobalOptions) {
 	fs.BoolVar(&yes, "yes", false, "Automatically answer 'yes' to all prompts")
 	fs.BoolVar(&yesShort, "y", false, "Automatically answer 'yes' to all prompts (shorthand)")
 
+	fs.SetOutput(Stderr)
+
 	if err := ParseFlagsFlexible(fs, args); err != nil {
 		fmt.Println(err)
-		os.Exit(1)
+		return err
 	}
 
 	if err := CheckFlagDuplicates(fs, [][2]string{
@@ -47,14 +55,14 @@ func handlePrStatus(args []string, opts GlobalOptions) {
 		{"yes", "y"},
 	}); err != nil {
 		fmt.Println("Error:", err)
-		os.Exit(1)
+		return err
 	}
 
 	// Resolve common values
 	configPath, jobsFlag, configData, err := ResolveCommonValues(fLong, fShort, jVal, jValShort, ignoreStdin)
 	if err != nil {
 		fmt.Println(err)
-		os.Exit(1)
+		return err
 	}
 
 	configPath, err = SearchParentConfig(configPath, configData, opts.GitPath)
@@ -68,7 +76,7 @@ func handlePrStatus(args []string, opts GlobalOptions) {
 	// 1. Check gh availability
 	if err := checkGhAvailability(opts.GhPath, verbose); err != nil {
 		fmt.Println(err)
-		os.Exit(1)
+		return err
 	}
 
 	// 2. Load conf.Config
@@ -81,14 +89,14 @@ func handlePrStatus(args []string, opts GlobalOptions) {
 
 	if err != nil {
 		fmt.Println(err)
-		os.Exit(1)
+		return err
 	}
 
 	// Resolve Jobs
 	jobs, err := DetermineJobs(jobsFlag, config)
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
-		os.Exit(1)
+		return err
 	}
 
 	// Verbose Override
@@ -100,7 +108,7 @@ func handlePrStatus(args []string, opts GlobalOptions) {
 	// 3. Validate Integrity
 	if err := ValidateRepositoriesIntegrity(config, opts.GitPath, verbose); err != nil {
 		fmt.Println(err)
-		os.Exit(1)
+		return err
 	}
 
 	// Initialize Spinner
@@ -117,4 +125,6 @@ func handlePrStatus(args []string, opts GlobalOptions) {
 
 	// 6. Render
 	RenderPrStatusTable(Stdout, prRows)
+
+	return nil
 }
