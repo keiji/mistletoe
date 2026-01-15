@@ -31,6 +31,8 @@
     *   Refer to `manual_tests/index.md` for manual test implementation guidelines.
 *   **Code Comments**:
     *   **No Change History**: Do not include comments about the change history or actions taken in the code (e.g., "Added this call", "Fixed bug", "Modified by ..."). The Git history is the source of truth for changes. Comments should focus on "why" and "how" the code works, not "what changed".
+*   **Artifacts**:
+    *   **No Test Artifacts**: Do not commit test artifacts or generated files (e.g., `result_full.txt`, temporary log files, etc.). The repository should remain clean of such files.
 
 # Pull Request Guidelines
 

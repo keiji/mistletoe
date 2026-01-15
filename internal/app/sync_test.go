@@ -96,7 +96,6 @@ func TestHandleSync(t *testing.T) {
 		if code != 0 {
 			t.Errorf("expected exit code 0, got %d", code)
 		}
-		// Logic change: Clean sync now skips pulling
 		if !strings.Contains(out, fmt.Sprintf("Skipping %s: Already up to date.", repo1Rel)) {
 			t.Errorf("Expected Skipping repo1 output. Got: %s", out)
 		}
