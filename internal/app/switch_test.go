@@ -207,6 +207,40 @@ func TestHandleSwitch(t *testing.T) {
 			t.Logf("Stderr: %s", stderr)
 		}
 	})
+
+	// Scenario 9: Flag Errors (Invalid & Duplicate)
+	t.Run("Switch Flag Errors", func(t *testing.T) {
+		// Invalid flag
+		_, stderr, code := runHandleSwitch("--invalid-flag")
+		if code != 1 {
+			t.Errorf("expected exit code 1 for invalid flag, got %d", code)
+		}
+		if !strings.Contains(stderr, "flag provided but not defined") {
+			t.Errorf("unexpected stderr: %s", stderr)
+		}
+
+		// Duplicate flags
+		_, stderr, code = runHandleSwitch("--file", "a", "-f", "b")
+		if code != 1 {
+			t.Errorf("expected exit code 1 for duplicate flags, got %d", code)
+		}
+		if !strings.Contains(stderr, "cannot be specified with different values") {
+			t.Errorf("unexpected stderr: %s", stderr)
+		}
+	})
+
+	// Scenario 10: Verbose Overrides Jobs
+	t.Run("Switch Verbose Overrides Jobs", func(t *testing.T) {
+		// Setup a repo to pass validation
+		// Use repo1 from main test setup
+		out, _, code := runHandleSwitch("master", "--file", configPath, "-v", "-j", "5")
+		if code != 0 {
+			t.Errorf("expected exit code 0, got %d", code)
+		}
+		if !strings.Contains(out, "Verbose is specified, so jobs is treated as 1") {
+			t.Errorf("Expected verbose override message")
+		}
+	})
 }
 
 func TestHandleSwitch_ConfigureUpstream(t *testing.T) {
