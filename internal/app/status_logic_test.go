@@ -225,8 +225,7 @@ func TestCollectStatus_UpstreamFix(t *testing.T) {
 	CollectStatus(&config, 1, "git", false, false)
 
 	// Verify upstream unset
-	err := exec.Command("git", "-C", localDir, "rev-parse", "--abbrev-ref", "@{u}").Run()
-	if err == nil {
+	if err := exec.Command("git", "-C", localDir, "rev-parse", "--abbrev-ref", "@{u}").Run(); err == nil {
 		t.Error("Scenario 1: Upstream should be unset")
 	}
 
@@ -253,8 +252,7 @@ func TestCollectStatus_UpstreamFix(t *testing.T) {
 	CollectStatus(&config, 1, "git", false, false)
 
 	// Verify upstream unset
-	err = exec.Command("git", "-C", localDir, "rev-parse", "--abbrev-ref", "@{u}").Run()
-	if err == nil {
+	if err := exec.Command("git", "-C", localDir, "rev-parse", "--abbrev-ref", "@{u}").Run(); err == nil {
 		t.Error("Scenario 2: Upstream should be unset")
 	}
 
@@ -265,62 +263,52 @@ func TestCollectStatus_UpstreamFix(t *testing.T) {
 }
 
 func TestValidateStatusForAction(t *testing.T) {
-	// Mock osExit
-	oldOsExit := osExit
-	defer func() { osExit = oldOsExit }()
-
-	var exitCode int
-	osExit = func(code int) {
-		exitCode = code
-	}
-
 	tests := []struct {
 		name          string
 		rows          []StatusRow
 		checkPullable bool
-		wantExit      bool
+		wantErr       bool
 	}{
 		{
 			name:          "Clean",
 			rows:          []StatusRow{{Repo: "r1", HasConflict: false, BranchName: "main"}},
 			checkPullable: true,
-			wantExit:      false,
+			wantErr:       false,
 		},
 		{
 			name:          "Conflict",
 			rows:          []StatusRow{{Repo: "r1", HasConflict: true, BranchName: "main"}},
 			checkPullable: false,
-			wantExit:      true,
+			wantErr:       true,
 		},
 		{
 			name:          "Detached HEAD",
 			rows:          []StatusRow{{Repo: "r1", HasConflict: false, BranchName: "HEAD"}},
 			checkPullable: false,
-			wantExit:      true,
+			wantErr:       true,
 		},
 		{
 			name:          "Behind (Check=True)",
 			rows:          []StatusRow{{Repo: "r1", IsPullable: true, BranchName: "main"}},
 			checkPullable: true,
-			wantExit:      true,
+			wantErr:       true,
 		},
 		{
 			name:          "Behind (Check=False)",
 			rows:          []StatusRow{{Repo: "r1", IsPullable: true, BranchName: "main"}},
 			checkPullable: false,
-			wantExit:      false,
+			wantErr:       false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			exitCode = 0 // reset
-			ValidateStatusForAction(tt.rows, tt.checkPullable)
-			if tt.wantExit && exitCode == 0 {
-				t.Error("Expected exit(1), got 0")
+			err := ValidateStatusForAction(tt.rows, tt.checkPullable)
+			if tt.wantErr && err == nil {
+				t.Error("Expected error, got nil")
 			}
-			if !tt.wantExit && exitCode != 0 {
-				t.Errorf("Expected exit(0), got %d", exitCode)
+			if !tt.wantErr && err != nil {
+				t.Errorf("Expected no error, got %v", err)
 			}
 		})
 	}

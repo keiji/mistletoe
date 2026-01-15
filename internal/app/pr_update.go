@@ -140,7 +140,10 @@ func handlePrUpdate(args []string, opts GlobalOptions) {
 	RenderPrStatusTable(Stdout, prRows)
 
 	// 6. Check for Behind/Conflict/Detached
-	ValidateStatusForAction(rows, true)
+	if err := ValidateStatusForAction(rows, true); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
 
 	// 7. Identify Active PRs to Update & Categorize
 	activeRepos, _, allPrMap, catPushUpdate, catNoPushUpdate, skippedRepos := categorizePrUpdate(config.Repositories, prRows, rows)

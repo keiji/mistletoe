@@ -17,7 +17,17 @@ import (
 
 // handlePrCreate handles 'pr create'.
 func handlePrCreate(args []string, opts GlobalOptions) {
-	fs := flag.NewFlagSet("pr create", flag.ExitOnError)
+	if err := prCreateCommand(args, opts); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+}
+
+func prCreateCommand(args []string, opts GlobalOptions) error {
+	fs := flag.NewFlagSet("pr create", flag.ContinueOnError)
+	// Suppress default usage on error, we might print it ourselves or rely on the caller
+	// fs.Usage = func() {}
+
 	var (
 		fLong      string
 		fShort     string
@@ -57,8 +67,8 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 	fs.BoolVar(&yesShort, "y", false, "Automatically answer 'yes' to all prompts (shorthand)")
 
 	if err := ParseFlagsFlexible(fs, args); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		// fs.Usage()
+		return err
 	}
 
 	if err := CheckFlagDuplicates(fs, [][2]string{
@@ -70,15 +80,13 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 		{"verbose", "v"},
 		{"yes", "y"},
 	}); err != nil {
-		fmt.Println("Error:", err)
-		os.Exit(1)
+		return fmt.Errorf("Error: %w", err)
 	}
 
 	// Resolve common values
 	configPath, jobsFlag, configData, err := ResolveCommonValues(fLong, fShort, jVal, jValShort, ignoreStdin)
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		return err
 	}
 
 	yesFlag := yes || yesShort
@@ -105,8 +113,7 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 
 	// 1. Check gh availability
 	if err := checkGhAvailability(opts.GhPath, verbose); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		return err
 	}
 
 	// 2. Load conf.Config
@@ -118,15 +125,13 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 	}
 
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		return err
 	}
 
 	// Resolve Jobs
 	jobs, err := DetermineJobs(jobsFlag, config)
 	if err != nil {
-		fmt.Printf("Error: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("Error: %w", err)
 	}
 
 	// Verbose Override
@@ -138,8 +143,7 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 	// 3. Load Dependencies (if specified)
 	deps, depContent, err := LoadDependencyGraph(depPath, config)
 	if err != nil {
-		fmt.Printf("%v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("%w", err)
 	}
 	if depContent != "" {
 		fmt.Println("Dependency graph loaded successfully.")
@@ -147,8 +151,7 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 
 	// 4. Validate Integrity
 	if err := ValidateRepositoriesIntegrity(config, opts.GitPath, verbose); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		return err
 	}
 
 	// 5. Collect Status & PR Status (Moved Up)
@@ -164,7 +167,9 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 
 	// 6. Check for Behind/Conflict/Detached
 	// Abort if pull required (behind)
-	ValidateStatusForAction(rows, true)
+	if err := ValidateStatusForAction(rows, true); err != nil {
+		return err
+	}
 
 	// 6.5 Categorize Repositories
 	fmt.Println("Analyzing repository states...")
@@ -337,7 +342,7 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 
 	if len(activeRepos) == 0 {
 		fmt.Println("No repositories to process.")
-		return
+		return nil
 	}
 
 	// 7. Prompt
@@ -351,26 +356,24 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 	if allUpdates {
 		confirmed, err := AskForConfirmation(reader, "No new Pull Requests to create. Update existing Pull Request descriptions? (yes/no): ", yesFlag)
 		if err != nil {
-			fmt.Printf("Error reading input: %v\n", err)
-			os.Exit(1)
+			return fmt.Errorf("Error reading input: %v", err)
 		}
 		if confirmed {
 			skipEditor = true
 		} else {
 			fmt.Println("Aborted.")
-			os.Exit(1)
+			return errors.New("aborted by user")
 		}
 	} else {
 		confirmed, err := AskForConfirmation(reader, "Proceed with Push and Pull Request creation? (yes/no): ", yesFlag)
 		if err != nil {
-			fmt.Printf("Error reading input: %v\n", err)
-			os.Exit(1)
+			return fmt.Errorf("Error reading input: %v", err)
 		}
 		if confirmed {
 			skipEditor = false
 		} else {
 			fmt.Println("Aborted.")
-			os.Exit(1)
+			return errors.New("aborted by user")
 		}
 	}
 
@@ -379,8 +382,7 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 		if prTitle == "" && prBody == "" {
 			content, err := RunEditor()
 			if err != nil {
-				fmt.Printf("error getting message: %v\n", err)
-				os.Exit(1)
+				return fmt.Errorf("error getting message: %v", err)
 			}
 			prTitle, prBody = ParsePrTitleBody(content)
 		}
@@ -401,23 +403,20 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 
 	_, err = verifyGithubRequirements(activeRepos, config.BaseDir, rows, jobs, opts.GitPath, opts.GhPath, verbose, prExistsMapURLs)
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		return err
 	}
 
 	// 9. Execution Phase 1: Push
 	// Final Verification: Ensure revisions haven't changed since status collection
 	fmt.Println("Verifying repository states...")
 	if err := VerifyRevisionsUnchanged(config, rows, opts.GitPath, verbose); err != nil {
-		fmt.Printf("error: state verification failed: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("error: state verification failed: %v", err)
 	}
 
 	if len(pushList) > 0 {
 		fmt.Println("Pushing changes...")
 		if err := executePush(pushList, config.BaseDir, rows, jobs, opts.GitPath, verbose); err != nil {
-			fmt.Printf("error during push: %v\n", err)
-			os.Exit(1)
+			return fmt.Errorf("error during push: %v", err)
 		}
 	}
 
@@ -436,8 +435,7 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 
 		createdMap, err := executePrCreationOnly(createList, rows, jobs, opts.GhPath, verbose, prTitle, prBodyWithPlaceholder, draft)
 		if err != nil {
-			fmt.Printf("error during PR creation: %v\n", err)
-			os.Exit(1)
+			return fmt.Errorf("error during PR creation: %v", err)
 		}
 		for k, url := range createdMap {
 			// Created PR is always OPEN
@@ -449,14 +447,12 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 	fmt.Println("Generating configuration snapshot...")
 	snapshotData, snapshotID, err := GenerateSnapshotFromStatus(config, rows)
 	if err != nil {
-		fmt.Printf("error generating snapshot: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("error generating snapshot: %v", err)
 	}
 
 	filename := fmt.Sprintf("mistletoe-snapshot-%s.json", snapshotID)
 	if err := os.WriteFile(filename, snapshotData, 0644); err != nil {
-		fmt.Printf("error writing snapshot file: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("error writing snapshot file: %v", err)
 	}
 	fmt.Printf("Snapshot saved to %s\n", filename)
 
@@ -464,8 +460,7 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 	// We pass finalPrMap (containing ALL PRs, including merged/closed) to ensure Related Links are complete.
 	// updatePrDescriptions will internally filter which PRs to actually update (Open/Draft only).
 	if err := updatePrDescriptions(finalPrMap, jobs, opts.GhPath, verbose, string(snapshotData), filename, deps, depContent, overwrite); err != nil {
-		fmt.Printf("error updating descriptions: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("error updating descriptions: %v", err)
 	}
 
 	// 11. Show Status (Final)
@@ -489,6 +484,7 @@ func handlePrCreate(args []string, opts GlobalOptions) {
 	RenderPrStatusTable(Stdout, displayRows)
 
 	fmt.Println("Done.")
+	return nil
 }
 
 // executePrCreationOnly creates PRs for the given repositories.
