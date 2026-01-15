@@ -180,15 +180,15 @@ func PerformInit(repos []conf.Repository, baseDir, gitPath string, jobs, depth i
 			if info, err := os.Stat(targetDir); err == nil && info.IsDir() {
 				gitDir := filepath.Join(targetDir, ".git")
 				if _, err := os.Stat(gitDir); err == nil {
-					fmt.Printf("Repository %s exists. Skipping clone.\n", targetDir)
+					fmt.Fprintf(Stdout, "Repository %s exists. Skipping clone.\n", targetDir)
 					shouldClone = false
 				}
 			}
 
 			if shouldClone {
-				fmt.Printf("Cloning %s into %s...\n", *repo.URL, targetDir)
+				fmt.Fprintf(Stdout, "Cloning %s into %s...\n", *repo.URL, targetDir)
 				if err := RunGitInteractive("", gitPath, verbose, gitArgs...); err != nil {
-					fmt.Printf("Error cloning %s: %v\n", *repo.URL, err)
+					fmt.Fprintf(Stderr, "Error cloning %s: %v\n", *repo.URL, err)
 					// Skip checkout if clone failed
 					return
 				}
@@ -197,26 +197,26 @@ func PerformInit(repos []conf.Repository, baseDir, gitPath string, jobs, depth i
 			// 2. Switch Branch / Checkout Revision
 			if repo.Revision != nil && *repo.Revision != "" {
 				// Checkout revision
-				fmt.Printf("Checking out revision %s in %s...\n", *repo.Revision, targetDir)
+				fmt.Fprintf(Stdout, "Checking out revision %s in %s...\n", *repo.Revision, targetDir)
 				if err := RunGitInteractive(targetDir, gitPath, verbose, "checkout", *repo.Revision); err != nil {
-					fmt.Printf("Error checking out revision %s in %s: %v\n", *repo.Revision, targetDir, err)
+					fmt.Fprintf(Stderr, "Error checking out revision %s in %s: %v\n", *repo.Revision, targetDir, err)
 					return
 				}
 
 				if repo.Branch != nil && *repo.Branch != "" {
 					// Create branch (or reset if exists)
-					fmt.Printf("Creating branch %s at revision %s in %s...\n", *repo.Branch, *repo.Revision, targetDir)
+					fmt.Fprintf(Stdout, "Creating branch %s at revision %s in %s...\n", *repo.Branch, *repo.Revision, targetDir)
 					// Use -B to force create/reset branch to the revision point.
 					// This matches the intent of initializing the workspace to the specified state.
 					if err := RunGitInteractive(targetDir, gitPath, verbose, "checkout", "-B", *repo.Branch); err != nil {
-						fmt.Printf("Error creating/resetting branch %s in %s: %v\n", *repo.Branch, targetDir, err)
+						fmt.Fprintf(Stderr, "Error creating/resetting branch %s in %s: %v\n", *repo.Branch, targetDir, err)
 					}
 				}
 			} else if repo.Branch != nil && *repo.Branch != "" {
 				// "チェックアウト後、各要素についてbranchで示されたブランチに切り替える。"
-				fmt.Printf("Switching %s to branch %s...\n", targetDir, *repo.Branch)
+				fmt.Fprintf(Stdout, "Switching %s to branch %s...\n", targetDir, *repo.Branch)
 				if err := RunGitInteractive(targetDir, gitPath, verbose, "checkout", *repo.Branch); err != nil {
-					fmt.Printf("Error switching branch for %s: %v.\n", targetDir, err)
+					fmt.Fprintf(Stderr, "Error switching branch for %s: %v.\n", targetDir, err)
 				}
 			}
 		}(repo)
@@ -278,7 +278,8 @@ func handleInit(args []string, opts GlobalOptions) {
 		yes, yesShort    bool
 	)
 
-	fs := flag.NewFlagSet("init", flag.ExitOnError)
+	fs := flag.NewFlagSet("init", flag.ContinueOnError)
+	fs.SetOutput(Stderr)
 	fs.StringVar(&fLong, "file", DefaultConfigFile, "configuration file")
 	fs.StringVar(&fShort, "f", DefaultConfigFile, "configuration file (shorthand)")
 	fs.StringVar(&destLong, "dest", "", "destination directory")
@@ -294,8 +295,9 @@ func handleInit(args []string, opts GlobalOptions) {
 	fs.BoolVar(&yesShort, "y", false, "Automatically answer 'yes' to all prompts (shorthand)")
 
 	if err := ParseFlagsFlexible(fs, args); err != nil {
-		fmt.Println("Error parsing flags:", err)
-		os.Exit(1)
+		fmt.Fprintln(Stderr, "Error parsing flags:", err)
+		osExit(1)
+		return
 	}
 
 	if err := CheckFlagDuplicates(fs, [][2]string{
@@ -304,14 +306,16 @@ func handleInit(args []string, opts GlobalOptions) {
 		{"verbose", "v"},
 		{"yes", "y"},
 	}); err != nil {
-		fmt.Println("Error:", err)
-		os.Exit(1)
+		fmt.Fprintln(Stderr, "Error:", err)
+		osExit(1)
+		return
 	}
 
 	configFile, jobsFlag, configData, err := ResolveCommonValues(fLong, fShort, jVal, jValShort, ignoreStdin)
 	if err != nil {
-		fmt.Printf("Error: %v\n", err)
-		os.Exit(1)
+		fmt.Fprintf(Stderr, "Error: %v\n", err)
+		osExit(1)
+		return
 	}
 
 	configFile, err = SearchParentConfig(configFile, configData, opts.GitPath)
@@ -335,21 +339,23 @@ func handleInit(args []string, opts GlobalOptions) {
 	}
 
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		fmt.Fprintln(Stderr, err)
+		osExit(1)
+		return
 	}
 
 	// Resolve Jobs
 	jobs, err := DetermineJobs(jobsFlag, config)
 	if err != nil {
-		fmt.Printf("Error: %v\n", err)
-		os.Exit(1)
+		fmt.Fprintf(Stderr, "Error: %v\n", err)
+		osExit(1)
+		return
 	}
 
 	// Verbose Override
 	verbose := vLong || vShort
 	if verbose && jobs > 1 {
-		fmt.Println("Verbose is specified, so jobs is treated as 1.")
+		fmt.Fprintln(Stdout, "Verbose is specified, so jobs is treated as 1.")
 		jobs = 1
 	}
 
@@ -359,8 +365,9 @@ func handleInit(args []string, opts GlobalOptions) {
 	}
 
 	if err := validateAndPrepareInitDest(dest); err != nil {
-		fmt.Println("Error:", err)
-		os.Exit(1)
+		fmt.Fprintln(Stderr, "Error:", err)
+		osExit(1)
+		return
 	}
 
 	// Validate dependency file if provided
@@ -379,20 +386,23 @@ func handleInit(args []string, opts GlobalOptions) {
 		// Since ParseDependencies takes string, we read file first.
 		rawContent, err := os.ReadFile(dependenciesLong)
 		if err != nil {
-			fmt.Printf("Error reading dependency file: %v\n", err)
-			os.Exit(1)
+			fmt.Fprintf(Stderr, "Error reading dependency file: %v\n", err)
+			osExit(1)
+			return
 		}
 		depContent = rawContent
 
 		if _, err := ParseDependencies(string(depContent), allIDs); err != nil {
-			fmt.Printf("Error validating dependency graph: %v\n", err)
-			os.Exit(1)
+			fmt.Fprintf(Stderr, "Error validating dependency graph: %v\n", err)
+			osExit(1)
+			return
 		}
 	}
 
 	if err := PerformInit(*config.Repositories, "", opts.GitPath, jobs, depth, verbose); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		fmt.Fprintln(Stderr, err)
+		osExit(1)
+		return
 	}
 
 	// Post-init: Create .mstl directory and save config/dependencies
@@ -412,7 +422,7 @@ func handleInit(args []string, opts GlobalOptions) {
 	if !shouldSkipWrite {
 		mstlDir := ".mstl"
 		if err := os.MkdirAll(mstlDir, 0755); err != nil {
-			fmt.Printf("Warning: Failed to create .mstl directory: %v\n", err)
+			fmt.Fprintf(Stderr, "Warning: Failed to create .mstl directory: %v\n", err)
 			return
 		}
 
@@ -430,13 +440,13 @@ func handleInit(args []string, opts GlobalOptions) {
 		// Marshal filtered config
 		configBytes, err := json.MarshalIndent(filteredConfig, "", "  ")
 		if err != nil {
-			fmt.Printf("Warning: Failed to marshal configuration: %v\n", err)
+			fmt.Fprintf(Stderr, "Warning: Failed to marshal configuration: %v\n", err)
 		} else {
 			configPath := filepath.Join(mstlDir, "config.json")
 			if err := os.WriteFile(configPath, configBytes, 0644); err != nil {
-				fmt.Printf("Warning: Failed to write %s: %v\n", configPath, err)
+				fmt.Fprintf(Stderr, "Warning: Failed to write %s: %v\n", configPath, err)
 			} else {
-				fmt.Printf("Configuration saved to %s\n", configPath)
+				fmt.Fprintf(Stdout, "Configuration saved to %s\n", configPath)
 			}
 		}
 
@@ -458,9 +468,9 @@ func handleInit(args []string, opts GlobalOptions) {
 		}
 
 		if err := os.WriteFile(depPath, []byte(graphContent), 0644); err != nil {
-			fmt.Printf("Warning: Failed to write %s: %v\n", depPath, err)
+			fmt.Fprintf(Stderr, "Warning: Failed to write %s: %v\n", depPath, err)
 		} else {
-			fmt.Printf("Dependencies graph saved to %s\n", depPath)
+			fmt.Fprintf(Stdout, "Dependencies graph saved to %s\n", depPath)
 		}
 	}
 }
