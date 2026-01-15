@@ -245,3 +245,57 @@ func TestWriteDependencyFile(t *testing.T) {
 		t.Errorf("Content should end with mermaid block. Got:\n%q", writtenContent)
 	}
 }
+
+func TestPrCheckoutCommand_Flags(t *testing.T) {
+	tests := []struct {
+		name          string
+		args          []string
+		wantError     bool
+		errorContains string
+	}{
+		{
+			name:          "Invalid flag",
+			args:          []string{"--invalid-flag"},
+			wantError:     true,
+			errorContains: "flag provided but not defined",
+		},
+		{
+			name:          "No URL",
+			args:          []string{},
+			wantError:     true,
+			errorContains: "URL required",
+		},
+		{
+			name:          "Duplicate flags (alias mismatch)",
+			args:          []string{"-j", "1", "--jobs", "2"},
+			wantError:     true,
+			errorContains: "options --jobs and -j cannot be specified with different values",
+		},
+		{
+			name:          "Valid flags - minimal (execution fails at gh check)",
+			args:          []string{"-u", "http://github.com/pr/1"},
+			wantError:     true,
+			errorContains: "command not found", // gh not found
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Use a dummy gh path to ensure failure regardless of environment
+			ghPath := "gh"
+			if tt.errorContains == "command not found" {
+				ghPath = "dummy-gh-executable"
+			}
+			err := prCheckoutCommand(tt.args, GlobalOptions{GitPath: "git", GhPath: ghPath})
+			if (err != nil) != tt.wantError {
+				t.Errorf("prCheckoutCommand() error = %v, wantError %v", err, tt.wantError)
+				return
+			}
+			if err != nil && tt.errorContains != "" {
+				if !strings.Contains(err.Error(), tt.errorContains) {
+					t.Errorf("error = %v, want error containing %q", err, tt.errorContains)
+				}
+			}
+		})
+	}
+}

@@ -14,7 +14,13 @@ import (
 
 // handlePrUpdate handles 'pr update'.
 func handlePrUpdate(args []string, opts GlobalOptions) {
-	fs := flag.NewFlagSet("pr update", flag.ExitOnError)
+	if err := prUpdateCommand(args, opts); err != nil {
+		os.Exit(1)
+	}
+}
+
+func prUpdateCommand(args []string, opts GlobalOptions) error {
+	fs := flag.NewFlagSet("pr update", flag.ContinueOnError)
 	var (
 		fLong     string
 		fShort    string
@@ -43,9 +49,18 @@ func handlePrUpdate(args []string, opts GlobalOptions) {
 	fs.BoolVar(&yes, "yes", false, "Automatically answer 'yes' to all prompts")
 	fs.BoolVar(&yesShort, "y", false, "Automatically answer 'yes' to all prompts (shorthand)")
 
+	// Set usage output to Stderr to capture it in tests if needed,
+	// though flag package defaults to Stderr.
+	fs.SetOutput(Stderr)
+
 	if err := ParseFlagsFlexible(fs, args); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		// flag package prints error automatically on ContinueOnError if parsing fails?
+		// Actually ParseFlagsFlexible calls fs.Parse. fs.Parse prints error to output.
+		// Original code printed `err` explicitly. `fs.Parse` returns error.
+		// If we return error here, we assume it's printed.
+		// However, to mimic exact behavior:
+		// fmt.Println(err)
+		return err
 	}
 
 	if err := CheckFlagDuplicates(fs, [][2]string{
@@ -56,14 +71,14 @@ func handlePrUpdate(args []string, opts GlobalOptions) {
 		{"yes", "y"},
 	}); err != nil {
 		fmt.Println("Error:", err)
-		os.Exit(1)
+		return err
 	}
 
 	// Resolve common values
 	configPath, jobsFlag, configData, err := ResolveCommonValues(fLong, fShort, jVal, jValShort, ignoreStdin)
 	if err != nil {
 		fmt.Println(err)
-		os.Exit(1)
+		return err
 	}
 
 	yesFlag := yes || yesShort
@@ -82,7 +97,7 @@ func handlePrUpdate(args []string, opts GlobalOptions) {
 	// 1. Check gh availability
 	if err := checkGhAvailability(opts.GhPath, verbose); err != nil {
 		fmt.Println(err)
-		os.Exit(1)
+		return err
 	}
 
 	// 2. Load conf.Config
@@ -95,14 +110,14 @@ func handlePrUpdate(args []string, opts GlobalOptions) {
 
 	if err != nil {
 		fmt.Println(err)
-		os.Exit(1)
+		return err
 	}
 
 	// Resolve Jobs
 	jobs, err := DetermineJobs(jobsFlag, config)
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
-		os.Exit(1)
+		return err
 	}
 
 	// Verbose Override
@@ -115,7 +130,7 @@ func handlePrUpdate(args []string, opts GlobalOptions) {
 	deps, depContent, err := LoadDependencyGraph(depPath, config)
 	if err != nil {
 		fmt.Printf("%v\n", err)
-		os.Exit(1)
+		return err
 	}
 	if depContent != "" {
 		fmt.Println("Dependency graph loaded successfully.")
@@ -124,7 +139,7 @@ func handlePrUpdate(args []string, opts GlobalOptions) {
 	// 4. Validate Integrity
 	if err := ValidateRepositoriesIntegrity(config, opts.GitPath, verbose); err != nil {
 		fmt.Println(err)
-		os.Exit(1)
+		return err
 	}
 
 	// 5. Collect Status & PR Status
@@ -142,7 +157,7 @@ func handlePrUpdate(args []string, opts GlobalOptions) {
 	// 6. Check for Behind/Conflict/Detached
 	if err := ValidateStatusForAction(rows, true); err != nil {
 		fmt.Println(err)
-		os.Exit(1)
+		return err
 	}
 
 	// 7. Identify Active PRs to Update & Categorize
@@ -175,7 +190,7 @@ func handlePrUpdate(args []string, opts GlobalOptions) {
 
 	if len(activeRepos) == 0 {
 		fmt.Println("No active Pull Requests found to update.")
-		return
+		return nil
 	}
 
 	// Prompt
@@ -183,11 +198,11 @@ func handlePrUpdate(args []string, opts GlobalOptions) {
 	confirmed, err := AskForConfirmation(reader, "Proceed with Push (if any) and Pull Request description update? (yes/no): ", yesFlag)
 	if err != nil {
 		fmt.Printf("Error reading input: %v\n", err)
-		os.Exit(1)
+		return err
 	}
 	if !confirmed {
 		fmt.Println("Aborted.")
-		os.Exit(1)
+		return fmt.Errorf("aborted by user")
 	}
 
 	// Execution
@@ -195,7 +210,7 @@ func handlePrUpdate(args []string, opts GlobalOptions) {
 		fmt.Println("Pushing changes for repositories with active Pull Requests...")
 		if err := executePush(catPushUpdate, config.BaseDir, rows, jobs, opts.GitPath, verbose); err != nil {
 			fmt.Printf("error during push: %v\n", err)
-			os.Exit(1)
+			return err
 		}
 	}
 
@@ -204,13 +219,13 @@ func handlePrUpdate(args []string, opts GlobalOptions) {
 	snapshotData, snapshotID, err := GenerateSnapshotFromStatus(config, rows)
 	if err != nil {
 		fmt.Printf("error generating snapshot: %v\n", err)
-		os.Exit(1)
+		return err
 	}
 
 	filename := fmt.Sprintf("mistletoe-snapshot-%s.json", snapshotID)
 	if err := os.WriteFile(filename, snapshotData, 0644); err != nil {
 		fmt.Printf("error writing snapshot file: %v\n", err)
-		os.Exit(1)
+		return err
 	}
 	fmt.Printf("Snapshot saved to %s\n", filename)
 
@@ -221,7 +236,7 @@ func handlePrUpdate(args []string, opts GlobalOptions) {
 	// but updatePrDescriptions will skip updating them.
 	if err := updatePrDescriptions(allPrMap, jobs, opts.GhPath, verbose, string(snapshotData), filename, deps, depContent, overwrite); err != nil {
 		fmt.Printf("error updating descriptions: %v\n", err)
-		os.Exit(1)
+		return err
 	}
 
 	// 10. Final Status
@@ -235,6 +250,7 @@ func handlePrUpdate(args []string, opts GlobalOptions) {
 	RenderPrStatusTable(Stdout, displayRows)
 
 	fmt.Println("Done.")
+	return nil
 }
 
 func categorizePrUpdate(

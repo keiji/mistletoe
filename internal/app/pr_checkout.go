@@ -14,7 +14,13 @@ import (
 )
 
 func handlePrCheckout(args []string, opts GlobalOptions) {
-	fs := flag.NewFlagSet("pr checkout", flag.ExitOnError)
+	if err := prCheckoutCommand(args, opts); err != nil {
+		os.Exit(1)
+	}
+}
+
+func prCheckoutCommand(args []string, opts GlobalOptions) error {
+	fs := flag.NewFlagSet("pr checkout", flag.ContinueOnError)
 	var (
 		uLong     string
 		uShort    string
@@ -39,9 +45,11 @@ func handlePrCheckout(args []string, opts GlobalOptions) {
 	fs.BoolVar(&yes, "yes", false, "Automatically answer 'yes' to all prompts")
 	fs.BoolVar(&yesShort, "y", false, "Automatically answer 'yes' to all prompts (shorthand)")
 
+	fs.SetOutput(Stderr)
+
 	if err := ParseFlagsFlexible(fs, args); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		// fmt.Println(err) // flag package handles printing
+		return err
 	}
 
 	if err := CheckFlagDuplicates(fs, [][2]string{
@@ -51,7 +59,7 @@ func handlePrCheckout(args []string, opts GlobalOptions) {
 		{"yes", "y"},
 	}); err != nil {
 		fmt.Println("Error:", err)
-		os.Exit(1)
+		return err
 	}
 
 	dest := dLong
@@ -66,7 +74,7 @@ func handlePrCheckout(args []string, opts GlobalOptions) {
 
 	if prURL == "" {
 		fmt.Println("Error: Pull Request URL is required (-u or --url)")
-		os.Exit(1)
+		return fmt.Errorf("URL required")
 	}
 
 	// Resolve Jobs - pr_checkout is unique, it doesn't utilize ResolveCommonValues for config loading initially
@@ -86,7 +94,7 @@ func handlePrCheckout(args []string, opts GlobalOptions) {
 	// 1. Check gh availability
 	if err := checkGhAvailability(opts.GhPath, verbose); err != nil {
 		fmt.Println(err)
-		os.Exit(1)
+		return err
 	}
 
 	// 2. Fetch PR Body
@@ -94,7 +102,7 @@ func handlePrCheckout(args []string, opts GlobalOptions) {
 	out, err := RunGh(opts.GhPath, verbose, "pr", "view", prURL, "--json", "body", "-q", ".body")
 	if err != nil {
 		fmt.Printf("Error fetching PR body: %v\n", err)
-		os.Exit(1)
+		return err
 	}
 	prBody := string(out)
 
@@ -103,18 +111,18 @@ func handlePrCheckout(args []string, opts GlobalOptions) {
 	config, relatedJSON, dependencyContent, found := ParseMistletoeBlock(prBody)
 	if !found {
 		fmt.Println("Error: Mistletoe block not found in PR body")
-		os.Exit(1)
+		return fmt.Errorf("Mistletoe block not found")
 	}
 	if config == nil {
 		fmt.Println("Error: Snapshot data missing in Mistletoe block")
-		os.Exit(1)
+		return fmt.Errorf("snapshot data missing")
 	}
 
 	// Resolve Jobs (Config fallback from Snapshot)
 	jobs, err := DetermineJobs(jobsFlag, config)
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
-		os.Exit(1)
+		return err
 	}
 
 	// Verbose Override
@@ -212,21 +220,19 @@ func handlePrCheckout(args []string, opts GlobalOptions) {
 				}
 			}
 		} else {
-			fmt.Printf("Warning: related PR JSON is invalid: %v\n", err) // err is from Unmarshal now? No, err variable scope issue.
-			// Actually err was defined in if err := json.Unmarshal...
-			// So it's fine.
+			fmt.Printf("Warning: related PR JSON is invalid: %v\n", err)
 		}
 	}
 
 	// 4. Init / Checkout
 	if len(*config.Repositories) == 0 {
 		fmt.Println("No repositories to initialize (all filtered or empty snapshot).")
-		return
+		return nil
 	}
 
 	if err := validateAndPrepareInitDest(dest); err != nil {
 		fmt.Printf("Error preparing destination: %v\n", err)
-		os.Exit(1)
+		return err
 	}
 
 	fmt.Println("Initializing repositories based on snapshot...")
@@ -236,7 +242,7 @@ func handlePrCheckout(args []string, opts GlobalOptions) {
 		fmt.Printf("Error during initialization: %v\n", err)
 		// We continue to status even if some failed? Or exit?
 		// Usually Init failure is critical.
-		os.Exit(1)
+		return err
 	}
 
 	// Save config and dependency
@@ -302,6 +308,8 @@ func handlePrCheckout(args []string, opts GlobalOptions) {
 	spinner.Stop()
 
 	RenderPrStatusTable(Stdout, prRows)
+
+	return nil
 }
 
 func writeDependencyFile(dir, content string) error {
