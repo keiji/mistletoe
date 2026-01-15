@@ -97,7 +97,13 @@ flowchart TD
     *   **Local**: `git rev-parse --abbrev-ref HEAD` (ブランチ名) および `git rev-parse --short HEAD` (ハッシュ) の取得。
     *   **Remote**: `git ls-remote origin refs/heads/<current-branch>` を実行し、リモートの最新ハッシュの取得。
 
-3.  **状態計算 (`status_logic.go`)**:
+3.  **Upstream 検証 (`status_logic.go`)**:
+    *   現在のブランチの upstream 設定 (`@{u}`) を確認します。
+    *   **不整合修正**: 以下の条件のいずれかに該当する場合、`branch --unset-upstream` を実行して upstream 指定を解除します。
+        1.  ローカルブランチ名と upstream のブランチ名が一致しない場合（例: ローカル `feature` が `origin/main` を追跡している）。
+        2.  Upstream に指定されたリモートブランチが存在しない場合（`git fetch` が失敗し、かつ `git ls-remote` で存在しないことが確認された場合）。
+
+4.  **状態計算 (`status_logic.go`)**:
     *   **Unpushed (`>`)**: `remote..local` のコミット数が 0 より大きい場合。
     *   **Pullable (`<`)**: 現在のブランチが設定ファイルの `branch` と一致する場合のみ判定。`local..remote` のコミット数が 0 より大きい場合。
         *   リモートオブジェクトがローカルに存在しない場合（`cat-file -e` 失敗）、`git fetch` を試行してから再判定。
