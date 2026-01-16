@@ -19,19 +19,19 @@ func TestValidateAndPrepareInitDest(t *testing.T) {
 	if err := os.WriteFile(destFile, []byte("content"), 0644); err != nil {
 		t.Fatalf("Failed to create file: %v", err)
 	}
-	if err := validateAndPrepareInitDest(destFile); err == nil {
+	if _, err := validateAndPrepareInitDest(destFile); err == nil {
 		t.Errorf("Expected error when dest is a file, got nil")
 	}
 
 	// Case 2: Destination does not exist, parent does not exist -> Error
 	destDeep := filepath.Join(tempDir, "missing", "missing")
-	if err := validateAndPrepareInitDest(destDeep); err == nil {
+	if _, err := validateAndPrepareInitDest(destDeep); err == nil {
 		t.Errorf("Expected error when parent does not exist, got nil")
 	}
 
 	// Case 3: Destination does not exist, parent is a file -> Error
 	destParentFile := filepath.Join(destFile, "subdir")
-	if err := validateAndPrepareInitDest(destParentFile); err == nil {
+	if _, err := validateAndPrepareInitDest(destParentFile); err == nil {
 		t.Errorf("Expected error when parent is a file, got nil")
 	}
 
@@ -45,7 +45,7 @@ func TestValidateAndPrepareInitDest(t *testing.T) {
 	}
 	// Restore CWD after success
 	origWd, _ := os.Getwd()
-	if err := validateAndPrepareInitDest(destNotEmpty); err != nil {
+	if _, err := validateAndPrepareInitDest(destNotEmpty); err != nil {
 		t.Errorf("Expected success when dest is not empty, got error: %v", err)
 	}
 	os.Chdir(origWd)
@@ -59,7 +59,7 @@ func TestValidateAndPrepareInitDest(t *testing.T) {
 	origWd, _ = os.Getwd()
 	defer os.Chdir(origWd)
 
-	if err := validateAndPrepareInitDest(destEmpty); err != nil {
+	if _, err := validateAndPrepareInitDest(destEmpty); err != nil {
 		t.Errorf("Expected success when dest is empty, got error: %v", err)
 	}
 	// Verify CWD changed
@@ -74,7 +74,7 @@ func TestValidateAndPrepareInitDest(t *testing.T) {
 
 	// Case 6: Destination does not exist, parent exists -> Success (creates dir)
 	destNew := filepath.Join(tempDir, "new_dir")
-	if err := validateAndPrepareInitDest(destNew); err != nil {
+	if _, err := validateAndPrepareInitDest(destNew); err != nil {
 		t.Errorf("Expected success when creating new dir, got error: %v", err)
 	}
 	// Verify it exists

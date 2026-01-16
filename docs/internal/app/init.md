@@ -91,7 +91,10 @@ flowchart TD
     CheckStdin -- Yes --> ReadStdin["標準入力から読み込み"]
     ReadStdin --> LoadConfig
     CheckFile -- Yes --> LoadConfig["ファイルから設定読み込み"]
-    LoadConfig --> ValidateEnv["環境検証 (全リポジトリ)"]
+    LoadConfig --> ValidateRoot{"ルートディレクトリ安全性チェック"}
+
+    ValidateRoot -- "未知のファイルあり & 拒否" --> Stop
+    ValidateRoot -- "OK / 承諾" --> ValidateEnv["環境検証 (全リポジトリ)"]
 
     ValidateEnv -- "エラー (リポジトリ無効, ディレクトリ空でない, URL不一致)" --> ErrorExit
     ValidateEnv -- "成功" --> ExecLoop["並列実行ループ"]
@@ -138,7 +141,27 @@ flowchart TD
 
 検証成功後、プロセスは対象ディレクトリに移動（`chdir`）し、以降の処理はすべてそのディレクトリ内で行われます。
 
-#### 4.2.2. リポジトリ環境の検証 (Repository Validation)
+#### 4.2.2. ルートディレクトリ安全性チェック (Root Directory Safety Check)
+
+設定読み込み後、対象のルートディレクトリ内に、設定ファイルのリポジトリ一覧に含まれない名前のファイルやディレクトリが存在するか確認します。
+
+*   **除外対象**:
+    *   `.git` ディレクトリ
+    *   `.mstl` ディレクトリ
+    *   現在の設定ファイル（ルートディレクトリにある場合）
+    *   `config.json` で定義された `id`（リポジトリディレクトリ名）に一致するもの
+
+上記以外のファイルまたはディレクトリが存在する場合、以下のプロンプトを表示してユーザーに確認を求めます。ユーザーが拒否した場合、処理を中止します。
+
+```text
+Current directory: /absolute/path/to/dest
+This directory contains files/directories not in the repository list.
+Are you sure you want to initialize in this directory? [y/N]
+```
+
+`--yes` オプションが指定されている場合、この確認はスキップ（自動承諾）されます。
+
+#### 4.2.3. リポジトリ環境の検証 (Repository Validation)
 
 各リポジトリについて以下の検証を行います。
 
