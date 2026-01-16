@@ -2,6 +2,7 @@ package app
 
 import (
 	conf "mistletoe/internal/config"
+	"mistletoe/internal/sys"
 )
 
 import (
@@ -10,8 +11,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"testing"
 	"strings"
+	"testing"
 )
 
 // Helper to create a fully set up dummy git repo
@@ -48,17 +49,17 @@ func setupDummyRepo(t *testing.T, dir, remoteURL, branchName string) {
 
 func runHandleSnapshot(t *testing.T, args []string, workDir string) (stdout string, stderr string, exitCode int) {
 	var stdoutBuf, stderrBuf bytes.Buffer
-	originalStdout, originalStderr := Stdout, Stderr
+	originalStdout, originalStderr := sys.Stdout, sys.Stderr
 	originalOsExit := osExit
 	defer func() {
-		Stdout, Stderr = originalStdout, originalStderr
+		sys.Stdout, sys.Stderr = originalStdout, originalStderr
 		osExit = originalOsExit
 	}()
-	Stdout = &stdoutBuf
-	Stderr = &stderrBuf
+	sys.Stdout = &stdoutBuf
+	sys.Stderr = &stderrBuf
 
 	// Mock Stdin
-	Stdin = strings.NewReader("")
+	sys.Stdin = strings.NewReader("")
 
 	osExit = func(code int) {
 		exitCode = code

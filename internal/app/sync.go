@@ -2,6 +2,7 @@ package app
 
 import (
 	conf "mistletoe/internal/config"
+	"mistletoe/internal/sys"
 	"mistletoe/internal/ui"
 )
 
@@ -21,7 +22,7 @@ func handleSync(args []string, opts GlobalOptions) {
 	)
 
 	fs := flag.NewFlagSet("sync", flag.ContinueOnError)
-	fs.SetOutput(Stderr)
+	fs.SetOutput(sys.Stderr)
 	fs.StringVar(&fLong, "file", DefaultConfigFile, "Configuration file path")
 	fs.StringVar(&fShort, "f", DefaultConfigFile, "Configuration file path (shorthand)")
 	fs.IntVar(&jVal, "jobs", -1, "number of concurrent jobs")
@@ -34,7 +35,7 @@ func handleSync(args []string, opts GlobalOptions) {
 	fs.BoolVar(&yesShort, "y", false, "Automatically answer 'yes' to all prompts (shorthand)")
 
 	if err := ParseFlagsFlexible(fs, args); err != nil {
-		fmt.Fprintln(Stderr, "Error parsing flags:", err)
+		fmt.Fprintln(sys.Stderr, "Error parsing flags:", err)
 		osExit(1)
 		return
 	}
@@ -45,14 +46,14 @@ func handleSync(args []string, opts GlobalOptions) {
 		{"verbose", "v"},
 		{"yes", "y"},
 	}); err != nil {
-		fmt.Fprintln(Stderr, "Error:", err)
+		fmt.Fprintln(sys.Stderr, "Error:", err)
 		osExit(1)
 		return
 	}
 
 	configFile, jobsFlag, configData, err := ResolveCommonValues(fLong, fShort, jVal, jValShort, ignoreStdin)
 	if err != nil {
-		fmt.Fprintf(Stderr, "Error: %v\n", err)
+		fmt.Fprintf(sys.Stderr, "Error: %v\n", err)
 		osExit(1)
 		return
 	}
@@ -61,7 +62,7 @@ func handleSync(args []string, opts GlobalOptions) {
 
 	configFile, err = SearchParentConfig(configFile, configData, opts.GitPath)
 	if err != nil {
-		fmt.Fprintf(Stderr, "Error searching parent config: %v\n", err)
+		fmt.Fprintf(sys.Stderr, "Error searching parent config: %v\n", err)
 	}
 
 	var config *conf.Config
@@ -72,7 +73,7 @@ func handleSync(args []string, opts GlobalOptions) {
 	}
 
 	if err != nil {
-		fmt.Fprintln(Stderr, err)
+		fmt.Fprintln(sys.Stderr, err)
 		osExit(1)
 		return
 	}
@@ -80,7 +81,7 @@ func handleSync(args []string, opts GlobalOptions) {
 	// Resolve Jobs
 	jobs, err := DetermineJobs(jobsFlag, config)
 	if err != nil {
-		fmt.Fprintf(Stderr, "Error: %v\n", err)
+		fmt.Fprintf(sys.Stderr, "Error: %v\n", err)
 		osExit(1)
 		return
 	}
@@ -88,7 +89,7 @@ func handleSync(args []string, opts GlobalOptions) {
 	// Verbose Override
 	verbose := vLong || vShort
 	if verbose && jobs > 1 {
-		fmt.Fprintln(Stdout, "Verbose is specified, so jobs is treated as 1.")
+		fmt.Fprintln(sys.Stdout, "Verbose is specified, so jobs is treated as 1.")
 		jobs = 1
 	}
 
@@ -96,7 +97,7 @@ func handleSync(args []string, opts GlobalOptions) {
 
 	fail := func(format string, a ...interface{}) {
 		spinner.Stop()
-		fmt.Fprintf(Stderr, format, a...)
+		fmt.Fprintf(sys.Stderr, format, a...)
 		osExit(1)
 	}
 
@@ -131,14 +132,14 @@ func handleSync(args []string, opts GlobalOptions) {
 
 	if needsPull {
 		if needsStrategy {
-			fmt.Fprintln(Stdout, "Updates available.")
+			fmt.Fprintln(sys.Stdout, "Updates available.")
 
 			if yesFlag {
-				fmt.Fprintln(Stdout, "Using default strategy (merge) due to --yes flag.")
+				fmt.Fprintln(sys.Stdout, "Using default strategy (merge) due to --yes flag.")
 				argsPull = append(argsPull, "--no-rebase")
 			} else {
-				fmt.Fprint(Stdout, "Merge, rebase, or abort? [merge/rebase/abort]: ")
-				scanner := bufio.NewScanner(Stdin)
+				fmt.Fprint(sys.Stdout, "Merge, rebase, or abort? [merge/rebase/abort]: ")
+				scanner := bufio.NewScanner(sys.Stdin)
 				if scanner.Scan() {
 					input := strings.ToLower(strings.TrimSpace(scanner.Text()))
 					switch input {
@@ -147,11 +148,11 @@ func handleSync(args []string, opts GlobalOptions) {
 					case "rebase", "r":
 						argsPull = append(argsPull, "--rebase")
 					case "abort", "a", "q":
-						fmt.Fprintln(Stdout, "Aborted.")
+						fmt.Fprintln(sys.Stdout, "Aborted.")
 						osExit(0)
 						return
 					default:
-						fmt.Fprintln(Stdout, "Invalid input. Aborted.")
+						fmt.Fprintln(sys.Stdout, "Invalid input. Aborted.")
 						osExit(1)
 						return
 					}
@@ -162,14 +163,14 @@ func handleSync(args []string, opts GlobalOptions) {
 				}
 			}
 		} else {
-			fmt.Fprintln(Stdout, "Updates available. Pulling...")
+			fmt.Fprintln(sys.Stdout, "Updates available. Pulling...")
 		}
 	}
 
 	// Execute Pull
 	for _, row := range rows {
 		if row.RemoteRev == "" {
-			fmt.Fprintf(Stdout, "Skipping %s: Remote branch not found.\n", row.Repo)
+			fmt.Fprintf(sys.Stdout, "Skipping %s: Remote branch not found.\n", row.Repo)
 			continue
 		}
 
@@ -183,13 +184,13 @@ func handleSync(args []string, opts GlobalOptions) {
 		// - We are Behind but 'repo.Branch' config doesn't match current branch -> IsPullable is false (gated).
 		//   In this case, we MUST run pull (which behaves like standard git pull).
 		if !row.IsPullable && row.LocalHeadFull == row.RemoteHeadFull {
-			fmt.Fprintf(Stdout, "Skipping %s: Already up to date.\n", row.Repo)
+			fmt.Fprintf(sys.Stdout, "Skipping %s: Already up to date.\n", row.Repo)
 			continue
 		}
 
-		fmt.Fprintf(Stdout, "Syncing %s...\n", row.Repo)
+		fmt.Fprintf(sys.Stdout, "Syncing %s...\n", row.Repo)
 		if err := RunGitInteractive(row.RepoDir, opts.GitPath, verbose, argsPull...); err != nil {
-			fmt.Fprintf(Stderr, "Error pulling %s: %v\n", row.Repo, err)
+			fmt.Fprintf(sys.Stderr, "Error pulling %s: %v\n", row.Repo, err)
 			osExit(1) // Abort on error as per "Sequentially pull" typical strict behavior or "abort" logic
 			return
 		}

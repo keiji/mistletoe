@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	conf "mistletoe/internal/config"
+	"mistletoe/internal/sys"
 )
 
 func TestCheckRootDirectorySafety(t *testing.T) {
@@ -91,15 +92,15 @@ func TestCheckRootDirectorySafety(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Mock Stdin
-			oldStdin := Stdin
-			defer func() { Stdin = oldStdin }()
+			oldStdin := sys.Stdin
+			defer func() { sys.Stdin = oldStdin }()
 
 			// We can't easily mock os.Stdin for bufio.NewReader(Stdin) inside the function
 			// if Stdin variable is just an io.Reader, because bufio.NewReader takes io.Reader.
 			// In `init.go`: reader := bufio.NewReader(Stdin).
 			// So setting app.Stdin = strings.NewReader(...) works.
 
-			Stdin = strings.NewReader(tt.input)
+			sys.Stdin = strings.NewReader(tt.input)
 
 			// Capture Stdout to verify prompt?
 			// It's hard to capture stdout since it prints to os.Stdout directly in `init.go`.

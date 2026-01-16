@@ -2,6 +2,7 @@ package app
 
 import (
 	conf "mistletoe/internal/config"
+	"mistletoe/internal/sys"
 )
 
 import (
@@ -325,17 +326,17 @@ func runHandleStatus(t *testing.T, configFile, workDir string) (stdout string, s
 
 func runHandleStatusWithArgs(t *testing.T, workDir string, args []string, stdinInput string) (stdout string, stderr string, exitCode int) {
 	var stdoutBuf, stderrBuf bytes.Buffer
-	originalStdout, originalStderr := Stdout, Stderr
+	originalStdout, originalStderr := sys.Stdout, sys.Stderr
 	originalOsExit := osExit
 	defer func() {
-		Stdout, Stderr = originalStdout, originalStderr
+		sys.Stdout, sys.Stderr = originalStdout, originalStderr
 		osExit = originalOsExit
 	}()
-	Stdout = &stdoutBuf
-	Stderr = &stderrBuf
+	sys.Stdout = &stdoutBuf
+	sys.Stderr = &stderrBuf
 
 	// Mock Stdin
-	Stdin = strings.NewReader("")
+	sys.Stdin = strings.NewReader("")
 
 	osExit = func(code int) {
 		exitCode = code
@@ -353,7 +354,7 @@ func runHandleStatusWithArgs(t *testing.T, workDir string, args []string, stdinI
 
 	// Mock Stdin if provided
 	if stdinInput != "" {
-		Stdin = strings.NewReader(stdinInput)
+		sys.Stdin = strings.NewReader(stdinInput)
 	}
 
 	handleStatus(args, GlobalOptions{GitPath: "git"})

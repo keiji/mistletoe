@@ -2,6 +2,7 @@ package app
 
 import (
 	conf "mistletoe/internal/config"
+	"mistletoe/internal/sys"
 )
 
 import (
@@ -38,23 +39,23 @@ func TestHandlePush(t *testing.T) {
 
 	// Mock Stdout/Stderr/Stdin/osExit
 	var stdoutBuf, stderrBuf bytes.Buffer
-	originalStdout, originalStderr, originalStdin := Stdout, Stderr, Stdin
+	originalStdout, originalStderr, originalStdin := sys.Stdout, sys.Stderr, sys.Stdin
 	originalOsExit := osExit
 	defer func() {
-		Stdout, Stderr, Stdin = originalStdout, originalStderr, originalStdin
+		sys.Stdout, sys.Stderr, sys.Stdin = originalStdout, originalStderr, originalStdin
 		osExit = originalOsExit
 	}()
-	Stdout = &stdoutBuf
-	Stderr = &stderrBuf
+	sys.Stdout = &stdoutBuf
+	sys.Stderr = &stderrBuf
 
 	runHandlePush := func(input string, args ...string) (stdout string, stderr string, code int) {
 		stdoutBuf.Reset()
 		stderrBuf.Reset()
 
 		if input != "" {
-			Stdin = strings.NewReader(input)
+			sys.Stdin = strings.NewReader(input)
 		} else {
-			Stdin = strings.NewReader("")
+			sys.Stdin = strings.NewReader("")
 		}
 
 		osExit = func(c int) {

@@ -397,7 +397,7 @@ func initCommand(args []string, opts GlobalOptions) error {
 
 	configFile, err = SearchParentConfig(configFile, configData, opts.GitPath)
 	if err != nil {
-		fmt.Fprintf(Stderr, "Error searching parent config: %v\n", err)
+		fmt.Fprintf(sys.Stderr, "Error searching parent config: %v\n", err)
 	}
 
 	// Resolve absolute path for config file before any directory change

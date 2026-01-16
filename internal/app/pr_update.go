@@ -2,6 +2,7 @@ package app
 
 import (
 	conf "mistletoe/internal/config"
+	"mistletoe/internal/sys"
 	"mistletoe/internal/ui"
 )
 
@@ -52,7 +53,7 @@ func prUpdateCommand(args []string, opts GlobalOptions) error {
 
 	// Set usage output to Stderr to capture it in tests if needed,
 	// though flag package defaults to Stderr.
-	fs.SetOutput(Stderr)
+	fs.SetOutput(sys.Stderr)
 
 	if err := ParseFlagsFlexible(fs, args); err != nil {
 		return err
@@ -80,7 +81,7 @@ func prUpdateCommand(args []string, opts GlobalOptions) error {
 
 	configPath, err = SearchParentConfig(configPath, configData, opts.GitPath)
 	if err != nil {
-		fmt.Fprintf(Stderr, "Error searching parent config: %v\n", err)
+		fmt.Fprintf(sys.Stderr, "Error searching parent config: %v\n", err)
 	}
 
 	depPath := dLong
@@ -147,7 +148,7 @@ func prUpdateCommand(args []string, opts GlobalOptions) error {
 	// Collect PR Status
 	prRows := CollectPrStatus(rows, config, jobs, opts.GhPath, verbose, nil)
 	spinner.Stop()
-	RenderPrStatusTable(Stdout, prRows)
+	RenderPrStatusTable(sys.Stdout, prRows)
 
 	// 6. Check for Behind/Conflict/Detached
 	if err := ValidateStatusForAction(rows, true); err != nil {
@@ -242,7 +243,7 @@ func prUpdateCommand(args []string, opts GlobalOptions) error {
 		}
 		displayRows = append(displayRows, row)
 	}
-	RenderPrStatusTable(Stdout, displayRows)
+	RenderPrStatusTable(sys.Stdout, displayRows)
 
 	fmt.Println("Done.")
 	return nil

@@ -43,11 +43,11 @@ func RunGit(dir string, gitPath string, verbose bool, args ...string) (string, e
 	start := time.Now()
 	cmdStr := fmt.Sprintf("%s %s", gitPath, strings.Join(args, " "))
 	if verbose {
-		fmt.Fprintf(Stderr, "[CMD] %s ", cmdStr)
+		fmt.Fprintf(sys.Stderr, "[CMD] %s ", cmdStr)
 	}
 	defer func() {
 		if verbose {
-			fmt.Fprintf(Stderr, "(%s)\n", formatDuration(time.Since(start)))
+			fmt.Fprintf(sys.Stderr, "(%s)\n", formatDuration(time.Since(start)))
 		}
 	}()
 
@@ -73,11 +73,11 @@ func RunGitInteractive(dir string, gitPath string, verbose bool, args ...string)
 	start := time.Now()
 	cmdStr := fmt.Sprintf("%s %s", gitPath, strings.Join(args, " "))
 	if verbose {
-		fmt.Fprintf(Stderr, "[CMD] %s ", cmdStr)
+		fmt.Fprintf(sys.Stderr, "[CMD] %s ", cmdStr)
 	}
 	defer func() {
 		if verbose {
-			fmt.Fprintf(Stderr, "(%s)\n", formatDuration(time.Since(start)))
+			fmt.Fprintf(sys.Stderr, "(%s)\n", formatDuration(time.Since(start)))
 		}
 	}()
 
@@ -85,8 +85,8 @@ func RunGitInteractive(dir string, gitPath string, verbose bool, args ...string)
 	if dir != "" {
 		cmd.Dir = dir
 	}
-	cmd.Stdout = Stdout
-	cmd.Stderr = Stderr
+	cmd.Stdout = sys.Stdout
+	cmd.Stderr = sys.Stderr
 	cmd.Stdin = sys.Stdin
 	return cmd.Run()
 }
@@ -104,11 +104,11 @@ func RunGh(ghPath string, verbose bool, args ...string) (string, error) {
 	start := time.Now()
 	cmdStr := fmt.Sprintf("%s %s", ghPath, strings.Join(args, " "))
 	if verbose {
-		fmt.Fprintf(Stderr, "[CMD] %s ", cmdStr)
+		fmt.Fprintf(sys.Stderr, "[CMD] %s ", cmdStr)
 	}
 	defer func() {
 		if verbose {
-			fmt.Fprintf(Stderr, "(%s)\n", formatDuration(time.Since(start)))
+			fmt.Fprintf(sys.Stderr, "(%s)\n", formatDuration(time.Since(start)))
 		}
 	}()
 
@@ -146,8 +146,8 @@ func RunEditor() (string, error) {
 
 	cmd := sys.ExecCommand(editor, tmpFile.Name())
 	cmd.Stdin = sys.Stdin
-	cmd.Stdout = Stdout
-	cmd.Stderr = Stderr
+	cmd.Stdout = sys.Stdout
+	cmd.Stderr = sys.Stderr
 
 	if err := cmd.Run(); err != nil {
 		return "", fmt.Errorf("failed to run editor: %w", err)

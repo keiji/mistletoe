@@ -2,6 +2,7 @@ package app
 
 import (
 	conf "mistletoe/internal/config"
+	"mistletoe/internal/sys"
 	"mistletoe/internal/ui"
 )
 
@@ -19,7 +20,7 @@ func handleStatus(args []string, opts GlobalOptions) {
 	)
 
 	fs := flag.NewFlagSet("status", flag.ContinueOnError)
-	fs.SetOutput(Stderr)
+	fs.SetOutput(sys.Stderr)
 	fs.StringVar(&fLong, "file", DefaultConfigFile, "configuration file")
 	fs.StringVar(&fShort, "f", DefaultConfigFile, "configuration file (shorthand)")
 	fs.IntVar(&jVal, "jobs", -1, "number of concurrent jobs")
@@ -32,7 +33,7 @@ func handleStatus(args []string, opts GlobalOptions) {
 	fs.BoolVar(&yesShort, "y", false, "Automatically answer 'yes' to all prompts (shorthand)")
 
 	if err := ParseFlagsFlexible(fs, args); err != nil {
-		fmt.Fprintln(Stderr, "Error parsing flags:", err)
+		fmt.Fprintln(sys.Stderr, "Error parsing flags:", err)
 		osExit(1)
 		return
 	}
@@ -43,21 +44,21 @@ func handleStatus(args []string, opts GlobalOptions) {
 		{"verbose", "v"},
 		{"yes", "y"},
 	}); err != nil {
-		fmt.Fprintln(Stderr, "Error:", err)
+		fmt.Fprintln(sys.Stderr, "Error:", err)
 		osExit(1)
 		return
 	}
 
 	configFile, jobsFlag, configData, err := ResolveCommonValues(fLong, fShort, jVal, jValShort, ignoreStdin)
 	if err != nil {
-		fmt.Fprintf(Stderr, "Error: %v\n", err)
+		fmt.Fprintf(sys.Stderr, "Error: %v\n", err)
 		osExit(1)
 		return
 	}
 
 	configFile, err = SearchParentConfig(configFile, configData, opts.GitPath)
 	if err != nil {
-		fmt.Fprintf(Stderr, "Error searching parent config: %v\n", err)
+		fmt.Fprintf(sys.Stderr, "Error searching parent config: %v\n", err)
 	}
 
 	var config *conf.Config
@@ -68,7 +69,7 @@ func handleStatus(args []string, opts GlobalOptions) {
 	}
 
 	if err != nil {
-		fmt.Fprintln(Stderr, err)
+		fmt.Fprintln(sys.Stderr, err)
 		osExit(1)
 		return
 	}
@@ -76,7 +77,7 @@ func handleStatus(args []string, opts GlobalOptions) {
 	// Resolve Jobs
 	jobs, err := DetermineJobs(jobsFlag, config)
 	if err != nil {
-		fmt.Fprintf(Stderr, "Error: %v\n", err)
+		fmt.Fprintf(sys.Stderr, "Error: %v\n", err)
 		osExit(1)
 		return
 	}
@@ -84,7 +85,7 @@ func handleStatus(args []string, opts GlobalOptions) {
 	// Verbose Override
 	verbose := vLong || vShort
 	if verbose && jobs > 1 {
-		fmt.Fprintln(Stdout, "Verbose is specified, so jobs is treated as 1.")
+		fmt.Fprintln(sys.Stdout, "Verbose is specified, so jobs is treated as 1.")
 		jobs = 1
 	}
 
@@ -92,7 +93,7 @@ func handleStatus(args []string, opts GlobalOptions) {
 
 	fail := func(format string, a ...interface{}) {
 		spinner.Stop()
-		fmt.Fprintf(Stderr, format, a...)
+		fmt.Fprintf(sys.Stderr, format, a...)
 		osExit(1)
 	}
 
@@ -109,5 +110,5 @@ func handleStatus(args []string, opts GlobalOptions) {
 
 	spinner.Stop()
 
-	RenderStatusTable(Stdout, rows)
+	RenderStatusTable(sys.Stdout, rows)
 }
