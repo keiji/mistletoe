@@ -2,6 +2,7 @@ package app
 
 import (
 	conf "mistletoe/internal/config"
+	"mistletoe/internal/sys"
 )
 
 import (
@@ -71,7 +72,7 @@ func handleSwitch(args []string, opts GlobalOptions) {
 	)
 
 	fs := flag.NewFlagSet("switch", flag.ContinueOnError)
-	fs.SetOutput(Stderr)
+	fs.SetOutput(sys.Stderr)
 	fs.StringVar(&fLong, "file", DefaultConfigFile, "configuration file")
 	fs.StringVar(&fShort, "f", DefaultConfigFile, "configuration file (shorthand)")
 	fs.StringVar(&createLong, "create", "", "create branch if it does not exist")
@@ -86,7 +87,7 @@ func handleSwitch(args []string, opts GlobalOptions) {
 	fs.BoolVar(&yesShort, "y", false, "Automatically answer 'yes' to all prompts (shorthand)")
 
 	if err := ParseFlagsFlexible(fs, args); err != nil {
-		fmt.Fprintln(Stderr, "Error parsing flags:", err)
+		fmt.Fprintln(sys.Stderr, "Error parsing flags:", err)
 		osExit(1)
 		return
 	}
@@ -98,21 +99,21 @@ func handleSwitch(args []string, opts GlobalOptions) {
 		{"verbose", "v"},
 		{"yes", "y"},
 	}); err != nil {
-		fmt.Fprintln(Stderr, "Error:", err)
+		fmt.Fprintln(sys.Stderr, "Error:", err)
 		osExit(1)
 		return
 	}
 
 	configFile, jobsFlag, configData, err := ResolveCommonValues(fLong, fShort, jVal, jValShort, ignoreStdin)
 	if err != nil {
-		fmt.Fprintf(Stderr, "Error: %v\n", err)
+		fmt.Fprintf(sys.Stderr, "Error: %v\n", err)
 		osExit(1)
 		return
 	}
 
 	configFile, err = SearchParentConfig(configFile, configData, opts.GitPath)
 	if err != nil {
-		fmt.Fprintf(Stderr, "Error searching parent config: %v\n", err)
+		fmt.Fprintf(sys.Stderr, "Error searching parent config: %v\n", err)
 	}
 
 	createBranchName := createLong
@@ -128,7 +129,7 @@ func handleSwitch(args []string, opts GlobalOptions) {
 	}
 
 	if err != nil {
-		fmt.Fprintln(Stderr, err)
+		fmt.Fprintln(sys.Stderr, err)
 		osExit(1)
 		return
 	}
@@ -136,7 +137,7 @@ func handleSwitch(args []string, opts GlobalOptions) {
 	// Resolve Jobs
 	jobs, err := DetermineJobs(jobsFlag, config)
 	if err != nil {
-		fmt.Fprintf(Stderr, "Error: %v\n", err)
+		fmt.Fprintf(sys.Stderr, "Error: %v\n", err)
 		osExit(1)
 		return
 	}
@@ -144,7 +145,7 @@ func handleSwitch(args []string, opts GlobalOptions) {
 	// Verbose Override
 	verbose := vLong || vShort
 	if verbose && jobs > 1 {
-		fmt.Fprintln(Stdout, "Verbose is specified, so jobs is treated as 1.")
+		fmt.Fprintln(sys.Stdout, "Verbose is specified, so jobs is treated as 1.")
 		jobs = 1
 	}
 
@@ -153,7 +154,7 @@ func handleSwitch(args []string, opts GlobalOptions) {
 
 	if createBranchName != "" {
 		if len(fs.Args()) > 0 {
-			fmt.Fprintf(Stderr, "Error: Unexpected argument: %s.\n", fs.Args()[0])
+			fmt.Fprintf(sys.Stderr, "Error: Unexpected argument: %s.\n", fs.Args()[0])
 			osExit(1)
 			return
 		}
@@ -162,11 +163,11 @@ func handleSwitch(args []string, opts GlobalOptions) {
 	} else {
 		// If create flag not set, look for positional argument
 		if len(fs.Args()) == 0 {
-			fmt.Fprintln(Stderr, "Error: Branch name required.")
+			fmt.Fprintln(sys.Stderr, "Error: Branch name required.")
 			osExit(1)
 			return
 		} else if len(fs.Args()) > 1 {
-			fmt.Fprintf(Stderr, "Error: Too many arguments: %v.\n", fs.Args())
+			fmt.Fprintf(sys.Stderr, "Error: Too many arguments: %v.\n", fs.Args())
 			osExit(1)
 			return
 		}
@@ -176,7 +177,7 @@ func handleSwitch(args []string, opts GlobalOptions) {
 
 	// Validate Integrity (Moved after argument parsing)
 	if err := ValidateRepositoriesIntegrity(config, opts.GitPath, verbose); err != nil {
-		fmt.Fprintln(Stderr, err)
+		fmt.Fprintln(sys.Stderr, err)
 		osExit(1)
 		return
 	}
@@ -200,7 +201,7 @@ func handleSwitch(args []string, opts GlobalOptions) {
 
 			// Check if directory exists
 			if _, err := os.Stat(dir); os.IsNotExist(err) {
-				fmt.Fprintf(Stderr, "Error: Repository directory %s does not exist.\n", dir)
+				fmt.Fprintf(sys.Stderr, "Error: Repository directory %s does not exist.\n", dir)
 				osExit(1)
 				// Note: osExit in goroutine might not be safe/clean for tests, but it mimics main behavior.
 				// In test mock, we should probably handle this.
@@ -240,9 +241,9 @@ func handleSwitch(args []string, opts GlobalOptions) {
 		}
 
 		if len(missing) > 0 {
-			fmt.Fprintf(Stderr, "Error: Branch '%s' missing in repositories:\n", branchName)
+			fmt.Fprintf(sys.Stderr, "Error: Branch '%s' missing in repositories:\n", branchName)
 			for _, item := range missing {
-				fmt.Fprintln(Stderr, " - "+item)
+				fmt.Fprintln(sys.Stderr, " - "+item)
 			}
 			osExit(1)
 			return
@@ -257,9 +258,9 @@ func handleSwitch(args []string, opts GlobalOptions) {
 				defer func() { <-sem }()
 
 				dir := config.GetRepoPath(repo)
-				fmt.Fprintf(Stdout, "Switching %s to branch %s...\n", dir, branchName)
+				fmt.Fprintf(sys.Stdout, "Switching %s to branch %s...\n", dir, branchName)
 				if err := RunGitInteractive(dir, opts.GitPath, verbose, "checkout", branchName); err != nil {
-					fmt.Fprintf(Stderr, "Error switching branch for %s: %v.\n", dir, err)
+					fmt.Fprintf(sys.Stderr, "Error switching branch for %s: %v.\n", dir, err)
 					osExit(1)
 					return
 				}
@@ -282,16 +283,16 @@ func handleSwitch(args []string, opts GlobalOptions) {
 				mu.Unlock()
 
 				if exists {
-					fmt.Fprintf(Stdout, "Branch %s exists in %s. Switching...\n", branchName, dir)
+					fmt.Fprintf(sys.Stdout, "Branch %s exists in %s. Switching...\n", branchName, dir)
 					if err := RunGitInteractive(dir, opts.GitPath, verbose, "checkout", branchName); err != nil {
-						fmt.Fprintf(Stderr, "Error switching branch for %s: %v.\n", dir, err)
+						fmt.Fprintf(sys.Stderr, "Error switching branch for %s: %v.\n", dir, err)
 						osExit(1)
 						return
 					}
 				} else {
-					fmt.Fprintf(Stdout, "Creating and switching to branch %s in %s...\n", branchName, dir)
+					fmt.Fprintf(sys.Stdout, "Creating and switching to branch %s in %s...\n", branchName, dir)
 					if err := RunGitInteractive(dir, opts.GitPath, verbose, "checkout", "-b", branchName); err != nil {
-						fmt.Fprintf(Stderr, "Error creating branch for %s: %v.\n", dir, err)
+						fmt.Fprintf(sys.Stderr, "Error creating branch for %s: %v.\n", dir, err)
 						osExit(1)
 						return
 					}

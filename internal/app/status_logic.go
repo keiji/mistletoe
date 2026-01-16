@@ -2,6 +2,7 @@ package app
 
 import (
 	conf "mistletoe/internal/config"
+	"mistletoe/internal/sys"
 )
 
 import (
@@ -38,13 +39,13 @@ type StatusRow struct {
 // ValidateRepositoriesIntegrity checks if repositories exist and are valid.
 func ValidateRepositoriesIntegrity(config *conf.Config, gitPath string, verbose bool) error {
 	// Debug
-	// fmt.Fprintf(Stderr, "DEBUG: ValidateRepositoriesIntegrity BaseDir=%s\n", config.BaseDir)
+	// fmt.Fprintf(sys.Stderr, "DEBUG: ValidateRepositoriesIntegrity BaseDir=%s\n", config.BaseDir)
 
 	for _, repo := range *config.Repositories {
 		targetDir := config.GetRepoPath(repo)
 		info, err := os.Stat(targetDir)
 		if os.IsNotExist(err) {
-			// fmt.Fprintf(Stderr, "DEBUG: skipping %s (not exist)\n", targetDir)
+			// fmt.Fprintf(sys.Stderr, "DEBUG: skipping %s (not exist)\n", targetDir)
 			continue
 		}
 		if err != nil {
@@ -66,7 +67,7 @@ func ValidateRepositoriesIntegrity(config *conf.Config, gitPath string, verbose 
 			return fmt.Errorf("error: directory %s is a git repo but failed to get remote origin: %v", targetDir, err)
 		}
 
-		// fmt.Fprintf(Stderr, "DEBUG: targetDir=%s, currentURL='%s', expectedURL='%s'\n", targetDir, currentURL, *repo.URL)
+		// fmt.Fprintf(sys.Stderr, "DEBUG: targetDir=%s, currentURL='%s', expectedURL='%s'\n", targetDir, currentURL, *repo.URL)
 
 		if currentURL != *repo.URL {
 			return fmt.Errorf("error: directory %s exists with different remote origin: %s (expected %s)", targetDir, currentURL, *repo.URL)
@@ -201,7 +202,7 @@ func getRepoStatus(repo conf.Repository, baseDir, gitPath string, verbose bool, 
 				// We assume remote is always "origin" per ValidateRepositoriesIntegrity
 				if currentUpstream != "origin/"+branchName {
 					msg := fmt.Sprintf("Unsetting upstream for %s because the configuration is invalid (differs from origin/%s).\n", repoName, branchName)
-					fmt.Fprint(Stderr, msg)
+					fmt.Fprint(sys.Stderr, msg)
 					_, _ = RunGit(targetDir, gitPath, verbose, "branch", "--unset-upstream")
 				} else {
 					// Condition 2: Remote branch does not exist
@@ -212,7 +213,7 @@ func getRepoStatus(repo conf.Repository, baseDir, gitPath string, verbose bool, 
 						// If ls-remote succeeded (network ok) but returned no output, branch is missing.
 						if lsErr == nil && lsOut == "" {
 							msg := fmt.Sprintf("Unsetting upstream for %s because the remote branch does not exist. It will be set again if you push.\n", repoName)
-							fmt.Fprint(Stderr, msg)
+							fmt.Fprint(sys.Stderr, msg)
 							_, _ = RunGit(targetDir, gitPath, verbose, "branch", "--unset-upstream")
 						}
 					}

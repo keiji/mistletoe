@@ -2,13 +2,14 @@ package app
 
 import (
 	conf "mistletoe/internal/config"
+	"mistletoe/internal/sys"
 )
 
 import (
-	"encoding/json"
-	"flag"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
+	"flag"
 	"fmt"
 	"os"
 	"sort"
@@ -30,7 +31,7 @@ func handleSnapshot(args []string, opts GlobalOptions) {
 		yesShort  bool
 	)
 	fs := flag.NewFlagSet("snapshot", flag.ContinueOnError)
-	fs.SetOutput(Stderr)
+	fs.SetOutput(sys.Stderr)
 	fs.StringVar(&oLong, "output-file", "", "output file path")
 	fs.StringVar(&oShort, "o", "", "output file path (shorthand)")
 	fs.StringVar(&fLong, "file", DefaultConfigFile, "configuration file")
@@ -45,7 +46,7 @@ func handleSnapshot(args []string, opts GlobalOptions) {
 	fs.BoolVar(&yesShort, "y", false, "Automatically answer 'yes' to all prompts (shorthand)")
 
 	if err := ParseFlagsFlexible(fs, args); err != nil {
-		fmt.Fprintln(Stderr, "Error parsing flags:", err)
+		fmt.Fprintln(sys.Stderr, "Error parsing flags:", err)
 		osExit(1)
 		return
 	}
@@ -57,7 +58,7 @@ func handleSnapshot(args []string, opts GlobalOptions) {
 		{"verbose", "v"},
 		{"yes", "y"},
 	}); err != nil {
-		fmt.Fprintln(Stderr, "Error:", err)
+		fmt.Fprintln(sys.Stderr, "Error:", err)
 		osExit(1)
 		return
 	}
@@ -71,14 +72,14 @@ func handleSnapshot(args []string, opts GlobalOptions) {
 	var config *conf.Config
 	configPath, jobsFlag, configData, err := ResolveCommonValues(fLong, fShort, jVal, jValShort, ignoreStdin)
 	if err != nil {
-		fmt.Fprintln(Stderr, err)
+		fmt.Fprintln(sys.Stderr, err)
 		osExit(1)
 		return
 	}
 
 	configPath, err = SearchParentConfig(configPath, configData, opts.GitPath)
 	if err != nil {
-		fmt.Fprintf(Stderr, "Error searching parent config: %v\n", err)
+		fmt.Fprintf(sys.Stderr, "Error searching parent config: %v\n", err)
 	}
 
 	if configPath != "" || len(configData) > 0 {
@@ -88,7 +89,7 @@ func handleSnapshot(args []string, opts GlobalOptions) {
 			config, err = conf.LoadConfigData(configData)
 		}
 		if err != nil {
-			fmt.Fprintln(Stderr, err)
+			fmt.Fprintln(sys.Stderr, err)
 			osExit(1)
 			return
 		}
@@ -97,7 +98,7 @@ func handleSnapshot(args []string, opts GlobalOptions) {
 	// Resolve Jobs
 	jobs, err := DetermineJobs(jobsFlag, config)
 	if err != nil {
-		fmt.Fprintf(Stderr, "Error: %v\n", err)
+		fmt.Fprintf(sys.Stderr, "Error: %v\n", err)
 		osExit(1)
 		return
 	}
@@ -105,13 +106,13 @@ func handleSnapshot(args []string, opts GlobalOptions) {
 	// Verbose Override
 	verbose := vLong || vShort
 	if verbose && jobs > 1 {
-		fmt.Fprintln(Stdout, "Verbose is specified, so jobs is treated as 1.")
+		fmt.Fprintln(sys.Stdout, "Verbose is specified, so jobs is treated as 1.")
 		jobs = 1
 	}
 
 	entries, err := os.ReadDir(".")
 	if err != nil {
-		fmt.Fprintf(Stderr, "Error reading current directory: %v.\n", err)
+		fmt.Fprintf(sys.Stderr, "Error reading current directory: %v.\n", err)
 		osExit(1)
 		return
 	}
@@ -146,7 +147,7 @@ func handleSnapshot(args []string, opts GlobalOptions) {
 				// Try getting it via config if get-url fails (older git versions or odd setups)
 				url, err = RunGit(dirName, opts.GitPath, verbose, "config", "--get", "remote.origin.url")
 				if err != nil {
-					fmt.Fprintf(Stdout, "Warning: Could not get remote origin for %s. Skipping.\n", dirName)
+					fmt.Fprintf(sys.Stdout, "Warning: Could not get remote origin for %s. Skipping.\n", dirName)
 					return
 				}
 			}
@@ -154,7 +155,7 @@ func handleSnapshot(args []string, opts GlobalOptions) {
 			// Get current branch
 			branch, err := RunGit(dirName, opts.GitPath, verbose, "rev-parse", "--abbrev-ref", "HEAD")
 			if err != nil {
-				fmt.Fprintf(Stdout, "Warning: Could not get current branch for %s.\n", dirName)
+				fmt.Fprintf(sys.Stdout, "Warning: Could not get current branch for %s.\n", dirName)
 				branch = ""
 			}
 
@@ -164,7 +165,7 @@ func handleSnapshot(args []string, opts GlobalOptions) {
 				branch = ""
 				revision, err = RunGit(dirName, opts.GitPath, verbose, "rev-parse", "HEAD")
 				if err != nil {
-					fmt.Fprintf(Stdout, "Warning: Could not get revision for %s.\n", dirName)
+					fmt.Fprintf(sys.Stdout, "Warning: Could not get revision for %s.\n", dirName)
 					revision = ""
 				}
 			}
@@ -218,9 +219,9 @@ func handleSnapshot(args []string, opts GlobalOptions) {
 		outputFile = fmt.Sprintf("mistletoe-snapshot-%s.json", identifier)
 	}
 
-	fmt.Fprintf(Stderr, "DEBUG: Checking existence of %s\n", outputFile)
+	fmt.Fprintf(sys.Stderr, "DEBUG: Checking existence of %s\n", outputFile)
 	if _, err := os.Stat(outputFile); err == nil {
-		fmt.Fprintf(Stderr, "Error: Output file '%s' exists.\n", outputFile)
+		fmt.Fprintf(sys.Stderr, "Error: Output file '%s' exists.\n", outputFile)
 		osExit(1)
 		return
 	}
@@ -237,18 +238,18 @@ func handleSnapshot(args []string, opts GlobalOptions) {
 
 	data, err := json.MarshalIndent(outputConfig, "", "  ")
 	if err != nil {
-		fmt.Fprintf(Stderr, "Error generating JSON: %v.\n", err)
+		fmt.Fprintf(sys.Stderr, "Error generating JSON: %v.\n", err)
 		osExit(1)
 		return
 	}
 
 	if err := os.WriteFile(outputFile, data, 0644); err != nil {
-		fmt.Fprintf(Stderr, "Error writing to file '%s': %v.\n", outputFile, err)
+		fmt.Fprintf(sys.Stderr, "Error writing to file '%s': %v.\n", outputFile, err)
 		osExit(1)
 		return
 	}
 
-	fmt.Fprintf(Stdout, "Snapshot saved to %s\n", outputFile)
+	fmt.Fprintf(sys.Stdout, "Snapshot saved to %s\n", outputFile)
 }
 
 // GenerateSnapshot creates a snapshot JSON of the current state of repositories defined in config

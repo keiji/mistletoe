@@ -2,6 +2,8 @@ package app
 
 import (
 	conf "mistletoe/internal/config"
+	"mistletoe/internal/sys"
+	"mistletoe/internal/ui"
 )
 
 import (
@@ -27,8 +29,8 @@ func prUpdateCommand(args []string, opts GlobalOptions) error {
 		jVal      int
 		jValShort int
 		dLong     string
-		wLong      bool
-		wShort     bool
+		wLong     bool
+		wShort    bool
 		vLong     bool
 		vShort    bool
 		yes       bool
@@ -51,15 +53,9 @@ func prUpdateCommand(args []string, opts GlobalOptions) error {
 
 	// Set usage output to Stderr to capture it in tests if needed,
 	// though flag package defaults to Stderr.
-	fs.SetOutput(Stderr)
+	fs.SetOutput(sys.Stderr)
 
 	if err := ParseFlagsFlexible(fs, args); err != nil {
-		// flag package prints error automatically on ContinueOnError if parsing fails?
-		// Actually ParseFlagsFlexible calls fs.Parse. fs.Parse prints error to output.
-		// Original code printed `err` explicitly. `fs.Parse` returns error.
-		// If we return error here, we assume it's printed.
-		// However, to mimic exact behavior:
-		// fmt.Println(err)
 		return err
 	}
 
@@ -85,7 +81,7 @@ func prUpdateCommand(args []string, opts GlobalOptions) error {
 
 	configPath, err = SearchParentConfig(configPath, configData, opts.GitPath)
 	if err != nil {
-		fmt.Fprintf(Stderr, "Error searching parent config: %v\n", err)
+		fmt.Fprintf(sys.Stderr, "Error searching parent config: %v\n", err)
 	}
 
 	depPath := dLong
@@ -144,7 +140,7 @@ func prUpdateCommand(args []string, opts GlobalOptions) error {
 
 	// 5. Collect Status & PR Status
 	fmt.Println("Collecting repository status and checking for existing Pull Requests...")
-	spinner := NewSpinner(verbose)
+	spinner := ui.NewSpinner(verbose)
 	spinner.Start()
 
 	rows := CollectStatus(config, jobs, opts.GitPath, verbose, false)
@@ -152,7 +148,7 @@ func prUpdateCommand(args []string, opts GlobalOptions) error {
 	// Collect PR Status
 	prRows := CollectPrStatus(rows, config, jobs, opts.GhPath, verbose, nil)
 	spinner.Stop()
-	RenderPrStatusTable(Stdout, prRows)
+	RenderPrStatusTable(sys.Stdout, prRows)
 
 	// 6. Check for Behind/Conflict/Detached
 	if err := ValidateStatusForAction(rows, true); err != nil {
@@ -195,7 +191,7 @@ func prUpdateCommand(args []string, opts GlobalOptions) error {
 
 	// Prompt
 	reader := bufio.NewReader(os.Stdin)
-	confirmed, err := AskForConfirmation(reader, "Proceed with Push (if any) and Pull Request description update? (yes/no): ", yesFlag)
+	confirmed, err := ui.AskForConfirmation(reader, "Proceed with Push (if any) and Pull Request description update? (yes/no): ", yesFlag)
 	if err != nil {
 		fmt.Printf("Error reading input: %v\n", err)
 		return err
@@ -247,7 +243,7 @@ func prUpdateCommand(args []string, opts GlobalOptions) error {
 		}
 		displayRows = append(displayRows, row)
 	}
-	RenderPrStatusTable(Stdout, displayRows)
+	RenderPrStatusTable(sys.Stdout, displayRows)
 
 	fmt.Println("Done.")
 	return nil

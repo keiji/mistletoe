@@ -2,6 +2,8 @@ package app
 
 import (
 	conf "mistletoe/internal/config"
+	"mistletoe/internal/sys"
+	"mistletoe/internal/ui"
 )
 
 import (
@@ -93,7 +95,7 @@ func prCreateCommand(args []string, opts GlobalOptions) error {
 
 	configPath, err = SearchParentConfig(configPath, configData, opts.GitPath)
 	if err != nil {
-		fmt.Fprintf(Stderr, "Error searching parent config: %v\n", err)
+		fmt.Fprintf(sys.Stderr, "Error searching parent config: %v\n", err)
 	}
 
 	// Resolve title, body, dependency file
@@ -156,14 +158,14 @@ func prCreateCommand(args []string, opts GlobalOptions) error {
 
 	// 5. Collect Status & PR Status (Moved Up)
 	fmt.Println("Collecting repository status and checking for existing Pull Requests...")
-	spinner := NewSpinner(verbose)
+	spinner := ui.NewSpinner(verbose)
 	spinner.Start()
 	// Pass noFetch=true to CollectStatus. We rely on subsequent checks.
 	rows := CollectStatus(config, jobs, opts.GitPath, verbose, true)
 	// Initial Check: No known PRs yet
 	prRows := CollectPrStatus(rows, config, jobs, opts.GhPath, verbose, nil)
 	spinner.Stop()
-	RenderPrStatusTable(Stdout, prRows)
+	RenderPrStatusTable(sys.Stdout, prRows)
 
 	// 6. Check for Behind/Conflict/Detached
 	// Abort if pull required (behind)
@@ -354,7 +356,7 @@ func prCreateCommand(args []string, opts GlobalOptions) error {
 	reader := bufio.NewReader(os.Stdin)
 
 	if allUpdates {
-		confirmed, err := AskForConfirmation(reader, "No new Pull Requests to create. Update existing Pull Request descriptions? (yes/no): ", yesFlag)
+		confirmed, err := ui.AskForConfirmation(reader, "No new Pull Requests to create. Update existing Pull Request descriptions? (yes/no): ", yesFlag)
 		if err != nil {
 			return fmt.Errorf("Error reading input: %v", err)
 		}
@@ -365,7 +367,7 @@ func prCreateCommand(args []string, opts GlobalOptions) error {
 			return errors.New("aborted by user")
 		}
 	} else {
-		confirmed, err := AskForConfirmation(reader, "Proceed with Push and Pull Request creation? (yes/no): ", yesFlag)
+		confirmed, err := ui.AskForConfirmation(reader, "Proceed with Push and Pull Request creation? (yes/no): ", yesFlag)
 		if err != nil {
 			return fmt.Errorf("Error reading input: %v", err)
 		}
@@ -497,7 +499,7 @@ func prCreateCommand(args []string, opts GlobalOptions) error {
 
 	// 11. Show Status (Final)
 	fmt.Println("Collecting final status...")
-	spinner = NewSpinner(verbose)
+	spinner = ui.NewSpinner(verbose)
 	spinner.Start()
 	finalRows := CollectStatus(config, jobs, opts.GitPath, verbose, true)
 
@@ -513,7 +515,7 @@ func prCreateCommand(args []string, opts GlobalOptions) error {
 		}
 		displayRows = append(displayRows, row)
 	}
-	RenderPrStatusTable(Stdout, displayRows)
+	RenderPrStatusTable(sys.Stdout, displayRows)
 
 	fmt.Println("Done.")
 	return nil

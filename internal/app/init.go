@@ -2,6 +2,8 @@ package app
 
 import (
 	conf "mistletoe/internal/config"
+	"mistletoe/internal/sys"
+	"mistletoe/internal/ui"
 )
 
 import (
@@ -116,8 +118,8 @@ func checkRootDirectorySafety(config *conf.Config, configFile string, targetDir 
 			return nil
 		}
 
-		reader := bufio.NewReader(Stdin)
-		ok, err := AskForConfirmationRequired(reader, "Are you sure you want to initialize in this directory? [yes/no] ", yes)
+		reader := bufio.NewReader(sys.Stdin)
+		ok, err := ui.AskForConfirmationRequired(reader, "Are you sure you want to initialize in this directory? [yes/no] ", yes)
 		if err != nil {
 			return fmt.Errorf("error reading confirmation: %w", err)
 		}
@@ -395,7 +397,7 @@ func initCommand(args []string, opts GlobalOptions) error {
 
 	configFile, err = SearchParentConfig(configFile, configData, opts.GitPath)
 	if err != nil {
-		fmt.Fprintf(Stderr, "Error searching parent config: %v\n", err)
+		fmt.Fprintf(sys.Stderr, "Error searching parent config: %v\n", err)
 	}
 
 	// Resolve absolute path for config file before any directory change

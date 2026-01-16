@@ -2,6 +2,7 @@ package app
 
 import (
 	conf "mistletoe/internal/config"
+	"mistletoe/internal/sys"
 )
 
 import (
@@ -88,14 +89,14 @@ func TestHandleSwitch(t *testing.T) {
 
 	// Mock Stdout/Stderr and osExit
 	var stdoutBuf, stderrBuf bytes.Buffer
-	originalStdout, originalStderr := Stdout, Stderr
+	originalStdout, originalStderr := sys.Stdout, sys.Stderr
 	originalOsExit := osExit
 	defer func() {
-		Stdout, Stderr = originalStdout, originalStderr
+		sys.Stdout, sys.Stderr = originalStdout, originalStderr
 		osExit = originalOsExit
 	}()
-	Stdout = &stdoutBuf
-	Stderr = &stderrBuf
+	sys.Stdout = &stdoutBuf
+	sys.Stderr = &stderrBuf
 
 	// Helper to run handleSwitch with capture
 	runHandleSwitch := func(args ...string) (stdout string, stderr string, code int) {
@@ -103,7 +104,7 @@ func TestHandleSwitch(t *testing.T) {
 		stderrBuf.Reset()
 
 		// Mock Stdin to empty
-		Stdin = strings.NewReader("")
+		sys.Stdin = strings.NewReader("")
 
 		osExit = func(c int) {
 			code = c
@@ -330,14 +331,14 @@ func TestHandleSwitch_ConfigureUpstream(t *testing.T) {
 
 	// 5. Mock Globals
 	var stdoutBuf, stderrBuf bytes.Buffer
-	originalStdout, originalStderr := Stdout, Stderr
+	originalStdout, originalStderr := sys.Stdout, sys.Stderr
 	originalOsExit := osExit
 	defer func() {
-		Stdout, Stderr = originalStdout, originalStderr
+		sys.Stdout, sys.Stderr = originalStdout, originalStderr
 		osExit = originalOsExit
 	}()
-	Stdout = &stdoutBuf
-	Stderr = &stderrBuf
+	sys.Stdout = &stdoutBuf
+	sys.Stderr = &stderrBuf
 
 	osExit = func(c int) {
 		panic(c)
@@ -386,7 +387,7 @@ func TestHandleSwitch_ConfigureUpstream(t *testing.T) {
 	}
 
 	// Mock Stdin
-	Stdin = strings.NewReader("")
+	sys.Stdin = strings.NewReader("")
 
 	args := []string{"-c", "feature-up", "--file", configPath, "--ignore-stdin"}
 	handleSwitch(args, GlobalOptions{GitPath: "git"})
@@ -500,17 +501,17 @@ func TestHandleSwitch_Conflict(t *testing.T) {
 
 	// 7. Mock Globals & Run HandleSwitch
 	var stdoutBuf, stderrBuf bytes.Buffer
-	originalStdout, originalStderr := Stdout, Stderr
+	originalStdout, originalStderr := sys.Stdout, sys.Stderr
 	originalOsExit := osExit
 	defer func() {
-		Stdout, Stderr = originalStdout, originalStderr
+		sys.Stdout, sys.Stderr = originalStdout, originalStderr
 		osExit = originalOsExit
 	}()
-	Stdout = &stdoutBuf
-	Stderr = &stderrBuf
+	sys.Stdout = &stdoutBuf
+	sys.Stderr = &stderrBuf
 	osExit = func(c int) { panic(c) }
 
-	Stdin = strings.NewReader("")
+	sys.Stdin = strings.NewReader("")
 
 	// We run switch to 'conflict-branch'. It exists locally.
 	// mstl should see it exists, checkout it (already checked out or switch to it).
@@ -612,21 +613,21 @@ func TestHandleSwitch_RemoteFallback(t *testing.T) {
 
 	// 6. Mock Globals & Run HandleSwitch
 	var stdoutBuf, stderrBuf bytes.Buffer
-	originalStdout, originalStderr := Stdout, Stderr
+	originalStdout, originalStderr := sys.Stdout, sys.Stderr
 	originalOsExit := osExit
 	defer func() {
-		Stdout, Stderr = originalStdout, originalStderr
+		sys.Stdout, sys.Stderr = originalStdout, originalStderr
 		osExit = originalOsExit
 	}()
-	Stdout = &stdoutBuf
-	Stderr = &stderrBuf
+	sys.Stdout = &stdoutBuf
+	sys.Stderr = &stderrBuf
 
 	exitCode := 0
 	osExit = func(c int) {
 		exitCode = c
 	}
 
-	Stdin = strings.NewReader("")
+	sys.Stdin = strings.NewReader("")
 
 	// Run without -c
 	args := []string{"remote-only", "--file", configPath, "--ignore-stdin"}

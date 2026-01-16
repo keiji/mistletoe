@@ -2,6 +2,8 @@ package app
 
 import (
 	conf "mistletoe/internal/config"
+	"mistletoe/internal/sys"
+	"mistletoe/internal/ui"
 )
 
 import (
@@ -41,7 +43,7 @@ func prStatusCommand(args []string, opts GlobalOptions) error {
 	fs.BoolVar(&yes, "yes", false, "Automatically answer 'yes' to all prompts")
 	fs.BoolVar(&yesShort, "y", false, "Automatically answer 'yes' to all prompts (shorthand)")
 
-	fs.SetOutput(Stderr)
+	fs.SetOutput(sys.Stderr)
 
 	if err := ParseFlagsFlexible(fs, args); err != nil {
 		fmt.Println(err)
@@ -67,7 +69,7 @@ func prStatusCommand(args []string, opts GlobalOptions) error {
 
 	configPath, err = SearchParentConfig(configPath, configData, opts.GitPath)
 	if err != nil {
-		fmt.Fprintf(Stderr, "Error searching parent config: %v\n", err)
+		fmt.Fprintf(sys.Stderr, "Error searching parent config: %v\n", err)
 	}
 
 	// Verbose Override (Forward declaration needed)
@@ -112,7 +114,7 @@ func prStatusCommand(args []string, opts GlobalOptions) error {
 	}
 
 	// Initialize Spinner
-	spinner := NewSpinner(verbose)
+	spinner := ui.NewSpinner(verbose)
 	spinner.Start()
 
 	// 4. Collect Status
@@ -124,7 +126,7 @@ func prStatusCommand(args []string, opts GlobalOptions) error {
 	spinner.Stop()
 
 	// 6. Render
-	RenderPrStatusTable(Stdout, prRows)
+	RenderPrStatusTable(sys.Stdout, prRows)
 
 	return nil
 }

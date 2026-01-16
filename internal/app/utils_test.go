@@ -11,6 +11,8 @@ import (
 	"bufio"
 
 	conf "mistletoe/internal/config"
+	"mistletoe/internal/sys"
+	"mistletoe/internal/ui"
 )
 
 // TestRunEditor verifies RunEditor functionality.
@@ -18,10 +20,10 @@ import (
 // that writes to the file.
 func TestRunEditor(t *testing.T) {
 	// Mock ExecCommand
-	originalExecCommand := ExecCommand
-	defer func() { ExecCommand = originalExecCommand }()
+	originalExecCommand := sys.ExecCommand
+	defer func() { sys.ExecCommand = originalExecCommand }()
 
-	ExecCommand = func(name string, arg ...string) *exec.Cmd {
+	sys.ExecCommand = func(name string, arg ...string) *exec.Cmd {
 		// Mock behavior: write "Edited content" to the file (arg[0])
 		return exec.Command(os.Args[0], "-test.run=TestHelperProcess_Editor", "--", arg[0])
 	}
@@ -85,10 +87,10 @@ func TestHelperProcess_Editor(t *testing.T) {
 
 func TestRunEditor_Empty(t *testing.T) {
 	// Mock ExecCommand to write nothing
-	originalExecCommand := ExecCommand
-	defer func() { ExecCommand = originalExecCommand }()
+	originalExecCommand := sys.ExecCommand
+	defer func() { sys.ExecCommand = originalExecCommand }()
 
-	ExecCommand = func(name string, arg ...string) *exec.Cmd {
+	sys.ExecCommand = func(name string, arg ...string) *exec.Cmd {
 		return exec.Command(os.Args[0], "-test.run=TestHelperProcess_EditorEmpty", "--", arg[0])
 	}
 
@@ -121,13 +123,13 @@ func TestHelperProcess_EditorEmpty(t *testing.T) {
 
 func TestSpinner(t *testing.T) {
 	// Test Normal Spinner
-	s := NewSpinner(false)
+	s := ui.NewSpinner(false)
 	s.Start()
 	// Let it run briefly
 	s.Stop()
 
 	// Test Verbose Spinner (No-op)
-	sVerbose := NewSpinner(true)
+	sVerbose := ui.NewSpinner(true)
 	sVerbose.Start()
 	// Should do nothing
 	sVerbose.Stop()
@@ -155,8 +157,8 @@ func TestFormatDuration(t *testing.T) {
 }
 
 func TestResolveCommonValues(t *testing.T) {
-	originalStdin := Stdin
-	defer func() { Stdin = originalStdin }()
+	originalStdin := sys.Stdin
+	defer func() { sys.Stdin = originalStdin }()
 
 	tests := []struct {
 		name        string
@@ -286,9 +288,9 @@ func TestResolveCommonValues(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.stdinData != "" {
-				Stdin = strings.NewReader(tt.stdinData)
+				sys.Stdin = strings.NewReader(tt.stdinData)
 			} else {
-				Stdin = strings.NewReader("")
+				sys.Stdin = strings.NewReader("")
 			}
 
 			gotFile, gotP, gotData, err := ResolveCommonValues(tt.fLong, tt.fShort, tt.jVal, tt.jValShort, tt.ignoreStdin)
@@ -455,7 +457,7 @@ func TestAskForConfirmation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			reader := bufio.NewReader(strings.NewReader(tt.input))
-			got, err := AskForConfirmation(reader, "Prompt? ", tt.yesFlag)
+			got, err := ui.AskForConfirmation(reader, "Prompt? ", tt.yesFlag)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("AskForConfirmation() error = %v, wantErr %v", err, tt.wantErr)
 				return

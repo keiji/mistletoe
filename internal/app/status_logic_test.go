@@ -2,6 +2,7 @@ package app
 
 import (
 	conf "mistletoe/internal/config"
+	"mistletoe/internal/sys"
 )
 
 import (
@@ -181,10 +182,10 @@ func TestCollectStatus(t *testing.T) {
 
 func TestCollectStatus_UpstreamFix(t *testing.T) {
 	// Capture Stderr
-	originalStderr := Stderr
+	originalStderr := sys.Stderr
 	var stderrBuf bytes.Buffer
-	Stderr = &stderrBuf
-	defer func() { Stderr = originalStderr }()
+	sys.Stderr = &stderrBuf
+	defer func() { sys.Stderr = originalStderr }()
 
 	tmpDir := t.TempDir()
 	cwd, _ := os.Getwd()

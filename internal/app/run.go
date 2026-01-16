@@ -3,8 +3,9 @@ package app
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
+
+	"mistletoe/internal/sys"
 )
 
 // Jobs processing constants.
@@ -26,9 +27,6 @@ type GlobalOptions struct {
 	GitPath string
 	GhPath  string
 }
-
-// execCommand is used for mocking exec.Command in tests.
-var execCommand = exec.Command
 
 func parseArgs(args []string) (string, []string, error) {
 	// Skip the first argument as it is the program name
@@ -58,17 +56,17 @@ func getGhPath() string {
 }
 
 func validateGit(gitPath string) error {
-	cmd := execCommand(gitPath, "--version")
+	cmd := sys.ExecCommand(gitPath, "--version")
 	return cmd.Run()
 }
 
 func validateGh(ghPath string) error {
-	cmd := execCommand(ghPath, "--version")
+	cmd := sys.ExecCommand(ghPath, "--version")
 	return cmd.Run()
 }
 
 func validateGhAuth(ghPath string) error {
-	cmd := execCommand(ghPath, "auth", "status")
+	cmd := sys.ExecCommand(ghPath, "auth", "status")
 	return cmd.Run()
 }
 

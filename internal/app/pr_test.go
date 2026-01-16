@@ -2,6 +2,7 @@ package app
 
 import (
 	conf "mistletoe/internal/config"
+	"mistletoe/internal/sys"
 )
 
 import (
@@ -183,12 +184,12 @@ func handleGitMock(args []string) {
 }
 
 func TestCheckGhAvailability(t *testing.T) {
-	oldExec := ExecCommand
-	ExecCommand = fakeExecCommand
+	oldExec := sys.ExecCommand
+	sys.ExecCommand = fakeExecCommand
 	oldLookPath := lookPath
 	lookPath = func(_ string) (string, error) { return "/usr/bin/gh", nil }
 	defer func() {
-		ExecCommand = oldExec
+		sys.ExecCommand = oldExec
 		lookPath = oldLookPath
 	}()
 
@@ -199,9 +200,9 @@ func TestCheckGhAvailability(t *testing.T) {
 }
 
 func TestVerifyGithubRequirements_Success(t *testing.T) {
-	oldExec := ExecCommand
-	ExecCommand = fakeExecCommand
-	defer func() { ExecCommand = oldExec }()
+	oldExec := sys.ExecCommand
+	sys.ExecCommand = fakeExecCommand
+	defer func() { sys.ExecCommand = oldExec }()
 
 	// Use "." as ID so RunGit runs in CWD, avoiding potential issues with test binary in tmp dir
 	id := "."
@@ -224,9 +225,9 @@ func TestVerifyGithubRequirements_Success(t *testing.T) {
 }
 
 func TestVerifyGithubRequirements_ExistingPR(t *testing.T) {
-	oldExec := ExecCommand
-	ExecCommand = fakeExecCommand
-	defer func() { ExecCommand = oldExec }()
+	oldExec := sys.ExecCommand
+	sys.ExecCommand = fakeExecCommand
+	defer func() { sys.ExecCommand = oldExec }()
 
 	id := "."
 	url := "https://github.com/user/repo.git"
@@ -248,9 +249,9 @@ func TestVerifyGithubRequirements_ExistingPR(t *testing.T) {
 }
 
 func TestVerifyGithubRequirements_MissingBaseBranch(t *testing.T) {
-	oldExec := ExecCommand
-	ExecCommand = fakeExecCommand
-	defer func() { ExecCommand = oldExec }()
+	oldExec := sys.ExecCommand
+	sys.ExecCommand = fakeExecCommand
+	defer func() { sys.ExecCommand = oldExec }()
 
 	id := "."
 	url := "https://github.com/user/repo.git"
@@ -275,9 +276,9 @@ func TestVerifyGithubRequirements_MissingBaseBranch(t *testing.T) {
 }
 
 func TestExecutePrCreation_NoCommitsError(t *testing.T) {
-	oldExec := ExecCommand
-	ExecCommand = fakeExecCommand
-	defer func() { ExecCommand = oldExec }()
+	oldExec := sys.ExecCommand
+	sys.ExecCommand = fakeExecCommand
+	defer func() { sys.ExecCommand = oldExec }()
 
 	id := "."
 	url := "https://github.com/user/repo.git"

@@ -5,6 +5,8 @@ import (
 	"os"
 	"os/exec"
 	"testing"
+
+	"mistletoe/internal/sys"
 )
 
 // TestSetupHelperProcess is a helper process for mocking exec.Command for setup checks
@@ -56,21 +58,21 @@ func TestSetupHelperProcess(_ *testing.T) {
 
 func TestValidateGit(t *testing.T) {
 	// Mock execCommand
-	execCommand = func(name string, arg ...string) *exec.Cmd {
+	sys.ExecCommand = func(name string, arg ...string) *exec.Cmd {
 		cs := []string{"-test.run=TestSetupHelperProcess", "--", name}
 		cs = append(cs, arg...)
 		cmd := exec.Command(os.Args[0], cs...)
 		cmd.Env = append(os.Environ(), "GO_WANT_HELPER_PROCESS=1")
 		return cmd
 	}
-	defer func() { execCommand = exec.Command }()
+	defer func() { sys.ExecCommand = exec.Command }()
 
 	if err := validateGit("git"); err != nil {
 		t.Errorf("validateGit(git) failed: %v", err)
 	}
 
 	// Test failure
-	execCommand = func(name string, arg ...string) *exec.Cmd {
+	sys.ExecCommand = func(name string, arg ...string) *exec.Cmd {
 		cs := []string{"-test.run=TestSetupHelperProcess", "--", "fail-cmd"}
 		cs = append(cs, arg...)
 		cmd := exec.Command(os.Args[0], cs...)
@@ -84,21 +86,21 @@ func TestValidateGit(t *testing.T) {
 
 func TestValidateGh(t *testing.T) {
 	// Mock execCommand
-	execCommand = func(name string, arg ...string) *exec.Cmd {
+	sys.ExecCommand = func(name string, arg ...string) *exec.Cmd {
 		cs := []string{"-test.run=TestSetupHelperProcess", "--", name}
 		cs = append(cs, arg...)
 		cmd := exec.Command(os.Args[0], cs...)
 		cmd.Env = append(os.Environ(), "GO_WANT_HELPER_PROCESS=1")
 		return cmd
 	}
-	defer func() { execCommand = exec.Command }()
+	defer func() { sys.ExecCommand = exec.Command }()
 
 	if err := validateGh("gh"); err != nil {
 		t.Errorf("validateGh(gh) failed: %v", err)
 	}
 
 	// Test failure
-	execCommand = func(name string, arg ...string) *exec.Cmd {
+	sys.ExecCommand = func(name string, arg ...string) *exec.Cmd {
 		cs := []string{"-test.run=TestSetupHelperProcess", "--", "fail-cmd"}
 		cs = append(cs, arg...)
 		cmd := exec.Command(os.Args[0], cs...)
@@ -112,21 +114,21 @@ func TestValidateGh(t *testing.T) {
 
 func TestValidateGhAuth(t *testing.T) {
 	// Mock execCommand
-	execCommand = func(name string, arg ...string) *exec.Cmd {
+	sys.ExecCommand = func(name string, arg ...string) *exec.Cmd {
 		cs := []string{"-test.run=TestSetupHelperProcess", "--", name}
 		cs = append(cs, arg...)
 		cmd := exec.Command(os.Args[0], cs...)
 		cmd.Env = append(os.Environ(), "GO_WANT_HELPER_PROCESS=1")
 		return cmd
 	}
-	defer func() { execCommand = exec.Command }()
+	defer func() { sys.ExecCommand = exec.Command }()
 
 	if err := validateGhAuth("gh"); err != nil {
 		t.Errorf("validateGhAuth(gh) failed: %v", err)
 	}
 
 	// Test auth failure
-	execCommand = func(name string, arg ...string) *exec.Cmd {
+	sys.ExecCommand = func(name string, arg ...string) *exec.Cmd {
 		cs := []string{"-test.run=TestSetupHelperProcess", "--", name}
 		cs = append(cs, arg...)
 		cmd := exec.Command(os.Args[0], cs...)
