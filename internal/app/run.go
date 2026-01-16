@@ -27,6 +27,9 @@ type GlobalOptions struct {
 	GhPath  string
 }
 
+// execCommand is used for mocking exec.Command in tests.
+var execCommand = exec.Command
+
 func parseArgs(args []string) (string, []string, error) {
 	// Skip the first argument as it is the program name
 	if len(args) < 2 {
@@ -55,7 +58,17 @@ func getGhPath() string {
 }
 
 func validateGit(gitPath string) error {
-	cmd := exec.Command(gitPath, "--version")
+	cmd := execCommand(gitPath, "--version")
+	return cmd.Run()
+}
+
+func validateGh(ghPath string) error {
+	cmd := execCommand(ghPath, "--version")
+	return cmd.Run()
+}
+
+func validateGhAuth(ghPath string) error {
+	cmd := execCommand(ghPath, "auth", "status")
 	return cmd.Run()
 }
 
@@ -75,19 +88,36 @@ func Run(appType Type, version, hash string, args []string, extraHandler func(st
 		os.Exit(1)
 	}
 
+	// Determine if command allows skipping checks (e.g. help, version)
+	isPermissive := subcmdName == CmdHelp || subcmdName == CmdVersion || subcmdName == ""
+
+	// 1. Verify Git (Required for both mstl and mstl-gh)
 	gitPath := getGitPath()
 	gitErr := validateGit(gitPath)
-
-	isPermissive := subcmdName == CmdHelp || subcmdName == CmdVersion || subcmdName == ""
 
 	if gitErr != nil && !isPermissive {
 		fmt.Printf("Error: Git is not callable at '%s'. (%v)\n", gitPath, gitErr)
 		os.Exit(1)
 	}
 
+	// 2. Verify Gh (Required for mstl-gh only)
 	ghPath := "gh"
 	if appType == TypeMstlGh {
 		ghPath = getGhPath()
+
+		if !isPermissive {
+			ghErr := validateGh(ghPath)
+			if ghErr != nil {
+				fmt.Printf("Error: GitHub CLI (gh) is not callable at '%s'. (%v)\n", ghPath, ghErr)
+				os.Exit(1)
+			}
+
+			ghAuthErr := validateGhAuth(ghPath)
+			if ghAuthErr != nil {
+				fmt.Printf("Error: GitHub CLI (gh) is not logged in. Please run 'gh auth login'. (%v)\n", ghAuthErr)
+				os.Exit(1)
+			}
+		}
 	}
 
 	opts := GlobalOptions{
