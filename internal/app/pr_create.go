@@ -401,9 +401,45 @@ func prCreateCommand(args []string, opts GlobalOptions) error {
 		prExistsMapURLs[k] = urls
 	}
 
-	_, err = verifyGithubRequirements(activeRepos, config.BaseDir, rows, jobs, opts.GitPath, opts.GhPath, verbose, prExistsMapURLs)
+	_, skippedByRequirements, err := verifyGithubRequirements(activeRepos, config.BaseDir, rows, jobs, opts.GitPath, opts.GhPath, verbose, prExistsMapURLs)
 	if err != nil {
 		return err
+	}
+
+	// Filter out repositories skipped during verification (missing base branch)
+	if len(skippedByRequirements) > 0 {
+		// Use a map for efficient lookups
+		skippedMap := make(map[string]bool)
+		for _, s := range skippedByRequirements {
+			skippedMap[s] = true
+		}
+
+		// Helper to filter slice
+		filter := func(list []conf.Repository) []conf.Repository {
+			var kept []conf.Repository
+			for _, r := range list {
+				if !skippedMap[getRepoName(r)] {
+					kept = append(kept, r)
+				}
+			}
+			return kept
+		}
+
+		pushList = filter(pushList)
+		createList = filter(createList)
+		updateList = filter(updateList)
+		// activeRepos doesn't need explicit filtering as it's just used for verifyGithubRequirements,
+		// but if we used it later, we would need to filter it too.
+		// However, pushList/createList/updateList are used for execution.
+
+		// Log skipped again or summarize if needed, though verifyGithubRequirements already logged warnings.
+		fmt.Printf("Skipped %d repositories due to missing base branches.\n", len(skippedByRequirements))
+	}
+
+	// Re-check if we have anything to do after filtering
+	if len(pushList) == 0 && len(createList) == 0 && len(updateList) == 0 {
+		fmt.Println("No active repositories remaining to process.")
+		return nil
 	}
 
 	// 9. Execution Phase 1: Push
