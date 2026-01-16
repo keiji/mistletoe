@@ -83,6 +83,8 @@ flowchart TD
     SetNoSkip --> VerifyBase
 
     VerifyBase -- "エラー" --> ErrorState["エラー停止"]
+    VerifyBase -- "Baseブランチ無し" --> SkipRepo["リポジトリスキップ"]
+    SkipRepo --> GenSnapshot
     VerifyBase -- "OK" --> CheckEditor{"エディタ起動？"}
     CheckEditor -- "Yes" --> InputContent["タイトル・本文入力 (エディタ)\n(解析ルール適用)"]
     CheckEditor -- "No" --> GenSnapshot["スナップショット生成"]
@@ -233,7 +235,7 @@ PR 本文の末尾に、自動生成された不可視（または折りたた�
 *   **GitHub のみ**: URL が GitHub を指していないリポジトリはスキップまたはエラー。
 *   **クリーンな状態**: 全てのリポジトリが最新（Up-to-date）であり、ローカルの変更がないことが推奨されますが、実装上は「プッシュ可能であること」の確認。
 *   **Detached HEAD 禁止**: ブランチ上にいない（Detached HEAD）リポジトリがある場合、PR 作成先が不明確なためエラー。
-*   **Baseブランチの存在**: PRの作成先となるBaseブランチが設定ファイルに指定（`base-branch` 優先、なければ `branch`）されており、かつリモートに存在しない場合、エラーとして終了します。
+*   **Baseブランチの存在**: PRの作成先となるBaseブランチが設定ファイルに指定（`base-branch` 優先、なければ `branch`）されており、かつリモートに存在しない場合、**そのリポジトリの処理はスキップ**されます（エラーにはなりません）。
 
 ### 3.8. 状態の再確認 (Final Verification)
 

@@ -617,13 +617,14 @@ func checkGhAvailability(ghPath string, verbose bool) error {
 }
 
 // verifyGithubRequirements checks GitHub URL, permissions, base branch existence, and existing PRs.
-// It returns a map of RepoName -> Existing PR URL.
+// It returns a map of RepoName -> Existing PR URL, and a list of skipped repositories (due to missing base branch).
 // Accepts knownPRs map[string][]string (ID -> []URL) to optimize existing PR check.
-func verifyGithubRequirements(repos []conf.Repository, baseDir string, rows []StatusRow, jobs int, gitPath, ghPath string, verbose bool, knownPRs map[string][]string) (map[string]string, error) {
+func verifyGithubRequirements(repos []conf.Repository, baseDir string, rows []StatusRow, jobs int, gitPath, ghPath string, verbose bool, knownPRs map[string][]string) (map[string]string, []string, error) {
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, jobs)
 	var errs []string
+	var skippedRepos []string
 	existingPRs := make(map[string]string)
 
 	statusMap := make(map[string]StatusRow)
@@ -683,7 +684,9 @@ func verifyGithubRequirements(repos []conf.Repository, baseDir string, rows []St
 				}
 				if remoteHash == "" {
 					mu.Lock()
-					errs = append(errs, fmt.Sprintf("[%s] base branch '%s' does not exist on remote", repoName, baseBranch))
+					// Log warning immediately
+					fmt.Printf("[%s] Warning: base branch '%s' does not exist on remote. Skipping.\n", repoName, baseBranch)
+					skippedRepos = append(skippedRepos, repoName)
 					mu.Unlock()
 					return
 				}
@@ -737,9 +740,9 @@ func verifyGithubRequirements(repos []conf.Repository, baseDir string, rows []St
 	wg.Wait()
 
 	if len(errs) > 0 {
-		return nil, fmt.Errorf("GitHub validation failed:\n%s", strings.Join(errs, "\n"))
+		return nil, nil, fmt.Errorf("GitHub validation failed:\n%s", strings.Join(errs, "\n"))
 	}
-	return existingPRs, nil
+	return existingPRs, skippedRepos, nil
 }
 
 // LoadDependencyGraph loads and parses the dependency graph from the specified file.
