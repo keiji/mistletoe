@@ -236,6 +236,33 @@ func TestLoadConfigData_Validation(t *testing.T) {
 			wantErr: ErrInvalidID,
 		},
 		{
+			name: "Invalid ID with slash",
+			input: `{
+				"repositories": [
+					{"id": "repo/1", "url": "http://a"}
+				]
+			}`,
+			wantErr: ErrInvalidID,
+		},
+		{
+			name: "Invalid ID with special char",
+			input: `{
+				"repositories": [
+					{"id": "repo*", "url": "http://a"}
+				]
+			}`,
+			wantErr: ErrInvalidID,
+		},
+		{
+			name: "Invalid ID path traversal",
+			input: `{
+				"repositories": [
+					{"id": "../repo1", "url": "http://a"}
+				]
+			}`,
+			wantErr: ErrInvalidID, // regex fails on /
+		},
+		{
 			name: "Invalid URL ext protocol",
 			input: `{
 				"repositories": [
@@ -249,6 +276,15 @@ func TestLoadConfigData_Validation(t *testing.T) {
 			input: `{
 				"repositories": [
 					{"id": "valid-id", "url": "http://example.com/\n"}
+				]
+			}`,
+			wantErr: ErrInvalidURL,
+		},
+		{
+			name: "Invalid URL starts with dash",
+			input: `{
+				"repositories": [
+					{"url": "-flags"}
 				]
 			}`,
 			wantErr: ErrInvalidURL,
@@ -279,6 +315,36 @@ func TestLoadConfigData_Validation(t *testing.T) {
 				]
 			}`,
 			wantErr: ErrInvalidGitRef,
+		},
+		{
+			name: "Invalid Jobs 0",
+			input: `{
+				"jobs": 0,
+				"repositories": [
+					{"url": "http://a"}
+				]
+			}`,
+			wantErr: ErrInvalidJobs,
+		},
+		{
+			name: "Invalid Jobs Negative",
+			input: `{
+				"jobs": -1,
+				"repositories": [
+					{"url": "http://a"}
+				]
+			}`,
+			wantErr: ErrInvalidJobs,
+		},
+		{
+			name: "Valid Configuration with Jobs",
+			input: `{
+				"jobs": 1,
+				"repositories": [
+					{"id": "repo1", "url": "http://example.com/r1"}
+				]
+			}`,
+			wantErr: nil,
 		},
 		{
 			name: "Valid Configuration",

@@ -25,6 +25,8 @@ var (
 	ErrInvalidURL = errors.New("Invalid repository URL")
 	// ErrInvalidGitRef indicates that the git reference is invalid.
 	ErrInvalidGitRef = errors.New("Invalid git reference")
+	// ErrInvalidJobs indicates that the jobs value is invalid.
+	ErrInvalidJobs = errors.New("Invalid jobs value")
 )
 
 var (
@@ -78,9 +80,16 @@ func ParseConfig(data []byte) (*Config, error) {
 	return &config, nil
 }
 
-// validateRepositories checks for duplicate IDs in the repository list.
-// If an ID is missing, it is derived from the URL.
-func validateRepositories(repos []Repository) error {
+// validateConfig checks the configuration for validity.
+func validateConfig(config *Config) error {
+	// Validate Jobs
+	if config.Jobs != nil {
+		if *config.Jobs <= 0 {
+			return fmt.Errorf("%w: %d (must be > 0)", ErrInvalidJobs, *config.Jobs)
+		}
+	}
+
+	repos := *config.Repositories
 	seenIDs := make(map[string]bool)
 	for i := range repos {
 		repo := &repos[i]
@@ -115,6 +124,10 @@ func validateRepositories(repos []Repository) error {
 			// Check for control characters
 			if strings.ContainsAny(*repo.URL, "\n\r\t") {
 				return fmt.Errorf("%w: %s (contains control characters)", ErrInvalidURL, *repo.URL)
+			}
+			// Check for flag injection
+			if strings.HasPrefix(*repo.URL, "-") {
+				return fmt.Errorf("%w: %s (cannot start with -)", ErrInvalidURL, *repo.URL)
 			}
 		}
 
@@ -183,7 +196,7 @@ func LoadConfigData(data []byte) (*Config, error) {
 		return nil, err
 	}
 
-	if err := validateRepositories(*config.Repositories); err != nil {
+	if err := validateConfig(config); err != nil {
 		return nil, fmt.Errorf("Error validating configuration: %w", err)
 	}
 
