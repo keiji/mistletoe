@@ -487,10 +487,8 @@ func prCreateCommand(args []string, opts GlobalOptions) error {
 	}
 
 	filename := fmt.Sprintf("mistletoe-snapshot-%s.json", snapshotID)
-	if err := os.WriteFile(filename, snapshotData, 0644); err != nil {
-		return fmt.Errorf("error writing snapshot file: %v", err)
-	}
-	fmt.Printf("Snapshot saved to %s\n", filename)
+	// Snapshot is not saved to local file in 'pr create', but filename is used for PR body reference.
+	// if err := os.WriteFile(filename, snapshotData, 0644); err != nil { ... }
 
 	fmt.Println("Updating Pull Request descriptions...")
 	// We pass finalPrMap (containing ALL PRs, including merged/closed) to ensure Related Links are complete.
