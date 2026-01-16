@@ -43,6 +43,34 @@ func buildBinaryForTest(t *testing.T, cmdName string) string {
 	return binPath
 }
 
+// setupMockGh builds a dummy gh executable that always succeeds.
+// It returns the directory containing the executable, suitable for GH_EXEC_PATH.
+func setupMockGh(t *testing.T) string {
+	dir := t.TempDir()
+	src := filepath.Join(dir, "main.go")
+	content := `package main
+import "os"
+func main() { os.Exit(0) }
+`
+	if err := os.WriteFile(src, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	binName := "gh"
+	if runtime.GOOS == "windows" {
+		binName += ".exe"
+	}
+	binPath := filepath.Join(dir, binName)
+
+	cmd := exec.Command("go", "build", "-o", binPath, src)
+	// Use same env as test process (needed for go build cache etc)
+	cmd.Env = os.Environ()
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("failed to build mock gh: %v", err)
+	}
+	return dir
+}
+
 func TestMstlAndMstlGhCompatibility(t *testing.T) {
 	// 1. Build binaries
 	binMstl := buildBinaryForTest(t, "mstl")
@@ -129,6 +157,9 @@ func TestMstlAndMstlGhCompatibility(t *testing.T) {
 			}
 		}
 
+		// Prepare mock gh for mstl-gh
+		mockGhDir := setupMockGh(t)
+
 		// Run mstl-gh init
 		dirMstlGh := t.TempDir()
 		configFileMstlGh := filepath.Join(dirMstlGh, "repos.json")
@@ -138,6 +169,7 @@ func TestMstlAndMstlGhCompatibility(t *testing.T) {
 
 		cmdGh := exec.Command(binMstlGh, "init", "-f", configFileMstlGh, "--ignore-stdin")
 		cmdGh.Dir = dirMstlGh
+		cmdGh.Env = append(os.Environ(), "GH_EXEC_PATH="+mockGhDir)
 		if out, err := cmdGh.CombinedOutput(); err != nil {
 			t.Fatalf("mstl-gh init failed: %v\n%s", err, out)
 		}
@@ -145,6 +177,7 @@ func TestMstlAndMstlGhCompatibility(t *testing.T) {
 		// Verify mstl-gh status
 		cmdStatusGh := exec.Command(binMstlGh, "status", "-f", configFileMstlGh, "--ignore-stdin")
 		cmdStatusGh.Dir = dirMstlGh
+		cmdStatusGh.Env = append(os.Environ(), "GH_EXEC_PATH="+mockGhDir)
 		if out, err := cmdStatusGh.CombinedOutput(); err != nil {
 			t.Fatalf("mstl-gh status failed: %v\n%s", err, out)
 		} else {
