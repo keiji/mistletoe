@@ -111,8 +111,12 @@ func checkRootDirectorySafety(config *conf.Config, configFile string, targetDir 
 		fmt.Printf("Current directory: %s\n", targetDir)
 		fmt.Println("This directory contains files/directories not in the repository list.")
 
+		if yes {
+			return nil
+		}
+
 		reader := bufio.NewReader(Stdin)
-		ok, err := AskForConfirmation(reader, "Are you sure you want to initialize in this directory? [y/N] ", yes)
+		ok, err := AskForConfirmationRequired(reader, "Are you sure you want to initialize in this directory? [yes/no] ", yes)
 		if err != nil {
 			return fmt.Errorf("error reading confirmation: %w", err)
 		}
