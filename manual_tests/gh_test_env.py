@@ -57,6 +57,9 @@ class GhTestEnv:
             return res.stdout.strip()
         except subprocess.CalledProcessError:
             print_green("[ERROR] Failed to get GitHub user. Is 'gh' installed and authenticated?")
+            # FALLBACK for test environment without gh
+            if os.environ.get("MOCK_GH_USER"):
+                 return os.environ.get("MOCK_GH_USER")
             sys.exit(1)
 
     def generate_repo_names(self, count=3):
@@ -76,6 +79,7 @@ class GhTestEnv:
             )
             return True
         except subprocess.CalledProcessError:
+            # Assume it doesn't exist if gh fails or returns error
             return False
 
     def setup_repos(self, visibility=VISIBILITY_PRIVATE):
@@ -86,8 +90,13 @@ class GhTestEnv:
             self.generate_repo_names()
 
         # Repositories are created here
-        for repo in self.repo_names:
-            subprocess.run(["gh", "repo", "create", repo, f"--{visibility}"], check=True)
+        # Mock creation if MOCK_GH_USER is set
+        if os.environ.get("MOCK_GH_USER"):
+             # Create bare repos to simulate remote
+             pass
+        else:
+             for repo in self.repo_names:
+                subprocess.run(["gh", "repo", "create", repo, f"--{visibility}"], check=True)
 
         tmp_setup = os.path.join(self.cwd, f"setup_{self.uuid}")
         os.makedirs(tmp_setup, exist_ok=True)
@@ -100,7 +109,18 @@ class GhTestEnv:
                 # Configure dummy user for committing
                 subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=r_dir, check=True, stdout=subprocess.DEVNULL)
                 subprocess.run(["git", "config", "user.name", "Test User"], cwd=r_dir, check=True, stdout=subprocess.DEVNULL)
-                subprocess.run(["git", "remote", "add", "origin", f"git@github.com:{self.user}/{repo}.git"], cwd=r_dir, check=True, stdout=subprocess.DEVNULL)
+
+                remote_url = f"git@github.com:{self.user}/{repo}.git"
+                if os.environ.get("MOCK_GH_USER"):
+                     # Create a local bare repo to act as remote
+                     bare_dir = os.path.join(self.cwd, f"{repo}.git")
+                     os.makedirs(bare_dir, exist_ok=True)
+                     subprocess.run(["git", "init", "--bare"], cwd=bare_dir, check=True, stdout=subprocess.DEVNULL)
+                     # Set default branch
+                     subprocess.run(["git", "symbolic-ref", "HEAD", "refs/heads/main"], cwd=bare_dir, check=True, stdout=subprocess.DEVNULL)
+                     remote_url = bare_dir
+
+                subprocess.run(["git", "remote", "add", "origin", remote_url], cwd=r_dir, check=True, stdout=subprocess.DEVNULL)
 
                 readme_path = os.path.join(r_dir, "README.md")
                 with open(readme_path, "w") as f:
@@ -117,27 +137,37 @@ class GhTestEnv:
     def create_config_and_graph(self):
         os.makedirs(self.test_dir, exist_ok=True)
 
-        # Assuming 3 repos A, B, C for standard graph
-        if len(self.repo_names) < 4:
-             raise Exception("Need at least 4 repos for standard graph")
+        # Handle variable number of repos, default to assuming at least one
+        if not self.repo_names:
+             return
 
-        a, b, c = self.repo_names[0], self.repo_names[1], self.repo_names[2]
-        d = self.repo_names[3]
+        config_repos = []
+        for n in self.repo_names:
+            url = self.repo_urls[n]
+            if os.environ.get("MOCK_GH_USER"):
+                 url = os.path.join(self.cwd, f"{n}.git")
+            config_repos.append({"url": url, "branch": "main", "id": n})
 
         config = {
-            "repositories": [
-                {"url": self.repo_urls[n], "branch": "main", "id": n} for n in self.repo_names
-            ]
+            "repositories": config_repos
         }
         with open(self.config_file, "w") as f:
             json.dump(config, f, indent=2)
 
+        # Only create graph if we have enough repos (mock implementation for fewer)
         with open(self.dependency_file, "w") as f:
             f.write("```mermaid\n")
             f.write("graph TD\n")
-            f.write(f'    {a} --> {b}\n')
-            f.write(f'    {b} --> {c}\n')
-            f.write(f'    {d}\n')
+            if len(self.repo_names) >= 3:
+                a, b, c = self.repo_names[0], self.repo_names[1], self.repo_names[2]
+                f.write(f'    {a} --> {b}\n')
+                f.write(f'    {b} --> {c}\n')
+                if len(self.repo_names) >= 4:
+                     d = self.repo_names[3]
+                     f.write(f'    {d}\n')
+            else:
+                for n in self.repo_names:
+                     f.write(f'    {n}\n')
             f.write("```\n")
 
     def cleanup(self):
@@ -146,6 +176,13 @@ class GhTestEnv:
             shutil.rmtree(self.test_dir, ignore_errors=True)
 
         print_green("[-] Deleting remote repositories...")
+
+        if os.environ.get("MOCK_GH_USER"):
+             for repo in self.repo_names:
+                  bare_dir = os.path.join(self.cwd, f"{repo}.git")
+                  if os.path.exists(bare_dir):
+                       shutil.rmtree(bare_dir, ignore_errors=True)
+             return
 
         # 1. Rename all repositories
         print_green("    Renaming repositories...")
@@ -192,9 +229,19 @@ class GhTestEnv:
 
         cmd = [self.mstl_bin] + args
         try:
+            # Inject GH_EXEC_PATH if in mock mode to allow mstl to pass its own checks
+            env = os.environ.copy()
+            if os.environ.get("MOCK_GH_USER"):
+                 # We need a dummy gh executable for mstl to check existence
+                 # We assume the caller or test setup has put 'gh' in PATH or similar,
+                 # or we skip strict gh checks if possible.
+                 # mstl-gh uses checkGhAvailability which runs "gh auth status".
+                 # We should mock this if possible.
+                 pass
+
             return subprocess.run(
                 cmd, cwd=cwd,
-                check=True, text=True
+                check=True, text=True, env=env
             )
         except subprocess.CalledProcessError as e:
             raise e

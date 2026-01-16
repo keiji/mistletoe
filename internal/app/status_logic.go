@@ -255,22 +255,20 @@ func getRepoStatus(repo conf.Repository, baseDir, gitPath string, verbose bool, 
 			}
 		}
 
-		if repo.Branch != nil && *repo.Branch != "" && *repo.Branch == branchName {
-			if remoteHeadFull != localHeadFull {
-				count, err := RunGit(targetDir, gitPath, verbose, "rev-list", "--count", localHeadFull+".."+remoteHeadFull)
-				if err == nil && count != "0" {
-					isPullable = true
-				}
+		if remoteHeadFull != localHeadFull {
+			count, err := RunGit(targetDir, gitPath, verbose, "rev-list", "--count", localHeadFull+".."+remoteHeadFull)
+			if err == nil && count != "0" {
+				isPullable = true
+			}
 
-				if isPullable {
-					base, err := RunGit(targetDir, gitPath, verbose, "merge-base", localHeadFull, remoteHeadFull)
-					if err == nil && base != "" {
-						base = strings.TrimSpace(base)
-						output, err := RunGit(targetDir, gitPath, verbose, "merge-tree", base, localHeadFull, remoteHeadFull)
-						if err == nil {
-							if strings.Contains(output, "<<<<<<<") {
-								hasConflict = true
-							}
+			if isPullable {
+				base, err := RunGit(targetDir, gitPath, verbose, "merge-base", localHeadFull, remoteHeadFull)
+				if err == nil && base != "" {
+					base = strings.TrimSpace(base)
+					output, err := RunGit(targetDir, gitPath, verbose, "merge-tree", base, localHeadFull, remoteHeadFull)
+					if err == nil {
+						if strings.Contains(output, "<<<<<<<") {
+							hasConflict = true
 						}
 					}
 				}

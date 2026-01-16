@@ -139,8 +139,9 @@ func TestStatusCmd(t *testing.T) {
 		if !strings.Contains(out, coloredUnpushed) {
 			t.Errorf("Expected Diverged repo to show '>'")
 		}
-		if strings.Contains(out, coloredPullable) {
-			t.Errorf("Did not expect '<'")
+		// Updated behavior: We now show Pullable status for any branch that is behind, not just configured branch
+		if !strings.Contains(out, coloredPullable) {
+			t.Errorf("Expected '<' (Pullable) because repo is behind/diverged")
 		}
 	})
 
