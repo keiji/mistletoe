@@ -101,6 +101,53 @@ func TestParseDependencies_InvalidID(t *testing.T) {
 	}
 }
 
+func TestParseDependencies_InvalidLeftID(t *testing.T) {
+	content := `Z --> B`
+	validIDs := []string{"A", "B"} // Z is missing
+
+	_, err := ParseDependencies(content, validIDs)
+	if err == nil {
+		t.Error("expected error for invalid left ID 'Z', got nil")
+	}
+}
+
+func TestParseDependencies_Malformed(t *testing.T) {
+	// These lines should be ignored because IDs cannot be extracted
+	content := `
+graph TD
+    A -->
+    --> B
+    % --> B
+    A --> %
+`
+	validIDs := []string{"A", "B"}
+	graph, err := ParseDependencies(content, validIDs)
+	if err != nil {
+		t.Fatalf("ParseDependencies failed: %v", err)
+	}
+
+	if len(graph.Forward) > 0 {
+		t.Errorf("expected empty graph, got %v", graph.Forward)
+	}
+}
+
+func TestParseDependencies_Duplicate(t *testing.T) {
+	content := `
+graph TD
+    A --> B
+    A --> B
+`
+	validIDs := []string{"A", "B"}
+	graph, err := ParseDependencies(content, validIDs)
+	if err != nil {
+		t.Fatalf("ParseDependencies failed: %v", err)
+	}
+
+	if len(graph.Forward["A"]) != 1 {
+		t.Errorf("expected 1 dependency for A, got %d", len(graph.Forward["A"]))
+	}
+}
+
 func contains(slice []string, item string) bool {
 	for _, s := range slice {
 		if s == item {
