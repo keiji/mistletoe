@@ -545,3 +545,104 @@ func TestHandleSwitch_Conflict(t *testing.T) {
 		t.Errorf("upstream WAS set (unsafe!), got: %s", out)
 	}
 }
+
+func TestHandleSwitch_RemoteFallback(t *testing.T) {
+	// 1. Setup Environment
+	tmpDir, err := os.MkdirTemp("", "mstl-switch-fallback-test")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	cwd, _ := os.Getwd()
+	defer func() { _ = os.Chdir(cwd) }()
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("failed to chdir: %v", err)
+	}
+
+	// 2. Setup Remote Bare Repo
+	remotePath := filepath.Join(tmpDir, "remote.git")
+	if err := exec.Command("git", "init", "--bare", remotePath).Run(); err != nil {
+		t.Fatalf("failed to init remote: %v", err)
+	}
+
+	// 3. Setup Seed Repo to create branch on remote
+	seedPath := filepath.Join(tmpDir, "seed")
+	if err := exec.Command("git", "clone", remotePath, seedPath).Run(); err != nil {
+		t.Fatalf("failed to clone seed: %v", err)
+	}
+	configGitUser := func(dir string) {
+		exec.Command("git", "-C", dir, "config", "user.email", "test@example.com").Run()
+		exec.Command("git", "-C", dir, "config", "user.name", "Test User").Run()
+	}
+	configGitUser(seedPath)
+
+	// Commit initial
+	os.WriteFile(filepath.Join(seedPath, "README.md"), []byte("init"), 0644)
+	exec.Command("git", "-C", seedPath, "add", "README.md").Run()
+	exec.Command("git", "-C", seedPath, "commit", "-m", "init").Run()
+	exec.Command("git", "-C", seedPath, "push", "origin", "master").Run()
+
+	// Create 'remote-only' branch
+	exec.Command("git", "-C", seedPath, "checkout", "-b", "remote-only").Run()
+	exec.Command("git", "-C", seedPath, "push", "origin", "remote-only").Run()
+
+	// 4. Setup Local Repo
+	localPath := filepath.Join(tmpDir, "local")
+	exec.Command("git", "clone", remotePath, localPath).Run()
+	configGitUser(localPath)
+
+	// Ensure 'remote-only' is NOT locally present
+	if err := exec.Command("git", "-C", localPath, "show-ref", "--verify", "--quiet", "refs/heads/remote-only").Run(); err == nil {
+		t.Fatalf("branch remote-only shouldn't exist locally yet")
+	}
+
+	// 5. Create Config
+	out, _ := exec.Command("git", "-C", localPath, "remote", "get-url", "origin").CombinedOutput()
+	remoteURL := strings.TrimSpace(string(out))
+	localRel := "local"
+	config := conf.Config{
+		Repositories: &[]conf.Repository{
+			{URL: &remoteURL, ID: &localRel},
+		},
+	}
+	configData, _ := json.Marshal(config)
+	configPath := filepath.Join(tmpDir, "mstl.json")
+	os.WriteFile(configPath, configData, 0644)
+
+	// 6. Mock Globals & Run HandleSwitch
+	var stdoutBuf, stderrBuf bytes.Buffer
+	originalStdout, originalStderr := Stdout, Stderr
+	originalOsExit := osExit
+	defer func() {
+		Stdout, Stderr = originalStdout, originalStderr
+		osExit = originalOsExit
+	}()
+	Stdout = &stdoutBuf
+	Stderr = &stderrBuf
+
+	exitCode := 0
+	osExit = func(c int) {
+		exitCode = c
+	}
+
+	Stdin = strings.NewReader("")
+
+	// Run without -c
+	args := []string{"remote-only", "--file", configPath, "--ignore-stdin"}
+	handleSwitch(args, GlobalOptions{GitPath: "git"})
+
+	if exitCode != 0 {
+		t.Errorf("handleSwitch failed with exit code %d. Stderr: %s", exitCode, stderrBuf.String())
+	}
+
+	// 7. Verify Branch Exists and Checked Out
+	cmd := exec.Command("git", "-C", localPath, "symbolic-ref", "--short", "HEAD")
+	out, err = cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("failed to check branch: %v", err)
+	}
+	if strings.TrimSpace(string(out)) != "remote-only" {
+		t.Errorf("expected branch remote-only, got %s", string(out))
+	}
+}
