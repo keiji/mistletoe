@@ -53,6 +53,33 @@ func AskForConfirmation(reader *bufio.Reader, prompt string, yesFlag bool) (bool
 	return input == "y" || input == "yes", nil
 }
 
+// AskForConfirmationRequired prompts the user for a yes/no confirmation.
+// It requires explicit "yes" or "no" input (case-insensitive).
+// It repeats the prompt until valid input is received.
+// If yesFlag is true, it returns true immediately without prompting.
+func AskForConfirmationRequired(reader *bufio.Reader, prompt string, yesFlag bool) (bool, error) {
+	if yesFlag {
+		return true, nil
+	}
+
+	for {
+		fmt.Print(prompt)
+		input, err := reader.ReadString('\n')
+		if err != nil {
+			return false, err
+		}
+
+		input = strings.TrimSpace(strings.ToLower(input))
+		if input == "y" || input == "yes" {
+			return true, nil
+		}
+		if input == "n" || input == "no" {
+			return false, nil
+		}
+		// Loop for invalid or empty input
+	}
+}
+
 // --- Git Helpers ---
 
 // RunGit runs a git command in the specified directory and returns its output (stdout).

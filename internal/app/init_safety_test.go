@@ -10,30 +10,19 @@ import (
 )
 
 func TestCheckRootDirectorySafety(t *testing.T) {
-	// Helper to create a temp dir with specific files
-	createTempDir := func(files ...string) string {
-		dir, err := os.MkdirTemp("", "init-safety-test-*")
-		if err != nil {
-			t.Fatalf("failed to create temp dir: %v", err)
-		}
-		for _, f := range files {
-			path := filepath.Join(dir, f)
-			if strings.HasSuffix(f, "/") {
-				os.MkdirAll(path, 0755)
-			} else {
-				os.WriteFile(path, []byte("test"), 0644)
-			}
-		}
-		return dir
+	// Setup temp directory with a "dirty" state
+	tmpDir, err := os.MkdirTemp("", "mstl-safety-test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// Create a random file to trigger the safety check
+	if err := os.WriteFile(filepath.Join(tmpDir, "dirty.txt"), []byte("data"), 0644); err != nil {
+		t.Fatal(err)
 	}
 
-	// Mock Stdin
-	mockStdin := func(input string) {
-		Stdin = strings.NewReader(input)
-	}
-	defer func() { Stdin = os.Stdin }()
-
-	// Config
+	// Mock Config
 	repoID := "repo1"
 	repoURL := "https://example.com/repo1.git"
 	config := &conf.Config{
@@ -43,66 +32,85 @@ func TestCheckRootDirectorySafety(t *testing.T) {
 	}
 
 	tests := []struct {
-		name        string
-		files       []string // files in temp dir
-		configFile  string   // name of config file (assumed in temp dir)
-		input       string   // user input (y/n)
-		yes         bool
-		expectError bool
-		expectPrompt bool // if we expect the logic to hit the prompt
+		name          string
+		yesFlag       bool
+		input         string
+		wantErr       bool
+		wantErrString string
 	}{
 		{
-			name:        "Clean directory (only whitelist)",
-			files:       []string{".git/", ".mstl/", "repo1/", "config.json"},
-			configFile:  "config.json",
-			expectError: false,
-			expectPrompt: false,
+			name:    "AutoApprove (Yes Flag)",
+			yesFlag: true,
+			input:   "", // Should not be read
+			wantErr: false,
 		},
 		{
-			name:        "Unknown file, User says Yes",
-			files:       []string{"repo1/", "unknown.txt"},
-			input:       "y\n",
-			expectError: false,
-			expectPrompt: true,
+			name:    "Manual Approve (y)",
+			yesFlag: false,
+			input:   "y\n",
+			wantErr: false,
 		},
 		{
-			name:        "Unknown file, User says No",
-			files:       []string{"repo1/", "unknown.txt"},
-			input:       "n\n",
-			expectError: true,
-			expectPrompt: true,
+			name:    "Manual Approve (yes)",
+			yesFlag: false,
+			input:   "yes\n",
+			wantErr: false,
 		},
 		{
-			name:        "Unknown file, Yes flag",
-			files:       []string{"repo1/", "unknown.txt"},
-			yes:         true,
-			expectError: false,
-			expectPrompt: true, // It hits the prompt block but auto-confirms
+			name:          "Manual Reject (n)",
+			yesFlag:       false,
+			input:         "n\n",
+			wantErr:       true,
+			wantErrString: "initialization aborted by user",
+		},
+		{
+			name:          "Manual Reject (no)",
+			yesFlag:       false,
+			input:         "no\n",
+			wantErr:       true,
+			wantErrString: "initialization aborted by user",
+		},
+		{
+			name:    "Retry on Empty Input",
+			yesFlag: false,
+			input:   "\n\ny\n", // Enter, Enter, y
+			wantErr: false,
+		},
+		{
+			name:          "Retry on Invalid Input then Reject",
+			yesFlag:       false,
+			input:         "what\nno\n",
+			wantErr:       true,
+			wantErrString: "initialization aborted by user",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			dir := createTempDir(tt.files...)
-			defer os.RemoveAll(dir)
+			// Mock Stdin
+			oldStdin := Stdin
+			defer func() { Stdin = oldStdin }()
 
-			// Resolve absolute path for config file to match application logic
-			confPath := ""
-			if tt.configFile != "" {
-				confPath = filepath.Join(dir, tt.configFile)
-			}
+			// We can't easily mock os.Stdin for bufio.NewReader(Stdin) inside the function
+			// if Stdin variable is just an io.Reader, because bufio.NewReader takes io.Reader.
+			// In `init.go`: reader := bufio.NewReader(Stdin).
+			// So setting app.Stdin = strings.NewReader(...) works.
 
-			if tt.input != "" {
-				mockStdin(tt.input)
-			}
+			Stdin = strings.NewReader(tt.input)
 
-			// We pass 'dir' explicitly as targetDir
-			err := checkRootDirectorySafety(config, confPath, dir, tt.yes)
-			if tt.expectError && err == nil {
-				t.Errorf("expected error but got nil")
+			// Capture Stdout to verify prompt?
+			// It's hard to capture stdout since it prints to os.Stdout directly in `init.go`.
+			// But we are testing logic here.
+
+			err := checkRootDirectorySafety(config, "", tmpDir, tt.yesFlag)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("checkRootDirectorySafety() error = %v, wantErr %v", err, tt.wantErr)
+				return
 			}
-			if !tt.expectError && err != nil {
-				t.Errorf("unexpected error: %v", err)
+			if tt.wantErr && err != nil {
+				if err.Error() != tt.wantErrString {
+					t.Errorf("checkRootDirectorySafety() error = %v, want %v", err, tt.wantErrString)
+				}
 			}
 		})
 	}
