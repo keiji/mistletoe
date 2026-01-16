@@ -210,6 +210,18 @@ func handleSwitch(args []string, opts GlobalOptions) {
 			}
 
 			exists := branchExists(dir, branchName, opts.GitPath, verbose)
+			if !exists {
+				// If not found locally, check if it exists on remote (fetch first)
+				// This allows switching to a branch that only exists on remote (git checkout <branch> will track it)
+				_, err := RunGit(dir, opts.GitPath, verbose, "fetch", "origin", branchName)
+				if err == nil {
+					// Check if remote branch exists after fetch
+					_, err = RunGit(dir, opts.GitPath, verbose, "show-ref", "--verify", "--quiet", "refs/remotes/origin/"+branchName)
+					if err == nil {
+						exists = true
+					}
+				}
+			}
 			mu.Lock()
 			dirExists[dir] = exists
 			mu.Unlock()
