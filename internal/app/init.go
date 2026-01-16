@@ -15,8 +15,11 @@ import (
 	"sync"
 )
 
-// branchExistsLocallyOrRemotely checks if a branch exists locally or remotely.
-func branchExistsLocallyOrRemotely(gitPath, dir, branch string, verbose bool) (bool, error) {
+// ensureBranchExistsLocally checks if a branch exists locally.
+// If not, it checks if it exists remotely.
+// If it exists remotely, it fetches it.
+// Returns true if the branch exists locally (or was successfully fetched), false otherwise.
+func ensureBranchExistsLocally(gitPath, dir, branch string, verbose bool) (bool, error) {
 	// Check local
 	// show-ref returns exit code 1 if not found, which RunGit returns as error.
 	_, err := RunGit(dir, gitPath, verbose, "show-ref", "--verify", "--quiet", "refs/heads/"+branch)
@@ -29,9 +32,22 @@ func branchExistsLocallyOrRemotely(gitPath, dir, branch string, verbose bool) (b
 	if err != nil {
 		return false, err
 	}
+
+	// If found on remote, fetch it
 	if len(out) > 0 {
+		// Use fetch to ensure it is available.
+		// We fetch specifically the branch to ensure refs/remotes/origin/branch is updated/created.
+		// We do not strictly need to create the local branch refs/heads/branch here,
+		// as 'checkout branch' (which happens later for repo.Branch) will find refs/remotes/origin/branch
+		// and create the local one automatically.
+		// However, for repo.BaseBranch, we just need it to be available in the object database/remote refs
+		// so that we don't error out saying it's missing.
+		if _, err := RunGit(dir, gitPath, verbose, "fetch", "origin", branch); err != nil {
+			return false, fmt.Errorf("branch %s found on remote but failed to fetch: %w", branch, err)
+		}
 		return true, nil
 	}
+
 	return false, nil
 }
 
@@ -88,7 +104,7 @@ func validateEnvironment(repos []conf.Repository, baseDir, gitPath string, verbo
 
 				// Branch
 				if repo.Branch != nil && *repo.Branch != "" {
-					exists, err := branchExistsLocallyOrRemotely(gitPath, targetDir, *repo.Branch, verbose)
+					exists, err := ensureBranchExistsLocally(gitPath, targetDir, *repo.Branch, verbose)
 					if err != nil {
 						eligibilityErr = fmt.Errorf("failed to check branch %s in %s: %v", *repo.Branch, targetDir, err)
 						checksPassed = false
@@ -100,7 +116,7 @@ func validateEnvironment(repos []conf.Repository, baseDir, gitPath string, verbo
 
 				// BaseBranch
 				if checksPassed && repo.BaseBranch != nil && *repo.BaseBranch != "" {
-					exists, err := branchExistsLocallyOrRemotely(gitPath, targetDir, *repo.BaseBranch, verbose)
+					exists, err := ensureBranchExistsLocally(gitPath, targetDir, *repo.BaseBranch, verbose)
 					if err != nil {
 						eligibilityErr = fmt.Errorf("failed to check base-branch %s in %s: %v", *repo.BaseBranch, targetDir, err)
 						checksPassed = false
