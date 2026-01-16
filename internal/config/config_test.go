@@ -3,10 +3,14 @@ package config
 import (
 	"errors"
 	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
 )
+
+// strPtr is a helper to return a pointer to a string.
+func strPtr(s string) *string { return &s }
 
 func TestLoadConfigFile(t *testing.T) {
 	// Helper to create temp file
@@ -175,5 +179,190 @@ func TestParseConfig(t *testing.T) {
 				t.Errorf("ParseConfig() = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestLoadConfigData_Validation(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		wantErr error
+	}{
+		{
+			name: "Duplicate IDs",
+			input: `{
+				"repositories": [
+					{"id": "repo1", "url": "http://a"},
+					{"id": "repo1", "url": "http://b"}
+				]
+			}`,
+			wantErr: ErrDuplicateID,
+		},
+		{
+			name: "Duplicate Auto-Generated IDs",
+			input: `{
+				"repositories": [
+					{"url": "http://example.com/repo.git"},
+					{"url": "http://other.com/repo.git"}
+				]
+			}`,
+			wantErr: ErrDuplicateID,
+		},
+		{
+			name: "Invalid ID with spaces",
+			input: `{
+				"repositories": [
+					{"id": "repo 1", "url": "http://a"}
+				]
+			}`,
+			wantErr: ErrInvalidID,
+		},
+		{
+			name: "Invalid ID dot",
+			input: `{
+				"repositories": [
+					{"id": ".", "url": "http://a"}
+				]
+			}`,
+			wantErr: ErrInvalidID,
+		},
+		{
+			name: "Invalid ID dotdot",
+			input: `{
+				"repositories": [
+					{"id": "..", "url": "http://a"}
+				]
+			}`,
+			wantErr: ErrInvalidID,
+		},
+		{
+			name: "Invalid URL ext protocol",
+			input: `{
+				"repositories": [
+					{"url": "ext::sh /tmp/pwn"}
+				]
+			}`,
+			wantErr: ErrInvalidURL,
+		},
+		{
+			name: "Invalid URL control char",
+			input: `{
+				"repositories": [
+					{"id": "valid-id", "url": "http://example.com/\n"}
+				]
+			}`,
+			wantErr: ErrInvalidURL,
+		},
+		{
+			name: "Invalid Branch",
+			input: `{
+				"repositories": [
+					{"url": "http://a", "branch": "-flag"}
+				]
+			}`,
+			wantErr: ErrInvalidGitRef,
+		},
+		{
+			name: "Invalid BaseBranch",
+			input: `{
+				"repositories": [
+					{"url": "http://a", "base-branch": "invalid~Char"}
+				]
+			}`,
+			wantErr: ErrInvalidGitRef,
+		},
+		{
+			name: "Invalid Revision",
+			input: `{
+				"repositories": [
+					{"url": "http://a", "revision": "invalid:Char"}
+				]
+			}`,
+			wantErr: ErrInvalidGitRef,
+		},
+		{
+			name: "Valid Configuration",
+			input: `{
+				"repositories": [
+					{"id": "repo1", "url": "http://example.com/r1"},
+					{"url": "http://example.com/r2"}
+				]
+			}`,
+			wantErr: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := LoadConfigData([]byte(tt.input))
+			if tt.wantErr != nil {
+				if err == nil {
+					t.Errorf("LoadConfigData() expected error %v, got nil", tt.wantErr)
+				} else if !errors.Is(err, tt.wantErr) {
+					t.Errorf("LoadConfigData() error = %v, want %v", err, tt.wantErr)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("LoadConfigData() unexpected error: %v", err)
+				}
+			}
+		})
+	}
+}
+
+func TestGetRepoDirName(t *testing.T) {
+	tests := []struct {
+		name string
+		repo Repository
+		want string
+	}{
+		{
+			name: "With Explicit ID",
+			repo: Repository{ID: strPtr("my-repo"), URL: strPtr("http://example.com/ignored")},
+			want: "my-repo",
+		},
+		{
+			name: "With URL only",
+			repo: Repository{URL: strPtr("http://example.com/foo.git")},
+			want: "foo",
+		},
+		{
+			name: "With URL no extension",
+			repo: Repository{URL: strPtr("http://example.com/bar")},
+			want: "bar",
+		},
+		{
+			name: "With URL trailing slash",
+			repo: Repository{URL: strPtr("http://example.com/baz/")},
+			want: "baz",
+		},
+		{
+			name: "Empty URL and ID",
+			repo: Repository{},
+			want: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := GetRepoDirName(tt.repo); got != tt.want {
+				t.Errorf("GetRepoDirName() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestGetRepoPath(t *testing.T) {
+	config := Config{
+		BaseDir: filepath.FromSlash("/base/dir"),
+	}
+
+	repo := Repository{ID: strPtr("sub"), URL: strPtr("http://a.com/sub")}
+
+	want := filepath.Join(config.BaseDir, "sub")
+
+	got := config.GetRepoPath(repo)
+	if got != want {
+		t.Errorf("GetRepoPath() = %v, want %v", got, want)
 	}
 }

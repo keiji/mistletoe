@@ -184,7 +184,7 @@ func LoadConfigData(data []byte) (*Config, error) {
 	}
 
 	if err := validateRepositories(*config.Repositories); err != nil {
-		return nil, fmt.Errorf("Error validating configuration: %v.", err)
+		return nil, fmt.Errorf("Error validating configuration: %w", err)
 	}
 
 	return config, nil
