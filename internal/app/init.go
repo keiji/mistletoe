@@ -5,6 +5,7 @@ import (
 )
 
 import (
+	"bufio"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -67,6 +68,59 @@ func isDirEmpty(dir string) (bool, error) {
 		return true, nil
 	}
 	return false, err
+}
+
+// checkRootDirectorySafety checks if the target directory contains files not listed in the configuration.
+func checkRootDirectorySafety(config *conf.Config, configFile string, targetDir string, yes bool) error {
+	entries, err := os.ReadDir(targetDir)
+	if err != nil {
+		return fmt.Errorf("failed to read target directory: %w", err)
+	}
+
+	// Build whitelist
+	allowed := make(map[string]bool)
+	allowed[".git"] = true
+	allowed[".mstl"] = true
+
+	// Whitelist the config file itself if it resides in the target directory
+	if configFile != "" {
+		absConfig, err := filepath.Abs(configFile)
+		if err == nil {
+			if filepath.Dir(absConfig) == targetDir {
+				allowed[filepath.Base(absConfig)] = true
+			}
+		}
+	}
+
+	for _, repo := range *config.Repositories {
+		dirName := conf.GetRepoDirName(repo)
+		allowed[dirName] = true
+	}
+
+	// Check for unknown files
+	foundUnknown := false
+	for _, entry := range entries {
+		name := entry.Name()
+		if !allowed[name] {
+			foundUnknown = true
+			break
+		}
+	}
+
+	if foundUnknown {
+		fmt.Printf("Current directory: %s\n", targetDir)
+		fmt.Println("This directory contains files/directories not in the repository list.")
+
+		reader := bufio.NewReader(Stdin)
+		ok, err := AskForConfirmation(reader, "Are you sure you want to initialize in this directory? [y/N] ", yes)
+		if err != nil {
+			return fmt.Errorf("error reading confirmation: %w", err)
+		}
+		if !ok {
+			return fmt.Errorf("initialization aborted by user")
+		}
+	}
+	return nil
 }
 
 // validateEnvironment checks if the current directory state is consistent with the configuration.
@@ -241,17 +295,17 @@ func PerformInit(repos []conf.Repository, baseDir, gitPath string, jobs, depth i
 	return nil
 }
 
-func validateAndPrepareInitDest(dest string) error {
+func validateAndPrepareInitDest(dest string) (string, error) {
 	absDest, err := filepath.Abs(dest)
 	if err != nil {
-		return fmt.Errorf("failed to resolve absolute path for %s: %w", dest, err)
+		return "", fmt.Errorf("failed to resolve absolute path for %s: %w", dest, err)
 	}
 
 	info, err := os.Stat(absDest)
 	if err == nil {
 		// Exists
 		if !info.IsDir() {
-			return fmt.Errorf("specified path is a file: %s", dest)
+			return "", fmt.Errorf("specified path is a file: %s", dest)
 		}
 	} else if os.IsNotExist(err) {
 		// Does not exist
@@ -259,28 +313,28 @@ func validateAndPrepareInitDest(dest string) error {
 		pInfo, pErr := os.Stat(parent)
 		if pErr != nil {
 			if os.IsNotExist(pErr) {
-				return fmt.Errorf("invalid path: parent directory %s does not exist", parent)
+				return "", fmt.Errorf("invalid path: parent directory %s does not exist", parent)
 			}
-			return fmt.Errorf("error checking parent directory %s: %w", parent, pErr)
+			return "", fmt.Errorf("error checking parent directory %s: %w", parent, pErr)
 		}
 		if !pInfo.IsDir() {
-			return fmt.Errorf("parent path %s is not a directory", parent)
+			return "", fmt.Errorf("parent path %s is not a directory", parent)
 		}
 
 		// Create directory
 		if err := os.Mkdir(absDest, 0755); err != nil {
-			return fmt.Errorf("failed to create directory %s: %w", absDest, err)
+			return "", fmt.Errorf("failed to create directory %s: %w", absDest, err)
 		}
 	} else {
 		// Other error
-		return fmt.Errorf("error checking path %s: %w", dest, err)
+		return "", fmt.Errorf("error checking path %s: %w", dest, err)
 	}
 
 	// Change directory
 	if err := os.Chdir(absDest); err != nil {
-		return fmt.Errorf("failed to change directory to %s: %w", absDest, err)
+		return "", fmt.Errorf("failed to change directory to %s: %w", absDest, err)
 	}
-	return nil
+	return absDest, nil
 }
 
 func handleInit(args []string, opts GlobalOptions) {
@@ -376,8 +430,15 @@ func initCommand(args []string, opts GlobalOptions) error {
 		dest = destLong
 	}
 
-	if err := validateAndPrepareInitDest(dest); err != nil {
+	absDest, err := validateAndPrepareInitDest(dest)
+	if err != nil {
 		return fmt.Errorf("Error: %w", err)
+	}
+
+	// Use boolean OR for yes/yesShort
+	forceYes := yes || yesShort
+	if err := checkRootDirectorySafety(config, configFile, absDest, forceYes); err != nil {
+		return err
 	}
 
 	// Validate dependency file if provided

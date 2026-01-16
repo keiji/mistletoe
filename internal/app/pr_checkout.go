@@ -230,7 +230,14 @@ func prCheckoutCommand(args []string, opts GlobalOptions) error {
 		return nil
 	}
 
-	if err := validateAndPrepareInitDest(dest); err != nil {
+	// We capture absDest but we don't strictly need to pass it to safety check here
+	// because pr checkout implicitly trusts the PR content via user action?
+	// Actually, pr checkout works similarly to init.
+	// However, pr checkout relies on `PerformInit` which does `validateEnvironment` (repo based).
+	// The prompt didn't ask to add safety check to `pr checkout`, only `init`.
+	// But `pr checkout` calls `validateAndPrepareInitDest`.
+	// I will just ignore the return string for now to fix compilation.
+	if _, err := validateAndPrepareInitDest(dest); err != nil {
 		fmt.Printf("Error preparing destination: %v\n", err)
 		return err
 	}

@@ -188,7 +188,7 @@ func TestInitCommand(t *testing.T) {
 		depContent := "graph TD\n    repoA --> repoB"
 		os.WriteFile("deps.md", []byte(depContent), 0644)
 
-		err := initCommand([]string{"-f", "config.json", "--dependencies", "deps.md"}, opts)
+		err := initCommand([]string{"-f", "config.json", "--dependencies", "deps.md", "--yes"}, opts)
 		if err != nil {
 			t.Errorf("Expected success with valid deps, got: %v", err)
 		}
@@ -207,7 +207,7 @@ func TestInitCommand(t *testing.T) {
 		depContent := "graph TD\n    repoA --> repoB"
 		os.WriteFile("deps.md", []byte(depContent), 0644)
 
-		err := initCommand([]string{"-f", "config.json", "--dependencies", "deps.md"}, opts)
+		err := initCommand([]string{"-f", "config.json", "--dependencies", "deps.md", "--yes"}, opts)
 		if err == nil {
 			t.Error("Expected error for invalid dependency ID, got nil")
 		}
