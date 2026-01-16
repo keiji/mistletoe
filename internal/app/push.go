@@ -2,6 +2,8 @@ package app
 
 import (
 	conf "mistletoe/internal/config"
+	"mistletoe/internal/sys"
+	"mistletoe/internal/ui"
 )
 
 import (
@@ -19,7 +21,7 @@ func handlePush(args []string, opts GlobalOptions) {
 	)
 
 	fs := flag.NewFlagSet("push", flag.ContinueOnError)
-	fs.SetOutput(Stderr)
+	fs.SetOutput(sys.Stderr)
 	fs.StringVar(&fLong, "file", DefaultConfigFile, "Configuration file path")
 	fs.StringVar(&fShort, "f", DefaultConfigFile, "Configuration file path (shorthand)")
 	fs.IntVar(&jVal, "jobs", -1, "number of concurrent jobs")
@@ -32,7 +34,7 @@ func handlePush(args []string, opts GlobalOptions) {
 	fs.BoolVar(&yesShort, "y", false, "Automatically answer 'yes' to all prompts (shorthand)")
 
 	if err := ParseFlagsFlexible(fs, args); err != nil {
-		fmt.Fprintln(Stderr, "error parsing flags:", err)
+		fmt.Fprintln(sys.Stderr, "error parsing flags:", err)
 		osExit(1)
 		return
 	}
@@ -43,14 +45,14 @@ func handlePush(args []string, opts GlobalOptions) {
 		{"verbose", "v"},
 		{"yes", "y"},
 	}); err != nil {
-		fmt.Fprintln(Stderr, "Error:", err)
+		fmt.Fprintln(sys.Stderr, "Error:", err)
 		osExit(1)
 		return
 	}
 
 	configFile, jobsFlag, configData, err := ResolveCommonValues(fLong, fShort, jVal, jValShort, ignoreStdin)
 	if err != nil {
-		fmt.Fprintf(Stderr, "error: %v\n", err)
+		fmt.Fprintf(sys.Stderr, "error: %v\n", err)
 		osExit(1)
 		return
 	}
@@ -58,7 +60,7 @@ func handlePush(args []string, opts GlobalOptions) {
 	yesFlag := yes || yesShort
 	configFile, err = SearchParentConfig(configFile, configData, opts.GitPath)
 	if err != nil {
-		fmt.Fprintf(Stderr, "Error searching parent config: %v\n", err)
+		fmt.Fprintf(sys.Stderr, "Error searching parent config: %v\n", err)
 	}
 
 	var config *conf.Config
@@ -69,7 +71,7 @@ func handlePush(args []string, opts GlobalOptions) {
 	}
 
 	if err != nil {
-		fmt.Fprintln(Stderr, err)
+		fmt.Fprintln(sys.Stderr, err)
 		osExit(1)
 		return
 	}
@@ -77,7 +79,7 @@ func handlePush(args []string, opts GlobalOptions) {
 	// Resolve Jobs
 	jobs, err := DetermineJobs(jobsFlag, config)
 	if err != nil {
-		fmt.Fprintf(Stderr, "Error: %v\n", err)
+		fmt.Fprintf(sys.Stderr, "Error: %v\n", err)
 		osExit(1)
 		return
 	}
@@ -85,15 +87,15 @@ func handlePush(args []string, opts GlobalOptions) {
 	// Verbose Override
 	verbose := vLong || vShort
 	if verbose && jobs > 1 {
-		fmt.Fprintln(Stdout, "Verbose is specified, so jobs is treated as 1.")
+		fmt.Fprintln(sys.Stdout, "Verbose is specified, so jobs is treated as 1.")
 		jobs = 1
 	}
 
-	spinner := NewSpinner(verbose)
+	spinner := ui.NewSpinner(verbose)
 
 	fail := func(format string, a ...interface{}) {
 		spinner.Stop()
-		fmt.Fprintf(Stderr, format, a...)
+		fmt.Fprintf(sys.Stderr, format, a...)
 		osExit(1)
 	}
 
@@ -110,7 +112,7 @@ func handlePush(args []string, opts GlobalOptions) {
 
 	spinner.Stop()
 
-	RenderStatusTable(Stdout, rows)
+	RenderStatusTable(sys.Stdout, rows)
 
 	// Validate status
 	if err := ValidateStatusForAction(rows, true); err != nil {
@@ -127,23 +129,23 @@ func handlePush(args []string, opts GlobalOptions) {
 	}
 
 	if len(pushable) == 0 {
-		fmt.Fprintln(Stdout, "No repositories to push.")
+		fmt.Fprintln(sys.Stdout, "No repositories to push.")
 		return
 	}
 
-	reader := bufio.NewReader(Stdin)
-	confirmed, err := AskForConfirmation(reader, "Push updates? (yes/no): ", yesFlag)
+	reader := bufio.NewReader(sys.Stdin)
+	confirmed, err := ui.AskForConfirmation(reader, "Push updates? (yes/no): ", yesFlag)
 	if err != nil {
-		fmt.Fprintf(Stderr, "Error reading input: %v\n", err)
+		fmt.Fprintf(sys.Stderr, "Error reading input: %v\n", err)
 		osExit(1)
 		return
 	}
 	if confirmed {
 		for _, row := range pushable {
-			fmt.Fprintf(Stdout, "Pushing %s (branch: %s)...\n", row.Repo, row.BranchName)
+			fmt.Fprintf(sys.Stdout, "Pushing %s (branch: %s)...\n", row.Repo, row.BranchName)
 			// git push -u origin [branchname]
 			if err := RunGitInteractive(row.RepoDir, opts.GitPath, verbose, "push", "-u", "origin", row.BranchName); err != nil {
-				fmt.Fprintf(Stdout, "Failed to push %s: %v.\n", row.Repo, err)
+				fmt.Fprintf(sys.Stdout, "Failed to push %s: %v.\n", row.Repo, err)
 			}
 		}
 	}

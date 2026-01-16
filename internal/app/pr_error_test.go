@@ -2,6 +2,7 @@ package app
 
 import (
 	conf "mistletoe/internal/config"
+	"mistletoe/internal/sys"
 )
 
 import (
@@ -10,9 +11,9 @@ import (
 )
 
 func TestCollectPrStatus_ErrorHandling(t *testing.T) {
-	oldExec := ExecCommand
-	ExecCommand = fakeExecCommand
-	defer func() { ExecCommand = oldExec }()
+	oldExec := sys.ExecCommand
+	sys.ExecCommand = fakeExecCommand
+	defer func() { sys.ExecCommand = oldExec }()
 
 	// Case 1: JSON Unmarshal Error (gh pr view returns invalid json)
 	os.Setenv("MOCK_GH_VIEW_INVALID_JSON", "1")

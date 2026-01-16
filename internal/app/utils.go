@@ -2,7 +2,6 @@ package app
 
 
 import (
-	"bufio"
 	"fmt"
 	"io"
 	"os"
@@ -12,16 +11,11 @@ import (
 	"time"
 
 	conf "mistletoe/internal/config"
+	"mistletoe/internal/sys"
 
 	"golang.org/x/text/language"
 	"golang.org/x/text/message"
 )
-
-// ExecCommand is a variable that holds exec.Command to allow mocking in tests.
-var ExecCommand = exec.Command
-
-// Stdin is a variable that holds os.Stdin to allow mocking in tests.
-var Stdin io.Reader = os.Stdin
 
 // verboseLogMu ensures atomic execution and logging when verbose mode is enabled.
 var verboseLogMu sync.Mutex
@@ -31,53 +25,6 @@ func formatDuration(d time.Duration) string {
 	ms := d.Milliseconds()
 	p := message.NewPrinter(language.English)
 	return p.Sprintf("%dms", ms)
-}
-
-// AskForConfirmation prompts the user for a yes/no confirmation.
-// If yesFlag is true, it automatically assumes "yes" and returns true without prompting.
-// Returns true if the user enters 'y' or 'yes' (case-insensitive), false otherwise.
-func AskForConfirmation(reader *bufio.Reader, prompt string, yesFlag bool) (bool, error) {
-	fmt.Print(prompt)
-
-	if yesFlag {
-		fmt.Println("yes (assumed via flag)")
-		return true, nil
-	}
-
-	input, err := reader.ReadString('\n')
-	if err != nil {
-		return false, err
-	}
-
-	input = strings.TrimSpace(strings.ToLower(input))
-	return input == "y" || input == "yes", nil
-}
-
-// AskForConfirmationRequired prompts the user for a yes/no confirmation.
-// It requires explicit "yes" or "no" input (case-insensitive).
-// It repeats the prompt until valid input is received.
-// If yesFlag is true, it returns true immediately without prompting.
-func AskForConfirmationRequired(reader *bufio.Reader, prompt string, yesFlag bool) (bool, error) {
-	if yesFlag {
-		return true, nil
-	}
-
-	for {
-		fmt.Print(prompt)
-		input, err := reader.ReadString('\n')
-		if err != nil {
-			return false, err
-		}
-
-		input = strings.TrimSpace(strings.ToLower(input))
-		if input == "y" || input == "yes" {
-			return true, nil
-		}
-		if input == "n" || input == "no" {
-			return false, nil
-		}
-		// Loop for invalid or empty input
-	}
 }
 
 // --- Git Helpers ---
@@ -104,7 +51,7 @@ func RunGit(dir string, gitPath string, verbose bool, args ...string) (string, e
 		}
 	}()
 
-	cmd := ExecCommand(gitPath, args...)
+	cmd := sys.ExecCommand(gitPath, args...)
 	if dir != "" {
 		cmd.Dir = dir
 	}
@@ -134,13 +81,13 @@ func RunGitInteractive(dir string, gitPath string, verbose bool, args ...string)
 		}
 	}()
 
-	cmd := ExecCommand(gitPath, args...)
+	cmd := sys.ExecCommand(gitPath, args...)
 	if dir != "" {
 		cmd.Dir = dir
 	}
 	cmd.Stdout = Stdout
 	cmd.Stderr = Stderr
-	cmd.Stdin = Stdin
+	cmd.Stdin = sys.Stdin
 	return cmd.Run()
 }
 
@@ -165,7 +112,7 @@ func RunGh(ghPath string, verbose bool, args ...string) (string, error) {
 		}
 	}()
 
-	cmd := ExecCommand(ghPath, args...)
+	cmd := sys.ExecCommand(ghPath, args...)
 	out, err := cmd.Output()
 	if err != nil {
 		return "", err
@@ -197,8 +144,8 @@ func RunEditor() (string, error) {
 	defer os.Remove(tmpFile.Name())
 	tmpFile.Close() // Close immediately, let editor open it
 
-	cmd := ExecCommand(editor, tmpFile.Name())
-	cmd.Stdin = Stdin
+	cmd := sys.ExecCommand(editor, tmpFile.Name())
+	cmd.Stdin = sys.Stdin
 	cmd.Stdout = Stdout
 	cmd.Stderr = Stderr
 
@@ -277,7 +224,7 @@ func ResolveCommonValues(fLong, fShort string, jVal, jValShort int, ignoreStdin 
 		// but for the logic "is data being piped?", we might need to rely on the type).
 		// For consistency in tests, we rely on the fact that if Stdin is NOT a terminal, it's available.
 
-		if f, ok := Stdin.(*os.File); ok {
+		if f, ok := sys.Stdin.(*os.File); ok {
 			stat, _ := f.Stat()
 			if (stat.Mode() & os.ModeCharDevice) == 0 {
 				stdinAvailable = true
@@ -298,7 +245,7 @@ func ResolveCommonValues(fLong, fShort string, jVal, jValShort int, ignoreStdin 
 	if checkStdin {
 		if stdinAvailable {
 			// Data is being piped to stdin
-			inputData, err := io.ReadAll(Stdin)
+			inputData, err := io.ReadAll(sys.Stdin)
 			if err != nil {
 				return "", 0, nil, fmt.Errorf("failed to read from stdin: %w", err)
 			}
@@ -335,59 +282,4 @@ func DetermineJobs(jobsFlag int, config *conf.Config) (int, error) {
 	}
 
 	return jobs, nil
-}
-
-// --- Spinner ---
-
-// Spinner shows a simple progress indicator.
-type Spinner struct {
-	stop     chan struct{}
-	done     chan struct{}
-	disabled bool
-}
-
-// NewSpinner creates a new Spinner instance.
-// If verbose is true, the spinner is disabled (no-op).
-func NewSpinner(verbose bool) *Spinner {
-	return &Spinner{
-		stop:     make(chan struct{}),
-		done:     make(chan struct{}),
-		disabled: verbose,
-	}
-}
-
-// Start starts the spinner in a separate goroutine.
-func (s *Spinner) Start() {
-	if s.disabled {
-		return
-	}
-	go func() {
-		defer close(s.done)
-		chars := []string{"/", "-", "\\", "|"}
-		i := 0
-		ticker := time.NewTicker(100 * time.Millisecond)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-s.stop:
-				fmt.Fprint(Stderr, "\r\033[K") // Clear line
-				return
-			case <-ticker.C:
-				fmt.Fprintf(Stderr, "\rProcessing... %s", chars[i])
-				i = (i + 1) % len(chars)
-			}
-		}
-	}()
-}
-
-// Stop stops the spinner and clears the line.
-func (s *Spinner) Stop() {
-	if s.disabled {
-		return
-	}
-	select {
-	case s.stop <- struct{}{}:
-		<-s.done
-	default:
-	}
 }

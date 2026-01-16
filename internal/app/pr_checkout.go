@@ -2,6 +2,7 @@ package app
 
 import (
 	conf "mistletoe/internal/config"
+	"mistletoe/internal/ui"
 )
 
 import (
@@ -308,7 +309,7 @@ func prCheckoutCommand(args []string, opts GlobalOptions) error {
 
 	// 5. Status
 	fmt.Println("Verifying status...")
-	spinner := NewSpinner(verbose)
+	spinner := ui.NewSpinner(verbose)
 	spinner.Start()
 	rows := CollectStatus(config, jobs, opts.GitPath, verbose, false)
 	prRows := CollectPrStatus(rows, config, jobs, opts.GhPath, verbose, nil)

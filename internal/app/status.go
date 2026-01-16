@@ -2,6 +2,7 @@ package app
 
 import (
 	conf "mistletoe/internal/config"
+	"mistletoe/internal/ui"
 )
 
 import (
@@ -87,7 +88,7 @@ func handleStatus(args []string, opts GlobalOptions) {
 		jobs = 1
 	}
 
-	spinner := NewSpinner(verbose)
+	spinner := ui.NewSpinner(verbose)
 
 	fail := func(format string, a ...interface{}) {
 		spinner.Stop()

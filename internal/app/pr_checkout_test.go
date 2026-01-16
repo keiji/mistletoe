@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"testing"
 	"strings"
+
+	"mistletoe/internal/sys"
 )
 
 // TestCheckoutHelperProcess is a helper process for mocking exec.Command
@@ -103,7 +105,7 @@ Some description...
 
 func TestHandlePrCheckout(t *testing.T) {
 	// Swap ExecCommand
-	ExecCommand = func(name string, arg ...string) *exec.Cmd {
+	sys.ExecCommand = func(name string, arg ...string) *exec.Cmd {
 		cs := []string{"-test.run=TestCheckoutHelperProcess", "--", name}
 		cs = append(cs, arg...)
 
@@ -117,7 +119,7 @@ func TestHandlePrCheckout(t *testing.T) {
 		cmd.Env = append(os.Environ(), "GO_WANT_HELPER_PROCESS=1")
 		return cmd
 	}
-	defer func() { ExecCommand = exec.Command }()
+	defer func() { sys.ExecCommand = exec.Command }()
 
 	// We verify parsing logic via public ParseMistletoeBlock
 	// Note: ParseMistletoeBlock requires separators.

@@ -2,6 +2,7 @@ package app
 
 import (
 	conf "mistletoe/internal/config"
+	"mistletoe/internal/ui"
 )
 
 import (
@@ -112,7 +113,7 @@ func prStatusCommand(args []string, opts GlobalOptions) error {
 	}
 
 	// Initialize Spinner
-	spinner := NewSpinner(verbose)
+	spinner := ui.NewSpinner(verbose)
 	spinner.Start()
 
 	// 4. Collect Status
