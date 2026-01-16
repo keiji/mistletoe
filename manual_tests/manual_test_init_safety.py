@@ -32,12 +32,14 @@ def main():
             f.write("I am unexpected")
 
         # Command to run init
+        # We must use --ignore-stdin to prevent mstl from reading config from stdin,
+        # which would consume the piped input intended for the prompt.
         mstl_path = os.path.abspath("mstl")
         if not os.path.exists(mstl_path):
             # Try go run
-            cmd = ["go", "run", "cmd/mstl/main.go", "init", "-f", config_path, "--dest", temp_dir]
+            cmd = ["go", "run", "cmd/mstl/main.go", "init", "-f", config_path, "--dest", temp_dir, "--ignore-stdin"]
         else:
-            cmd = [mstl_path, "init", "-f", config_path, "--dest", temp_dir]
+            cmd = [mstl_path, "init", "-f", config_path, "--dest", temp_dir, "--ignore-stdin"]
 
         print("Running init in a dirty directory...")
 
@@ -88,6 +90,34 @@ def main():
                 runner.log("Passed safety check (failed later at clone as expected).", status="SUCCESS")
             else:
                 runner.fail("Aborted by user despite sending 'y'.")
+
+        print("Test 3: Bypass safety check with --yes")
+        # Add --yes to the command
+        cmd_yes = cmd + ["--yes"]
+        p = subprocess.Popen(cmd_yes, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        # No input provided to confirm prompt is skipped
+        stdout, stderr = p.communicate()
+
+        print("--- Stdout ---")
+        print(stdout)
+        print("--- Stderr ---")
+        print(stderr)
+
+        if "Are you sure you want to initialize in this directory?" in stdout:
+             runner.fail("Prompt displayed despite --yes flag.")
+        else:
+             runner.log("Prompt skipped with --yes flag.", status="SUCCESS")
+
+        if "This directory contains files/directories not in the repository list" in stdout:
+             runner.log("Safety warning message still displayed (as expected).", status="SUCCESS")
+
+        if "Cloning https://github.com/example/repo1.git" in stdout or "Cloning..." in stdout:
+             runner.log("Proceeded to clone automatically.", status="SUCCESS")
+        elif "Error" in stdout or "Error" in stderr:
+            if "initialization aborted by user" not in stdout:
+                runner.log("Passed safety check (failed later at clone as expected).", status="SUCCESS")
+            else:
+                runner.fail("Aborted by user unexpectedly.")
 
     finally:
         shutil.rmtree(temp_dir)

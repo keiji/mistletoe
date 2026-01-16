@@ -111,6 +111,7 @@ func checkRootDirectorySafety(config *conf.Config, configFile string, targetDir 
 		fmt.Printf("Current directory: %s\n", targetDir)
 		fmt.Println("This directory contains files/directories not in the repository list.")
 
+		// If --yes is provided, automatically approve the safety check.
 		if yes {
 			return nil
 		}

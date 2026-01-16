@@ -34,7 +34,7 @@ def main():
         env.create_config_and_graph() # Creates A->B->C
 
         print_green(f"[-] Initializing...")
-        env.run_mstl_cmd(["init", "-f", "mistletoe.json", "--verbose"])
+        env.run_mstl_cmd(["init", "-f", "mistletoe.json", "--ignore-stdin", "--verbose"])
 
         print_green("[-] Configuring git user...")
         for repo in env.repo_names:

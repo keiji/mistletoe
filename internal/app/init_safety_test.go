@@ -39,9 +39,12 @@ func TestCheckRootDirectorySafety(t *testing.T) {
 		wantErrString string
 	}{
 		{
-			name:    "AutoApprove (Yes Flag)",
+			name:    "AutoApprove (Yes Flag) - Dirty Directory",
 			yesFlag: true,
-			input:   "", // Should not be read
+			// Input is empty. If the prompt were not skipped, the reader would attempt to read from Stdin,
+			// encounter EOF (or block), and likely cause an error or timeout.
+			// Success here proves that no input was requested.
+			input:   "",
 			wantErr: false,
 		},
 		{
