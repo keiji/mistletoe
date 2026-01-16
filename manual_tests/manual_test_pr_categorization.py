@@ -12,6 +12,8 @@ def main():
     runner.parse_args()
 
     env = GhTestEnv()
+    if runner.args.yes:
+        env.auto_yes = True
 
     # 1. Setup Phase (Automated)
     print_green("[-] Setting up test environment (generating names)...")
@@ -36,7 +38,8 @@ def main():
 
         # Initialize
         print_green(f"[-] Initializing in {env.test_dir}...")
-        env.run_mstl_cmd(["init", "-f", "mistletoe.json", "--verbose"])
+        # Use --ignore-stdin to prevent unintended interaction with stdin
+        env.run_mstl_cmd(["init", "-f", "mistletoe.json", "--ignore-stdin", "--verbose"])
 
         # Configure git user for the cloned repos
         print_green("[-] Configuring dummy git user for cloned repositories...")

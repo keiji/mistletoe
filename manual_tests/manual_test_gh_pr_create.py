@@ -36,7 +36,7 @@ def main():
 
         # Initialize
         print_green(f"[-] Initializing in {env.test_dir}...")
-        env.run_mstl_cmd(["init", "-f", "mistletoe.json", "--verbose"])
+        env.run_mstl_cmd(["init", "-f", "mistletoe.json", "--ignore-stdin", "--verbose"])
 
         # Configure git user for the cloned repos (required for subsequent commits)
         print_green("[-] Configuring dummy git user for cloned repositories...")

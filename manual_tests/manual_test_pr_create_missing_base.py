@@ -56,7 +56,7 @@ def main():
 
         # Initialize
         print_green(f"[-] Initializing in {env.test_dir}...")
-        env.run_mstl_cmd(["init", "-f", "mistletoe.json", "--verbose"])
+        env.run_mstl_cmd(["init", "-f", "mistletoe.json", "--ignore-stdin", "--verbose"])
 
         # Configure dummy git user
         for repo in env.repo_names:
