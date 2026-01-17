@@ -9,6 +9,7 @@
 1.  4つのリポジトリ（A, B, C, D）で Pull Request を作成する（`pr create` 相当）。
 2.  作成された Pull Request の URL を指定して `pr checkout` を実行する。
 3.  指定したディレクトリにすべてのリポジトリがクローンされ、正しい状態（ブランチ・コミット）になっているか検証する。
+4.  `--depth 1` オプションを指定した浅いクローン（Shallow Clone）の動作を検証する。
 
 ## テスト構成
 
@@ -26,7 +27,7 @@
 2.  各リポジトリに変更を加え、`pr create` を実行して Pull Request を作成します。
 3.  リポジトリ A の Pull Request URL を取得します。
 
-### 2. `pr checkout` の実行
+### 2. `pr checkout` の実行（通常）
 
 以下のコマンドを実行します。
 
@@ -37,13 +38,26 @@ mstl-gh pr checkout \
   --verbose
 ```
 
-### 3. 検証（自動・手動）
+### 3. `pr checkout` の実行（Shallow Clone）
 
-1.  **ディレクトリ生成**: カレントディレクトリに `pr_checkout` ディレクトリが作成されていること。
-2.  **リポジトリ展開**: `pr_checkout` ディレクトリ内に、4つのリポジトリ（A, B, C, D）のディレクトリが存在すること。
+以下のコマンドを実行します。
+
+```bash
+mstl-gh pr checkout \
+  -u <Repo_A_PR_URL> \
+  --dest ./pr_checkout_shallow \
+  --depth 1 \
+  --verbose
+```
+
+### 4. 検証（自動・手動）
+
+1.  **ディレクトリ生成**: カレントディレクトリに `pr_checkout` および `pr_checkout_shallow` ディレクトリが作成されていること。
+2.  **リポジトリ展開**: 各ディレクトリ内に、4つのリポジトリ（A, B, C, D）のディレクトリが存在すること。
 3.  **状態の復元**: 各リポジトリが `feature/checkout-test` ブランチ（または作成時のコミット）にチェックアウトされていること。
 4.  **依存関係**: `.mstl/dependency-graph.md` が復元されていること。
+5.  **履歴の深さ（Shallow）**: `pr_checkout_shallow` 内のリポジトリにおいて、コミット履歴が1件のみであることを確認する（`git rev-list --count HEAD` が 1）。
 
 ## クリーンアップ
 
-テスト終了後、GitHub リポジトリおよびローカルの一時ディレクトリ（`pr_checkout` を含む）を削除します。
+テスト終了後、GitHub リポジトリおよびローカルの一時ディレクトリ（`pr_checkout`, `pr_checkout_shallow` を含む）を削除します。
