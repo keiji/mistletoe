@@ -258,7 +258,8 @@ func handleSwitch(args []string, opts GlobalOptions) {
 				defer func() { <-sem }()
 
 				dir := config.GetRepoPath(repo)
-				fmt.Fprintf(sys.Stdout, "Switching %s to branch %s...\n", dir, branchName)
+				repoID := *repo.ID
+				fmt.Fprintf(sys.Stdout, "[%s] Switching to branch %s...\n", repoID, branchName)
 				if err := RunGitInteractive(dir, opts.GitPath, verbose, "checkout", branchName); err != nil {
 					fmt.Fprintf(sys.Stderr, "Error switching branch for %s: %v.\n", dir, err)
 					osExit(1)
@@ -278,19 +279,20 @@ func handleSwitch(args []string, opts GlobalOptions) {
 				defer func() { <-sem }()
 
 				dir := config.GetRepoPath(repo)
+				repoID := *repo.ID
 				mu.Lock()
 				exists := dirExists[dir]
 				mu.Unlock()
 
 				if exists {
-					fmt.Fprintf(sys.Stdout, "Branch %s exists in %s. Switching...\n", branchName, dir)
+					fmt.Fprintf(sys.Stdout, "[%s] Branch %s exists. Switching...\n", repoID, branchName)
 					if err := RunGitInteractive(dir, opts.GitPath, verbose, "checkout", branchName); err != nil {
 						fmt.Fprintf(sys.Stderr, "Error switching branch for %s: %v.\n", dir, err)
 						osExit(1)
 						return
 					}
 				} else {
-					fmt.Fprintf(sys.Stdout, "Creating and switching to branch %s in %s...\n", branchName, dir)
+					fmt.Fprintf(sys.Stdout, "[%s] Creating and switching to branch %s...\n", repoID, branchName)
 					if err := RunGitInteractive(dir, opts.GitPath, verbose, "checkout", "-b", branchName); err != nil {
 						fmt.Fprintf(sys.Stderr, "Error creating branch for %s: %v.\n", dir, err)
 						osExit(1)
