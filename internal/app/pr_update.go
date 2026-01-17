@@ -219,11 +219,6 @@ func prUpdateCommand(args []string, opts GlobalOptions) error {
 	}
 
 	filename := fmt.Sprintf("mistletoe-snapshot-%s.json", snapshotID)
-	if err := os.WriteFile(filename, snapshotData, 0644); err != nil {
-		fmt.Printf("error writing snapshot file: %v\n", err)
-		return err
-	}
-	fmt.Printf("Snapshot saved to %s\n", filename)
 
 	// 9. Update Descriptions
 	fmt.Println("Updating Pull Request descriptions...")

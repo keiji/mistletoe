@@ -57,7 +57,7 @@ flowchart TD
     CheckTarget -- "Yes" --> VerifyPush{"Pushが必要か？\n(Ahead)"}
 
     VerifyPush -- "Yes" --> ExecPush["Push実行"]
-    VerifyPush -- "No" --> GenSnapshot["スナップショット生成"]
+    VerifyPush -- "No" --> GenSnapshot["スナップショット生成\n(ファイル保存なし)"]
     ExecPush --> GenSnapshot
 
     GenSnapshot --> ExecUpdate["PR本文更新\n(スナップショット埋め込み)"]
@@ -90,6 +90,7 @@ flowchart TD
 ### 3.4. Mistletoe ブロック (Mistletoe Block)
 
 PR 本文の更新仕様は `pr create` と完全に同一です。
+スナップショットJSONはPR本文の `<details>` ブロック内に埋め込まれますが、ローカルファイルシステムには保存されません。
 
 ### 3.5. 制約事項 (Constraints)
 
