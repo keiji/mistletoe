@@ -146,8 +146,11 @@ func TestHandleSwitch(t *testing.T) {
 		// Verify
 		verifyBranch(t, repo1, "feature-branch")
 		verifyBranch(t, repo2, "feature-branch")
-		if !strings.Contains(out, "Creating and switching to branch") {
-			t.Logf("Output: %s", out)
+		if !strings.Contains(out, "[repo1] Creating and switching to branch") {
+			t.Errorf("Output missing [repo1]: %s", out)
+		}
+		if !strings.Contains(out, "[repo2] Creating and switching to branch") {
+			t.Errorf("Output missing [repo2]: %s", out)
 		}
 	})
 
