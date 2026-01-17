@@ -83,15 +83,13 @@ Follow the on-screen prompts. These scripts act as interactive guides, performin
 
 ## Available Tests
 
-*   **`manual_test_gh_pr_create.py`**: Verifies the `mstl-gh pr create` workflow, including dependency graph parsing, snapshot generation, and bulk PR creation.
-*   **`manual_test_mstl.py`**: Verifies core `mstl` commands (`init`, `status`, `switch`, `push`, `sync`) against local bare repositories.
-*   **`manual_test_gh_safety.py`**: Verifies safety checks (race conditions) for `pr create`.
-*   **`manual_test_init_dest.py`**: Verifies the `init` command's destination logic.
-*   **`manual_test_sync_conflict.py`**: Verifies `sync` behavior when merge conflicts occur.
+For a complete list of available manual tests, their descriptions, and corresponding design documentation, please refer to:
+
+**[docs/manual_tests/index.md](../docs/manual_tests/index.md)**
 
 ## Cleanup
 
-The test scripts attempt to clean up the temporary repositories they create (prefixed with `mistletoe-test-`) upon completion or failure.
+The test scripts attempt to clean up the temporary repositories they create (prefixed with `mistletoe-test-` or similar) upon completion or failure.
 
 If a test is interrupted and artifacts remain, you can run the cleanup script (requires `gh` authentication):
 
