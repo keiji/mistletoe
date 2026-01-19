@@ -344,11 +344,8 @@ func validateAndPrepareInitDest(dest string) (string, error) {
 	return absDest, nil
 }
 
-func handleInit(args []string, opts GlobalOptions) {
-	if err := initCommand(args, opts); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
+func handleInit(args []string, opts GlobalOptions) error {
+	return initCommand(args, opts)
 }
 
 func initCommand(args []string, opts GlobalOptions) error {

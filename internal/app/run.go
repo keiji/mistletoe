@@ -72,6 +72,14 @@ func validateGhAuth(ghPath string) error {
 
 // Run is the entry point for the application logic.
 func Run(appType Type, version, hash string, args []string, extraHandler func(string, []string, GlobalOptions) bool) {
+	if err := RunApp(appType, version, hash, args, extraHandler); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+}
+
+// RunApp is the internal entry point that returns an error instead of exiting.
+func RunApp(appType Type, version, hash string, args []string, extraHandler func(string, []string, GlobalOptions) bool) error {
 	if appType == TypeMstlGh {
 		AppName = AppNameMstlGh
 	} else {
@@ -82,8 +90,7 @@ func Run(appType Type, version, hash string, args []string, extraHandler func(st
 
 	subcmdName, subcmdArgs, err := parseArgs(args)
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		return err
 	}
 
 	// Determine if command allows skipping checks (e.g. help, version)
@@ -94,8 +101,7 @@ func Run(appType Type, version, hash string, args []string, extraHandler func(st
 	gitErr := validateGit(gitPath)
 
 	if gitErr != nil && !isPermissive {
-		fmt.Printf("Error: Git is not callable at '%s'. (%v)\n", gitPath, gitErr)
-		os.Exit(1)
+		return fmt.Errorf("Error: Git is not callable at '%s'. (%v)", gitPath, gitErr)
 	}
 
 	// 2. Verify Gh (Required for mstl-gh only)
@@ -106,14 +112,12 @@ func Run(appType Type, version, hash string, args []string, extraHandler func(st
 		if !isPermissive {
 			ghErr := validateGh(ghPath)
 			if ghErr != nil {
-				fmt.Printf("Error: GitHub CLI (gh) is not callable at '%s'. (%v)\n", ghPath, ghErr)
-				os.Exit(1)
+				return fmt.Errorf("Error: GitHub CLI (gh) is not callable at '%s'. (%v)", ghPath, ghErr)
 			}
 
 			ghAuthErr := validateGhAuth(ghPath)
 			if ghAuthErr != nil {
-				fmt.Printf("Error: GitHub CLI (gh) is not logged in. Please run 'gh auth login'. (%v)\n", ghAuthErr)
-				os.Exit(1)
+				return fmt.Errorf("Error: GitHub CLI (gh) is not logged in. Please run 'gh auth login'. (%v)", ghAuthErr)
 			}
 		}
 	}
@@ -125,32 +129,30 @@ func Run(appType Type, version, hash string, args []string, extraHandler func(st
 
 	switch subcmdName {
 	case CmdInit:
-		handleInit(subcmdArgs, opts)
+		return handleInit(subcmdArgs, opts)
 	case CmdSnapshot:
-		handleSnapshot(subcmdArgs, opts)
+		return handleSnapshot(subcmdArgs, opts)
 	case CmdSwitch:
-		handleSwitch(subcmdArgs, opts)
+		return handleSwitch(subcmdArgs, opts)
 	case CmdStatus:
-		handleStatus(subcmdArgs, opts)
+		return handleStatus(subcmdArgs, opts)
 	case CmdSync:
-		handleSync(subcmdArgs, opts)
+		return handleSync(subcmdArgs, opts)
 	case CmdPush:
-		handlePush(subcmdArgs, opts)
+		return handlePush(subcmdArgs, opts)
 	case CmdHelp:
-		handleHelp(subcmdArgs, opts)
+		return handleHelp(subcmdArgs, opts)
 	case CmdVersion:
 		if appType == TypeMstlGh {
-			handleVersionGh(opts)
-		} else {
-			handleVersionMstl(opts)
+			return handleVersionGh(opts)
 		}
+		return handleVersionMstl(opts)
 	case "":
-		handleHelp(subcmdArgs, opts)
+		return handleHelp(subcmdArgs, opts)
 	default:
 		if extraHandler != nil && extraHandler(subcmdName, subcmdArgs, opts) {
-			return
+			return nil
 		}
-		fmt.Printf("Unknown subcommand: %s.\n", subcmdName)
-		os.Exit(1)
+		return fmt.Errorf("Unknown subcommand: %s.", subcmdName)
 	}
 }

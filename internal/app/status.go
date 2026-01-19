@@ -11,7 +11,7 @@ import (
 	"fmt"
 )
 
-func handleStatus(args []string, opts GlobalOptions) {
+func handleStatus(args []string, opts GlobalOptions) error {
 	var (
 		fShort, fLong   string
 		jVal, jValShort int
@@ -33,9 +33,11 @@ func handleStatus(args []string, opts GlobalOptions) {
 	fs.BoolVar(&yesShort, "y", false, "Automatically answer 'yes' to all prompts (shorthand)")
 
 	if err := ParseFlagsFlexible(fs, args); err != nil {
-		fmt.Fprintln(sys.Stderr, "Error parsing flags:", err)
-		osExit(1)
-		return
+		return fmt.Errorf("Error parsing flags: %w", err)
+	}
+
+	if len(fs.Args()) > 0 {
+		return fmt.Errorf("Error: status command does not accept positional arguments")
 	}
 
 	if err := CheckFlagDuplicates(fs, [][2]string{
@@ -44,16 +46,12 @@ func handleStatus(args []string, opts GlobalOptions) {
 		{"verbose", "v"},
 		{"yes", "y"},
 	}); err != nil {
-		fmt.Fprintln(sys.Stderr, "Error:", err)
-		osExit(1)
-		return
+		return fmt.Errorf("Error: %w", err)
 	}
 
 	configFile, jobsFlag, configData, err := ResolveCommonValues(fLong, fShort, jVal, jValShort, ignoreStdin)
 	if err != nil {
-		fmt.Fprintf(sys.Stderr, "Error: %v\n", err)
-		osExit(1)
-		return
+		return fmt.Errorf("Error: %w", err)
 	}
 
 	configFile, err = SearchParentConfig(configFile, configData, opts.GitPath)
@@ -69,17 +67,13 @@ func handleStatus(args []string, opts GlobalOptions) {
 	}
 
 	if err != nil {
-		fmt.Fprintln(sys.Stderr, err)
-		osExit(1)
-		return
+		return err
 	}
 
 	// Resolve Jobs
 	jobs, err := DetermineJobs(jobsFlag, config)
 	if err != nil {
-		fmt.Fprintf(sys.Stderr, "Error: %v\n", err)
-		osExit(1)
-		return
+		return fmt.Errorf("Error: %w", err)
 	}
 
 	// Verbose Override
@@ -90,19 +84,12 @@ func handleStatus(args []string, opts GlobalOptions) {
 	}
 
 	spinner := ui.NewSpinner(verbose)
-
-	fail := func(format string, a ...interface{}) {
-		spinner.Stop()
-		fmt.Fprintf(sys.Stderr, format, a...)
-		osExit(1)
-	}
-
 	spinner.Start()
 
 	// Validation Phase
 	if err := ValidateRepositoriesIntegrity(config, opts.GitPath, verbose); err != nil {
-		fail("%v\n", err)
-		return
+		spinner.Stop()
+		return err
 	}
 
 	// Output Phase
@@ -111,4 +98,5 @@ func handleStatus(args []string, opts GlobalOptions) {
 	spinner.Stop()
 
 	RenderStatusTable(sys.Stdout, rows)
+	return nil
 }

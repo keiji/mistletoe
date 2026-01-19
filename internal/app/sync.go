@@ -13,7 +13,7 @@ import (
 	"strings"
 )
 
-func handleSync(args []string, opts GlobalOptions) {
+func handleSync(args []string, opts GlobalOptions) error {
 	var (
 		fShort, fLong string
 		jVal, jValShort int
@@ -35,9 +35,11 @@ func handleSync(args []string, opts GlobalOptions) {
 	fs.BoolVar(&yesShort, "y", false, "Automatically answer 'yes' to all prompts (shorthand)")
 
 	if err := ParseFlagsFlexible(fs, args); err != nil {
-		fmt.Fprintln(sys.Stderr, "Error parsing flags:", err)
-		osExit(1)
-		return
+		return fmt.Errorf("Error parsing flags: %w", err)
+	}
+
+	if len(fs.Args()) > 0 {
+		return fmt.Errorf("Error: sync command does not accept positional arguments")
 	}
 
 	if err := CheckFlagDuplicates(fs, [][2]string{
@@ -46,16 +48,12 @@ func handleSync(args []string, opts GlobalOptions) {
 		{"verbose", "v"},
 		{"yes", "y"},
 	}); err != nil {
-		fmt.Fprintln(sys.Stderr, "Error:", err)
-		osExit(1)
-		return
+		return fmt.Errorf("Error: %w", err)
 	}
 
 	configFile, jobsFlag, configData, err := ResolveCommonValues(fLong, fShort, jVal, jValShort, ignoreStdin)
 	if err != nil {
-		fmt.Fprintf(sys.Stderr, "Error: %v\n", err)
-		osExit(1)
-		return
+		return fmt.Errorf("Error: %w", err)
 	}
 
 	yesFlag := yes || yesShort
@@ -73,17 +71,13 @@ func handleSync(args []string, opts GlobalOptions) {
 	}
 
 	if err != nil {
-		fmt.Fprintln(sys.Stderr, err)
-		osExit(1)
-		return
+		return err
 	}
 
 	// Resolve Jobs
 	jobs, err := DetermineJobs(jobsFlag, config)
 	if err != nil {
-		fmt.Fprintf(sys.Stderr, "Error: %v\n", err)
-		osExit(1)
-		return
+		return fmt.Errorf("Error: %w", err)
 	}
 
 	// Verbose Override
@@ -94,19 +88,12 @@ func handleSync(args []string, opts GlobalOptions) {
 	}
 
 	spinner := ui.NewSpinner(verbose)
-
-	fail := func(format string, a ...interface{}) {
-		spinner.Stop()
-		fmt.Fprintf(sys.Stderr, format, a...)
-		osExit(1)
-	}
-
 	spinner.Start()
 
 	// Validation Phase
 	if err := ValidateRepositoriesIntegrity(config, opts.GitPath, verbose); err != nil {
-		fail("%v\n", err)
-		return
+		spinner.Stop()
+		return err
 	}
 
 	// Status Phase
@@ -149,17 +136,13 @@ func handleSync(args []string, opts GlobalOptions) {
 						argsPull = append(argsPull, "--rebase")
 					case "abort", "a", "q":
 						fmt.Fprintln(sys.Stdout, "Aborted.")
-						osExit(0)
-						return
+						return nil
 					default:
-						fmt.Fprintln(sys.Stdout, "Invalid input. Aborted.")
-						osExit(1)
-						return
+						return fmt.Errorf("Invalid input. Aborted.")
 					}
 				} else {
 					// EOF or error
-					osExit(1)
-					return
+					return fmt.Errorf("Input error or EOF.")
 				}
 			}
 		} else {
@@ -190,9 +173,8 @@ func handleSync(args []string, opts GlobalOptions) {
 
 		fmt.Fprintf(sys.Stdout, "Syncing %s...\n", row.Repo)
 		if err := RunGitInteractive(row.RepoDir, opts.GitPath, verbose, argsPull...); err != nil {
-			fmt.Fprintf(sys.Stderr, "Error pulling %s: %v\n", row.Repo, err)
-			osExit(1) // Abort on error as per "Sequentially pull" typical strict behavior or "abort" logic
-			return
+			return fmt.Errorf("Error pulling %s: %w", row.Repo, err)
 		}
 	}
+	return nil
 }
