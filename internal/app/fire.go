@@ -13,7 +13,7 @@ import (
 )
 
 // handleFire handles the fire subcommand.
-func handleFire(args []string, opts GlobalOptions) error {
+func handleFire(_ []string, opts GlobalOptions) error {
 	// "fire" takes no options and implies --yes behavior.
 	// It uses the default config file search logic.
 
