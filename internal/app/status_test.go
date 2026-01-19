@@ -17,8 +17,6 @@ import (
 
 
 // setupRemoteAndContent from common_test.go is assumed to be available
-// If not, we copy it here for self-contained test
-// But common_test.go is in the same package, so it should be fine if we run `go test ./internal/app/...`
 
 func TestStatusCmd(t *testing.T) {
 	// Refactored to unit test logic using handleStatus
@@ -45,15 +43,15 @@ func TestStatusCmd(t *testing.T) {
 		data, _ := json.Marshal(config)
 		os.WriteFile(configFile, data, 0644)
 
-		out, stderr, code := runHandleStatus(t, configFile, tmpDir)
+		out, stderr, err := runHandleStatus(t, configFile, tmpDir)
 
-		if code != 1 {
-			t.Errorf("Expected exit code 1, got %d", code)
-		}
-		if !strings.Contains(stderr, "different remote origin") {
-			t.Errorf("Expected error message, got: %s", stderr)
+		if err == nil {
+			t.Error("Expected error, got nil")
+		} else if !strings.Contains(err.Error(), "different remote origin") {
+			t.Errorf("Expected error message to contain 'different remote origin', got: %v", err)
 		}
 		_ = out
+		_ = stderr
 	})
 
 	// 2. Status Success - Synced and Unpushed
@@ -84,9 +82,9 @@ func TestStatusCmd(t *testing.T) {
 		data, _ := json.Marshal(config)
 		os.WriteFile(configFile, data, 0644)
 
-		out, _, code := runHandleStatus(t, configFile, tmpDir)
-		if code != 0 {
-			t.Errorf("Expected exit code 0, got %d", code)
+		out, _, err := runHandleStatus(t, configFile, tmpDir)
+		if err != nil {
+			t.Errorf("Expected success, got error: %v", err)
 		}
 
 		coloredUnpushed := "\033[32m>\033[0m"
@@ -128,9 +126,9 @@ func TestStatusCmd(t *testing.T) {
 		data, _ := json.Marshal(config)
 		os.WriteFile(configFile, data, 0644)
 
-		out, _, code := runHandleStatus(t, configFile, tmpDir)
-		if code != 0 {
-			t.Errorf("Expected exit code 0, got %d", code)
+		out, _, err := runHandleStatus(t, configFile, tmpDir)
+		if err != nil {
+			t.Errorf("Expected success, got error: %v", err)
 		}
 
 		coloredUnpushed := "\033[32m>\033[0m"
@@ -169,9 +167,9 @@ func TestStatusCmd(t *testing.T) {
 		data, _ := json.Marshal(config)
 		os.WriteFile(configFile, data, 0644)
 
-		out, _, code := runHandleStatus(t, configFile, tmpDir)
-		if code != 0 {
-			t.Errorf("Expected exit code 0, got %d", code)
+		out, _, err := runHandleStatus(t, configFile, tmpDir)
+		if err != nil {
+			t.Errorf("Expected success, got error: %v", err)
 		}
 
 		coloredPullable := "\033[33m<\033[0m"
@@ -208,9 +206,9 @@ func TestStatusCmd(t *testing.T) {
 		data, _ := json.Marshal(config)
 		os.WriteFile(configFile, data, 0644)
 
-		out, _, code := runHandleStatus(t, configFile, tmpDir)
-		if code != 0 {
-			t.Errorf("Expected exit code 0, got %d", code)
+		out, _, err := runHandleStatus(t, configFile, tmpDir)
+		if err != nil {
+			t.Errorf("Expected success, got error: %v", err)
 		}
 
 		coloredDiverged := "\033[32m>\033[0m\033[33m<\033[0m"
@@ -248,9 +246,9 @@ func TestStatusCmd(t *testing.T) {
 		data, _ := json.Marshal(config)
 		os.WriteFile(configFile, data, 0644)
 
-		out, _, code := runHandleStatus(t, configFile, tmpDir)
-		if code != 0 {
-			t.Errorf("Expected exit code 0, got %d", code)
+		out, _, err := runHandleStatus(t, configFile, tmpDir)
+		if err != nil {
+			t.Errorf("Expected success, got error: %v", err)
 		}
 
 		coloredConflict := "\033[33m!\033[0m"
@@ -267,30 +265,27 @@ func TestStatusCmd(t *testing.T) {
 	// 7. Status Flag Errors and Logic
 	t.Run("Status Flag Errors", func(t *testing.T) {
 		// Invalid flag
-		_, stderr, code := runHandleStatusWithArgs(t, tmpDir, []string{"--invalid-flag"}, "")
-		if code != 1 {
-			t.Errorf("Expected exit code 1 for invalid flag, got %d", code)
-		}
-		if !strings.Contains(stderr, "flag provided but not defined") {
-			t.Errorf("Expected flag error, got: %s", stderr)
+		_, _, err := runHandleStatusWithArgs(t, tmpDir, []string{"--invalid-flag"}, "")
+		if err == nil {
+			t.Error("Expected error for invalid flag, got nil")
+		} else if !strings.Contains(err.Error(), "flag provided but not defined") {
+			t.Errorf("Expected flag error, got: %v", err)
 		}
 
 		// Duplicate flags
-		_, stderr, code = runHandleStatusWithArgs(t, tmpDir, []string{"--file", "a", "-f", "b"}, "")
-		if code != 1 {
-			t.Errorf("Expected exit code 1 for duplicate flags, got %d", code)
-		}
-		if !strings.Contains(stderr, "cannot be specified with different values") {
-			t.Errorf("Expected conflicting values error, got: %s", stderr)
+		_, _, err = runHandleStatusWithArgs(t, tmpDir, []string{"--file", "a", "-f", "b"}, "")
+		if err == nil {
+			t.Error("Expected error for duplicate flags, got nil")
+		} else if !strings.Contains(err.Error(), "cannot be specified with different values") {
+			t.Errorf("Expected conflicting values error, got: %v", err)
 		}
 
 		// Invalid jobs
-		_, stderr, code = runHandleStatusWithArgs(t, tmpDir, []string{"-j", "0"}, "")
-		if code != 1 {
-			t.Errorf("Expected exit code 1 for invalid jobs, got %d", code)
-		}
-		if !strings.Contains(stderr, "Jobs must be at least") {
-			t.Errorf("Expected jobs error, got: %s", stderr)
+		_, _, err = runHandleStatusWithArgs(t, tmpDir, []string{"-j", "0"}, "")
+		if err == nil {
+			t.Error("Expected error for invalid jobs, got nil")
+		} else if !strings.Contains(err.Error(), "Jobs must be at least") {
+			t.Errorf("Expected jobs error, got: %v", err)
 		}
 	})
 
@@ -311,9 +306,9 @@ func TestStatusCmd(t *testing.T) {
 		data, _ := json.Marshal(config)
 		os.WriteFile(configFile, data, 0644)
 
-		out, _, code := runHandleStatusWithArgs(t, tmpDir, []string{"--file", configFile, "-v", "-j", "10", "--ignore-stdin"}, "")
-		if code != 0 {
-			t.Errorf("Expected exit code 0, got %d", code)
+		out, _, err := runHandleStatusWithArgs(t, tmpDir, []string{"--file", configFile, "-v", "-j", "10", "--ignore-stdin"}, "")
+		if err != nil {
+			t.Errorf("Expected success, got error: %v", err)
 		}
 		if !strings.Contains(out, "Verbose is specified, so jobs is treated as 1") {
 			t.Errorf("Expected verbose override message")
@@ -321,33 +316,21 @@ func TestStatusCmd(t *testing.T) {
 	})
 }
 
-func runHandleStatus(t *testing.T, configFile, workDir string) (stdout string, stderr string, exitCode int) {
+func runHandleStatus(t *testing.T, configFile, workDir string) (stdout string, stderr string, err error) {
 	return runHandleStatusWithArgs(t, workDir, []string{"--file", configFile, "--ignore-stdin"}, "")
 }
 
-func runHandleStatusWithArgs(t *testing.T, workDir string, args []string, stdinInput string) (stdout string, stderr string, exitCode int) {
+func runHandleStatusWithArgs(t *testing.T, workDir string, args []string, stdinInput string) (stdout string, stderr string, err error) {
 	var stdoutBuf, stderrBuf bytes.Buffer
 	originalStdout, originalStderr := sys.Stdout, sys.Stderr
-	originalOsExit := osExit
 	defer func() {
 		sys.Stdout, sys.Stderr = originalStdout, originalStderr
-		osExit = originalOsExit
 	}()
 	sys.Stdout = &stdoutBuf
 	sys.Stderr = &stderrBuf
 
 	// Mock Stdin
 	sys.Stdin = strings.NewReader("")
-
-	osExit = func(code int) {
-		exitCode = code
-		panic("os.Exit called")
-	}
-	defer func() {
-		recover()
-		stdout = stdoutBuf.String()
-		stderr = stderrBuf.String()
-	}()
 
 	cwd, _ := os.Getwd()
 	os.Chdir(workDir)
@@ -358,7 +341,7 @@ func runHandleStatusWithArgs(t *testing.T, workDir string, args []string, stdinI
 		sys.Stdin = strings.NewReader(stdinInput)
 	}
 
-	handleStatus(args, GlobalOptions{GitPath: "git"})
+	err = handleStatus(args, GlobalOptions{GitPath: "git"})
 
 	stdout = stdoutBuf.String()
 	stderr = stderrBuf.String()

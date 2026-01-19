@@ -17,7 +17,7 @@ import (
 	"sync"
 )
 
-func handleSnapshot(args []string, opts GlobalOptions) {
+func handleSnapshot(args []string, opts GlobalOptions) error {
 	var (
 		oLong     string
 		oShort    string
@@ -46,9 +46,11 @@ func handleSnapshot(args []string, opts GlobalOptions) {
 	fs.BoolVar(&yesShort, "y", false, "Automatically answer 'yes' to all prompts (shorthand)")
 
 	if err := ParseFlagsFlexible(fs, args); err != nil {
-		fmt.Fprintln(sys.Stderr, "Error parsing flags:", err)
-		osExit(1)
-		return
+		return fmt.Errorf("Error parsing flags: %w", err)
+	}
+
+	if len(fs.Args()) > 0 {
+		return fmt.Errorf("Error: snapshot command does not accept positional arguments")
 	}
 
 	if err := CheckFlagDuplicates(fs, [][2]string{
@@ -58,9 +60,7 @@ func handleSnapshot(args []string, opts GlobalOptions) {
 		{"verbose", "v"},
 		{"yes", "y"},
 	}); err != nil {
-		fmt.Fprintln(sys.Stderr, "Error:", err)
-		osExit(1)
-		return
+		return fmt.Errorf("Error: %w", err)
 	}
 
 	outputFile := oLong
@@ -72,9 +72,7 @@ func handleSnapshot(args []string, opts GlobalOptions) {
 	var config *conf.Config
 	configPath, jobsFlag, configData, err := ResolveCommonValues(fLong, fShort, jVal, jValShort, ignoreStdin)
 	if err != nil {
-		fmt.Fprintln(sys.Stderr, err)
-		osExit(1)
-		return
+		return err
 	}
 
 	configPath, err = SearchParentConfig(configPath, configData, opts.GitPath)
@@ -89,18 +87,14 @@ func handleSnapshot(args []string, opts GlobalOptions) {
 			config, err = conf.LoadConfigData(configData)
 		}
 		if err != nil {
-			fmt.Fprintln(sys.Stderr, err)
-			osExit(1)
-			return
+			return err
 		}
 	}
 
 	// Resolve Jobs
 	jobs, err := DetermineJobs(jobsFlag, config)
 	if err != nil {
-		fmt.Fprintf(sys.Stderr, "Error: %v\n", err)
-		osExit(1)
-		return
+		return fmt.Errorf("Error: %w", err)
 	}
 
 	// Verbose Override
@@ -112,9 +106,7 @@ func handleSnapshot(args []string, opts GlobalOptions) {
 
 	entries, err := os.ReadDir(".")
 	if err != nil {
-		fmt.Fprintf(sys.Stderr, "Error reading current directory: %v.\n", err)
-		osExit(1)
-		return
+		return fmt.Errorf("Error reading current directory: %w", err)
 	}
 
 	// Collect valid git directories
@@ -221,9 +213,7 @@ func handleSnapshot(args []string, opts GlobalOptions) {
 
 	fmt.Fprintf(sys.Stderr, "DEBUG: Checking existence of %s\n", outputFile)
 	if _, err := os.Stat(outputFile); err == nil {
-		fmt.Fprintf(sys.Stderr, "Error: Output file '%s' exists.\n", outputFile)
-		osExit(1)
-		return
+		return fmt.Errorf("Error: Output file '%s' exists.", outputFile)
 	}
 
 	// Sort Repos to match order of CalculateSnapshotIdentifier (and general neatness)
@@ -238,18 +228,15 @@ func handleSnapshot(args []string, opts GlobalOptions) {
 
 	data, err := json.MarshalIndent(outputConfig, "", "  ")
 	if err != nil {
-		fmt.Fprintf(sys.Stderr, "Error generating JSON: %v.\n", err)
-		osExit(1)
-		return
+		return fmt.Errorf("Error generating JSON: %w", err)
 	}
 
 	if err := os.WriteFile(outputFile, data, 0644); err != nil {
-		fmt.Fprintf(sys.Stderr, "Error writing to file '%s': %v.\n", outputFile, err)
-		osExit(1)
-		return
+		return fmt.Errorf("Error writing to file '%s': %w", outputFile, err)
 	}
 
 	fmt.Fprintf(sys.Stdout, "Snapshot saved to %s\n", outputFile)
+	return nil
 }
 
 // GenerateSnapshot creates a snapshot JSON of the current state of repositories defined in config

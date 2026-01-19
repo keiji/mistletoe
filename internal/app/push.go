@@ -12,7 +12,7 @@ import (
 	"fmt"
 )
 
-func handlePush(args []string, opts GlobalOptions) {
+func handlePush(args []string, opts GlobalOptions) error {
 	var (
 		fShort, fLong string
 		jVal, jValShort int
@@ -34,9 +34,11 @@ func handlePush(args []string, opts GlobalOptions) {
 	fs.BoolVar(&yesShort, "y", false, "Automatically answer 'yes' to all prompts (shorthand)")
 
 	if err := ParseFlagsFlexible(fs, args); err != nil {
-		fmt.Fprintln(sys.Stderr, "error parsing flags:", err)
-		osExit(1)
-		return
+		return fmt.Errorf("error parsing flags: %w", err)
+	}
+
+	if len(fs.Args()) > 0 {
+		return fmt.Errorf("Error: push command does not accept positional arguments")
 	}
 
 	if err := CheckFlagDuplicates(fs, [][2]string{
@@ -45,16 +47,12 @@ func handlePush(args []string, opts GlobalOptions) {
 		{"verbose", "v"},
 		{"yes", "y"},
 	}); err != nil {
-		fmt.Fprintln(sys.Stderr, "Error:", err)
-		osExit(1)
-		return
+		return fmt.Errorf("Error: %w", err)
 	}
 
 	configFile, jobsFlag, configData, err := ResolveCommonValues(fLong, fShort, jVal, jValShort, ignoreStdin)
 	if err != nil {
-		fmt.Fprintf(sys.Stderr, "error: %v\n", err)
-		osExit(1)
-		return
+		return fmt.Errorf("error: %w", err)
 	}
 
 	yesFlag := yes || yesShort
@@ -71,17 +69,13 @@ func handlePush(args []string, opts GlobalOptions) {
 	}
 
 	if err != nil {
-		fmt.Fprintln(sys.Stderr, err)
-		osExit(1)
-		return
+		return err
 	}
 
 	// Resolve Jobs
 	jobs, err := DetermineJobs(jobsFlag, config)
 	if err != nil {
-		fmt.Fprintf(sys.Stderr, "Error: %v\n", err)
-		osExit(1)
-		return
+		return fmt.Errorf("Error: %w", err)
 	}
 
 	// Verbose Override
@@ -92,19 +86,12 @@ func handlePush(args []string, opts GlobalOptions) {
 	}
 
 	spinner := ui.NewSpinner(verbose)
-
-	fail := func(format string, a ...interface{}) {
-		spinner.Stop()
-		fmt.Fprintf(sys.Stderr, format, a...)
-		osExit(1)
-	}
-
 	spinner.Start()
 
 	// Validation Phase
 	if err := ValidateRepositoriesIntegrity(config, opts.GitPath, verbose); err != nil {
-		fail("%v\n", err)
-		return
+		spinner.Stop()
+		return err
 	}
 
 	// Output Phase
@@ -116,8 +103,7 @@ func handlePush(args []string, opts GlobalOptions) {
 
 	// Validate status
 	if err := ValidateStatusForAction(rows, true); err != nil {
-		fail("%v\n", err)
-		return
+		return err
 	}
 
 	// Identify repositories to push
@@ -130,15 +116,13 @@ func handlePush(args []string, opts GlobalOptions) {
 
 	if len(pushable) == 0 {
 		fmt.Fprintln(sys.Stdout, "No repositories to push.")
-		return
+		return nil
 	}
 
 	reader := bufio.NewReader(sys.Stdin)
 	confirmed, err := ui.AskForConfirmation(reader, "Push updates? (yes/no): ", yesFlag)
 	if err != nil {
-		fmt.Fprintf(sys.Stderr, "Error reading input: %v\n", err)
-		osExit(1)
-		return
+		return fmt.Errorf("Error reading input: %w", err)
 	}
 	if confirmed {
 		for _, row := range pushable {
@@ -149,4 +133,5 @@ func handlePush(args []string, opts GlobalOptions) {
 			}
 		}
 	}
+	return nil
 }

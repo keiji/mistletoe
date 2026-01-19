@@ -37,18 +37,16 @@ func TestHandlePush(t *testing.T) {
 	data, _ := json.Marshal(config)
 	os.WriteFile(configPath, data, 0644)
 
-	// Mock Stdout/Stderr/Stdin/osExit
+	// Mock Stdout/Stderr/Stdin
 	var stdoutBuf, stderrBuf bytes.Buffer
 	originalStdout, originalStderr, originalStdin := sys.Stdout, sys.Stderr, sys.Stdin
-	originalOsExit := osExit
 	defer func() {
 		sys.Stdout, sys.Stderr, sys.Stdin = originalStdout, originalStderr, originalStdin
-		osExit = originalOsExit
 	}()
 	sys.Stdout = &stdoutBuf
 	sys.Stderr = &stderrBuf
 
-	runHandlePush := func(input string, args ...string) (stdout string, stderr string, code int) {
+	runHandlePush := func(input string, args ...string) (stdout string, stderr string, err error) {
 		stdoutBuf.Reset()
 		stderrBuf.Reset()
 
@@ -58,22 +56,12 @@ func TestHandlePush(t *testing.T) {
 			sys.Stdin = strings.NewReader("")
 		}
 
-		osExit = func(c int) {
-			code = c
-			panic("os.Exit called")
-		}
-		defer func() {
-			recover()
-			stdout = stdoutBuf.String()
-			stderr = stderrBuf.String()
-		}()
-
 		fullArgs := append(args, "--file", configPath)
 		cwd, _ := os.Getwd()
 		os.Chdir(tmpDir)
 		defer os.Chdir(cwd)
 
-		handlePush(fullArgs, GlobalOptions{GitPath: "git"})
+		err = handlePush(fullArgs, GlobalOptions{GitPath: "git"})
 
 		stdout = stdoutBuf.String()
 		stderr = stderrBuf.String()
@@ -82,9 +70,9 @@ func TestHandlePush(t *testing.T) {
 
 	// Scenario 1: No Push Needed
 	t.Run("NoPushNeeded", func(t *testing.T) {
-		out, _, code := runHandlePush("", "--ignore-stdin")
-		if code != 0 {
-			t.Errorf("expected exit code 0, got %d", code)
+		out, _, err := runHandlePush("", "--ignore-stdin")
+		if err != nil {
+			t.Errorf("expected success, got error: %v", err)
 		}
 		if !strings.Contains(out, "No repositories to push") {
 			t.Errorf("Unexpected output: %s", out)
@@ -99,9 +87,9 @@ func TestHandlePush(t *testing.T) {
 		exec.Command("git", "-C", repoPath, "add", ".").Run()
 		exec.Command("git", "-C", repoPath, "commit", "-m", "unpushed").Run()
 
-		out, _, code := runHandlePush("y\n", "--ignore-stdin") // input piped
-		if code != 0 {
-			t.Errorf("expected exit code 0, got %d", code)
+		out, _, err := runHandlePush("y\n", "--ignore-stdin") // input piped
+		if err != nil {
+			t.Errorf("expected success, got error: %v", err)
 		}
 		if !strings.Contains(out, "Pushing repo1") {
 			t.Errorf("Expected Pushing repo1. Got: %s", out)
@@ -129,9 +117,9 @@ func TestHandlePush(t *testing.T) {
 		exec.Command("git", "-C", repoPath, "add", ".").Run()
 		exec.Command("git", "-C", repoPath, "commit", "-m", "unpushed2").Run()
 
-		out, _, code := runHandlePush("n\n", "--ignore-stdin")
-		if code != 0 {
-			t.Errorf("expected exit code 0, got %d", code)
+		out, _, err := runHandlePush("n\n", "--ignore-stdin")
+		if err != nil {
+			t.Errorf("expected success, got error: %v", err)
 		}
 		if strings.Contains(out, "Pushing repo1") {
 			t.Errorf("Should not push")
@@ -157,35 +145,33 @@ func TestHandlePush(t *testing.T) {
 
 		// Push should detect conflict in ValidateStatusForAction
 		// It prints to Stderr and exits 1
-		out, stderr, code := runHandlePush("", "--ignore-stdin")
-		if code != 1 {
-			t.Errorf("expected exit code 1 for conflict, got %d", code)
+		out, stderr, err := runHandlePush("", "--ignore-stdin")
+		if err == nil {
+			t.Error("expected error for conflict, got nil")
 		}
-		if !strings.Contains(stderr, "has conflicts") {
-			t.Logf("Stdout: %s\nStderr: %s", out, stderr)
+		if !strings.Contains(stderr, "has conflicts") && !strings.Contains(err.Error(), "has conflicts") {
+			t.Logf("Stdout: %s\nStderr: %s\nError: %v", out, stderr, err)
 		}
 	})
 
 	// Scenario 5: Flag Unknown
 	t.Run("Flag_Unknown", func(t *testing.T) {
-		out, stderr, code := runHandlePush("", "--unknown")
-		if code != 1 {
-			t.Errorf("expected exit code 1, got %d", code)
-		}
-		if !strings.Contains(stderr, "flag provided but not defined") {
-			t.Errorf("Expected flag error. Got: %s", stderr)
+		out, _, err := runHandlePush("", "--unknown")
+		if err == nil {
+			t.Error("expected error for unknown flag, got nil")
+		} else if !strings.Contains(err.Error(), "flag provided but not defined") {
+			t.Errorf("Expected flag error. Got: %v", err)
 		}
 		_ = out
 	})
 
 	// Scenario 6: Flag Duplicate
 	t.Run("Flag_Duplicate", func(t *testing.T) {
-		out, stderr, code := runHandlePush("", "-j", "1", "--jobs", "2")
-		if code != 1 {
-			t.Errorf("expected exit code 1, got %d", code)
-		}
-		if !strings.Contains(stderr, "cannot be specified with different values") {
-			t.Errorf("Expected duplicate flag error. Got: %s", stderr)
+		out, _, err := runHandlePush("", "-j", "1", "--jobs", "2")
+		if err == nil {
+			t.Error("expected error for duplicate flag, got nil")
+		} else if !strings.Contains(err.Error(), "cannot be specified with different values") {
+			t.Errorf("Expected duplicate flag error. Got: %v", err)
 		}
 		_ = out
 	})
@@ -205,9 +191,9 @@ func TestHandlePush(t *testing.T) {
 		exec.Command("git", "-C", repoPath, "commit", "-m", "unpushed3").Run()
 
 		// Run with -y and empty input (would fail if it asked for prompt)
-		out, _, code := runHandlePush("", "-y", "--ignore-stdin")
-		if code != 0 {
-			t.Errorf("expected exit code 0, got %d", code)
+		out, _, err := runHandlePush("", "-y", "--ignore-stdin")
+		if err != nil {
+			t.Errorf("expected success, got error: %v", err)
 		}
 		if !strings.Contains(out, "Pushing repo1") {
 			t.Errorf("Expected Pushing repo1. Got: %s", out)

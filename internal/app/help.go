@@ -4,7 +4,7 @@ import (
 	"fmt"
 )
 
-func handleHelp(_ []string, _ GlobalOptions) {
+func handleHelp(_ []string, _ GlobalOptions) error {
 	fmt.Printf("Usage: %s <command> [options] [arguments]\n", AppName)
 	fmt.Println("")
 	fmt.Println("Commands:")
@@ -16,4 +16,5 @@ func handleHelp(_ []string, _ GlobalOptions) {
 	fmt.Printf("  %-10s Push changes\n", CmdPush)
 	fmt.Printf("  %-10s Show version\n", CmdVersion)
 	fmt.Printf("  %-10s Show this help message\n", CmdHelp)
+	return nil
 }

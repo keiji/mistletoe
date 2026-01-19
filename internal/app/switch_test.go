@@ -99,27 +99,16 @@ func TestHandleSwitch(t *testing.T) {
 	sys.Stderr = &stderrBuf
 
 	// Helper to run handleSwitch with capture
-	runHandleSwitch := func(args ...string) (stdout string, stderr string, code int) {
+	runHandleSwitch := func(args ...string) (stdout string, stderr string, err error) {
 		stdoutBuf.Reset()
 		stderrBuf.Reset()
 
 		// Mock Stdin to empty
 		sys.Stdin = strings.NewReader("")
 
-		osExit = func(c int) {
-			code = c
-			panic("os.Exit called")
-		}
-
-		defer func() {
-			recover()
-			stdout = stdoutBuf.String()
-			stderr = stderrBuf.String()
-		}()
-
 		// Append --ignore-stdin
 		fullArgs := append(args, "--ignore-stdin")
-		handleSwitch(fullArgs, GlobalOptions{GitPath: "git"})
+		err = handleSwitch(fullArgs, GlobalOptions{GitPath: "git"})
 
 		stdout = stdoutBuf.String()
 		stderr = stderrBuf.String()
@@ -128,20 +117,19 @@ func TestHandleSwitch(t *testing.T) {
 
 	// Scenario 1: Switch to non-existent branch (fail)
 	t.Run("Switch NonExistent Strict", func(t *testing.T) {
-		_, stderr, code := runHandleSwitch("feature-branch", "--file", configPath)
-		if code != 1 {
-			t.Errorf("expected exit code 1, got %d", code)
-		}
-		if !strings.Contains(stderr, "missing in repositories") {
-			t.Errorf("unexpected stderr: %s", stderr)
+		_, _, err := runHandleSwitch("feature-branch", "--file", configPath)
+		if err == nil {
+			t.Error("expected error, got nil")
+		} else if !strings.Contains(err.Error(), "missing in repositories") {
+			t.Errorf("unexpected error: %v", err)
 		}
 	})
 
 	// Scenario 2: Create branch (success)
 	t.Run("Switch Create Success", func(t *testing.T) {
-		out, _, code := runHandleSwitch("-v", "-c", "feature-branch", "--file", configPath)
-		if code != 0 {
-			t.Errorf("expected exit code 0, got %d", code)
+		out, _, err := runHandleSwitch("-v", "-c", "feature-branch", "--file", configPath)
+		if err != nil {
+			t.Errorf("expected success, got error: %v", err)
 		}
 		// Verify
 		verifyBranch(t, repo1, "feature-branch")
@@ -156,9 +144,9 @@ func TestHandleSwitch(t *testing.T) {
 
 	// Scenario 3: Flexible ordering
 	t.Run("Switch Flexible Ordering", func(t *testing.T) {
-		_, _, code := runHandleSwitch("--file", configPath, "-c", "feature-branch-2")
-		if code != 0 {
-			t.Errorf("expected exit code 0, got %d", code)
+		_, _, err := runHandleSwitch("--file", configPath, "-c", "feature-branch-2")
+		if err != nil {
+			t.Errorf("expected success, got error: %v", err)
 		}
 		verifyBranch(t, repo1, "feature-branch-2")
 		verifyBranch(t, repo2, "feature-branch-2")
@@ -166,70 +154,58 @@ func TestHandleSwitch(t *testing.T) {
 
 	// Scenario 4: Error - switch branch -c (Ambiguous / Invalid flag usage)
 	t.Run("Switch Invalid Flag Position", func(t *testing.T) {
-		_, stderr, code := runHandleSwitch("abranch", "-c", "--file", configPath)
-		if code != 1 {
-			t.Errorf("expected exit code 1, got %d", code)
-		}
-		// flag package outputs to Stderr
-		if !strings.Contains(stderr, "flag needs an argument") && !strings.Contains(stderr, "parse error") && !strings.Contains(stderr, "invalid") {
-			// Note: flag.ContinueOnError means ParseFlagsFlexible returns error, and we print "Error parsing flags:"
-			if !strings.Contains(stderr, "Error parsing flags") {
-				t.Logf("Stderr: %s", stderr)
-			}
+		_, _, err := runHandleSwitch("abranch", "-c", "--file", configPath)
+		if err == nil {
+			t.Error("expected error, got nil")
 		}
 	})
 
 	// Scenario 5: Error - switch -c branch extra
 	t.Run("Switch Extra Args", func(t *testing.T) {
-		_, stderr, code := runHandleSwitch("-c", "branch3", "extra", "--file", configPath)
-		if code != 1 {
-			t.Errorf("expected exit code 1, got %d", code)
-		}
-		if !strings.Contains(stderr, "Unexpected argument: extra") {
-			t.Logf("Stderr: %s", stderr)
+		_, _, err := runHandleSwitch("-c", "branch3", "extra", "--file", configPath)
+		if err == nil {
+			t.Error("expected error, got nil")
+		} else if !strings.Contains(err.Error(), "Unexpected argument: extra") {
+			t.Errorf("Unexpected error msg: %v", err)
 		}
 	})
 
 	// Scenario 6: Mixed - switch branch -c branch2
 	t.Run("Switch Ambiguous Mixed", func(t *testing.T) {
-		_, stderr, code := runHandleSwitch("branchA", "-c", "branchB", "--file", configPath)
-		if code != 1 {
-			t.Errorf("expected exit code 1, got %d", code)
-		}
-		if !strings.Contains(stderr, "Unexpected argument: branchA") {
-			t.Logf("Stderr: %s", stderr)
+		_, _, err := runHandleSwitch("branchA", "-c", "branchB", "--file", configPath)
+		if err == nil {
+			t.Error("expected error, got nil")
+		} else if !strings.Contains(err.Error(), "Unexpected argument: branchA") {
+			t.Errorf("Unexpected error msg: %v", err)
 		}
 	})
 
 	// Scenario 8: Jobs validation
 	t.Run("Switch Jobs Invalid", func(t *testing.T) {
-		_, stderr, code := runHandleSwitch("b", "-j", "0", "--file", configPath)
-		if code != 1 {
-			t.Errorf("expected exit code 1, got %d", code)
-		}
-		if !strings.Contains(stderr, "Jobs must be at least") {
-			t.Logf("Stderr: %s", stderr)
+		_, _, err := runHandleSwitch("b", "-j", "0", "--file", configPath)
+		if err == nil {
+			t.Error("expected error, got nil")
+		} else if !strings.Contains(err.Error(), "Jobs must be at least") {
+			t.Errorf("Unexpected error msg: %v", err)
 		}
 	})
 
 	// Scenario 9: Flag Errors (Invalid & Duplicate)
 	t.Run("Switch Flag Errors", func(t *testing.T) {
 		// Invalid flag
-		_, stderr, code := runHandleSwitch("--invalid-flag")
-		if code != 1 {
-			t.Errorf("expected exit code 1 for invalid flag, got %d", code)
-		}
-		if !strings.Contains(stderr, "flag provided but not defined") {
-			t.Errorf("unexpected stderr: %s", stderr)
+		_, _, err := runHandleSwitch("--invalid-flag")
+		if err == nil {
+			t.Error("expected error for invalid flag, got nil")
+		} else if !strings.Contains(err.Error(), "flag provided but not defined") {
+			t.Errorf("unexpected error: %v", err)
 		}
 
 		// Duplicate flags
-		_, stderr, code = runHandleSwitch("--file", "a", "-f", "b")
-		if code != 1 {
-			t.Errorf("expected exit code 1 for duplicate flags, got %d", code)
-		}
-		if !strings.Contains(stderr, "cannot be specified with different values") {
-			t.Errorf("unexpected stderr: %s", stderr)
+		_, _, err = runHandleSwitch("--file", "a", "-f", "b")
+		if err == nil {
+			t.Error("expected error for duplicate flags, got nil")
+		} else if !strings.Contains(err.Error(), "cannot be specified with different values") {
+			t.Errorf("unexpected error: %v", err)
 		}
 	})
 
@@ -237,9 +213,9 @@ func TestHandleSwitch(t *testing.T) {
 	t.Run("Switch Verbose Overrides Jobs", func(t *testing.T) {
 		// Setup a repo to pass validation
 		// Use repo1 from main test setup
-		out, _, code := runHandleSwitch("master", "--file", configPath, "-v", "-j", "5")
-		if code != 0 {
-			t.Errorf("expected exit code 0, got %d", code)
+		out, _, err := runHandleSwitch("master", "--file", configPath, "-v", "-j", "5")
+		if err != nil {
+			t.Errorf("expected success, got error: %v", err)
 		}
 		if !strings.Contains(out, "Verbose is specified, so jobs is treated as 1") {
 			t.Errorf("Expected verbose override message")
@@ -335,26 +311,15 @@ func TestHandleSwitch_ConfigureUpstream(t *testing.T) {
 	// 5. Mock Globals
 	var stdoutBuf, stderrBuf bytes.Buffer
 	originalStdout, originalStderr := sys.Stdout, sys.Stderr
-	originalOsExit := osExit
 	defer func() {
 		sys.Stdout, sys.Stderr = originalStdout, originalStderr
-		osExit = originalOsExit
 	}()
 	sys.Stdout = &stdoutBuf
 	sys.Stderr = &stderrBuf
 
-	osExit = func(c int) {
-		panic(c)
-	}
-
 	// 6. Run HandleSwitch for 'feature-up'
 	// Since it exists on remote, mstl should check it out and set upstream.
 	// It does NOT exist locally yet.
-	defer func() {
-		if r := recover(); r != nil {
-			t.Errorf("panicked with %v. Stderr: %s", r, stderrBuf.String())
-		}
-	}()
 
 	// We use -c because handleSwitch requires -c to create local branch even if remote exists?
 	// Wait, standard `git checkout branch` (without -b) works if it matches a remote.
@@ -393,7 +358,9 @@ func TestHandleSwitch_ConfigureUpstream(t *testing.T) {
 	sys.Stdin = strings.NewReader("")
 
 	args := []string{"-c", "feature-up", "--file", configPath, "--ignore-stdin"}
-	handleSwitch(args, GlobalOptions{GitPath: "git"})
+	if err := handleSwitch(args, GlobalOptions{GitPath: "git"}); err != nil {
+		t.Errorf("handleSwitch failed: %v", err)
+	}
 
 	// 7. Verify Upstream
 	cmd := exec.Command("git", "-C", localPath, "config", "--get", "branch.feature-up.remote")
@@ -505,14 +472,11 @@ func TestHandleSwitch_Conflict(t *testing.T) {
 	// 7. Mock Globals & Run HandleSwitch
 	var stdoutBuf, stderrBuf bytes.Buffer
 	originalStdout, originalStderr := sys.Stdout, sys.Stderr
-	originalOsExit := osExit
 	defer func() {
 		sys.Stdout, sys.Stderr = originalStdout, originalStderr
-		osExit = originalOsExit
 	}()
 	sys.Stdout = &stdoutBuf
 	sys.Stderr = &stderrBuf
-	osExit = func(c int) { panic(c) }
 
 	sys.Stdin = strings.NewReader("")
 
@@ -527,19 +491,15 @@ func TestHandleSwitch_Conflict(t *testing.T) {
 		t.Fatalf("upstream should not be set yet, got: %s", outPre)
 	}
 
-	defer func() {
-		if r := recover(); r != nil {
-			t.Errorf("panicked with %v", r)
-		}
-	}()
-
 	// -c needed? No, branch exists locally. But switch requires -c to create if not exists?
 	// If it exists, simple `switch conflict-branch` works if we don't pass -c?
 	// Looking at `handleSwitch`:
 	// If !create (no -c): check dirExists. If exists, checkout.
 	// So `-c` is not needed if it exists.
 	args := []string{"conflict-branch", "--file", configPath, "--ignore-stdin"}
-	handleSwitch(args, GlobalOptions{GitPath: "git"})
+	if err := handleSwitch(args, GlobalOptions{GitPath: "git"}); err != nil {
+		t.Errorf("handleSwitch failed: %v", err)
+	}
 
 	// 8. Verify Upstream is NOT set
 	cmd := exec.Command("git", "-C", localPath, "config", "--get", "branch.conflict-branch.remote")
@@ -617,27 +577,18 @@ func TestHandleSwitch_RemoteFallback(t *testing.T) {
 	// 6. Mock Globals & Run HandleSwitch
 	var stdoutBuf, stderrBuf bytes.Buffer
 	originalStdout, originalStderr := sys.Stdout, sys.Stderr
-	originalOsExit := osExit
 	defer func() {
 		sys.Stdout, sys.Stderr = originalStdout, originalStderr
-		osExit = originalOsExit
 	}()
 	sys.Stdout = &stdoutBuf
 	sys.Stderr = &stderrBuf
-
-	exitCode := 0
-	osExit = func(c int) {
-		exitCode = c
-	}
 
 	sys.Stdin = strings.NewReader("")
 
 	// Run without -c
 	args := []string{"remote-only", "--file", configPath, "--ignore-stdin"}
-	handleSwitch(args, GlobalOptions{GitPath: "git"})
-
-	if exitCode != 0 {
-		t.Errorf("handleSwitch failed with exit code %d. Stderr: %s", exitCode, stderrBuf.String())
+	if err := handleSwitch(args, GlobalOptions{GitPath: "git"}); err != nil {
+		t.Errorf("handleSwitch failed: %v", err)
 	}
 
 	// 7. Verify Branch Exists and Checked Out

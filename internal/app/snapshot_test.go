@@ -47,13 +47,11 @@ func setupDummyRepo(t *testing.T, dir, remoteURL, branchName string) {
 	}
 }
 
-func runHandleSnapshot(t *testing.T, args []string, workDir string) (stdout string, stderr string, exitCode int) {
+func runHandleSnapshot(t *testing.T, args []string, workDir string) (stdout string, stderr string, err error) {
 	var stdoutBuf, stderrBuf bytes.Buffer
 	originalStdout, originalStderr := sys.Stdout, sys.Stderr
-	originalOsExit := osExit
 	defer func() {
 		sys.Stdout, sys.Stderr = originalStdout, originalStderr
-		osExit = originalOsExit
 	}()
 	sys.Stdout = &stdoutBuf
 	sys.Stderr = &stderrBuf
@@ -61,23 +59,13 @@ func runHandleSnapshot(t *testing.T, args []string, workDir string) (stdout stri
 	// Mock Stdin
 	sys.Stdin = strings.NewReader("")
 
-	osExit = func(code int) {
-		exitCode = code
-		panic("os.Exit called")
-	}
-	defer func() {
-		recover()
-		stdout = stdoutBuf.String()
-		stderr = stderrBuf.String()
-	}()
-
 	cwd, _ := os.Getwd()
 	os.Chdir(workDir)
 	defer os.Chdir(cwd)
 
 	// Append --ignore-stdin
 	fullArgs := append(args, "--ignore-stdin")
-	handleSnapshot(fullArgs, GlobalOptions{GitPath: "git"})
+	err = handleSnapshot(fullArgs, GlobalOptions{GitPath: "git"})
 
 	stdout = stdoutBuf.String()
 	stderr = stderrBuf.String()
@@ -111,9 +99,9 @@ func TestSnapshot(t *testing.T) {
 	// Run snapshot
 	outputFile := "snapshot.json"
 
-	_, _, code := runHandleSnapshot(t, []string{"-o", outputFile, "-f", ""}, tmpDir)
-	if code != 0 {
-		t.Errorf("Expected exit code 0, got %d", code)
+	_, _, err = runHandleSnapshot(t, []string{"-o", outputFile, "-f", ""}, tmpDir)
+	if err != nil {
+		t.Errorf("Expected success, got error: %v", err)
 	}
 
 	// Verify output file exists
@@ -191,9 +179,9 @@ func TestSnapshot_DefaultFilename(t *testing.T) {
 	repo1Branch := "main"
 	setupDummyRepo(t, repo1Dir, repo1URL, repo1Branch)
 
-	_, _, code := runHandleSnapshot(t, []string{"-f", ""}, tmpDir)
-	if code != 0 {
-		t.Errorf("Expected exit code 0, got %d", code)
+	_, _, err = runHandleSnapshot(t, []string{"-f", ""}, tmpDir)
+	if err != nil {
+		t.Errorf("Expected success, got error: %v", err)
 	}
 
 	files, err := os.ReadDir(tmpDir)
@@ -232,13 +220,12 @@ func TestSnapshot_FileExists(t *testing.T) {
 
 	// Pass "-f", "" to skip config loading logic, ensuring we reach the file check.
 	// Also append --ignore-stdin is handled by runHandleSnapshot.
-	_, stderr, code := runHandleSnapshot(t, []string{"-o", outputFile, "-f", ""}, tmpDir)
+	_, _, err = runHandleSnapshot(t, []string{"-o", outputFile, "-f", ""}, tmpDir)
 
-	if code != 1 {
-		t.Errorf("Expected exit code 1, got %d", code)
-	}
-	if !strings.Contains(stderr, "exists") {
-		t.Errorf("Expected exists error, got: %s", stderr)
+	if err == nil {
+		t.Error("Expected error for existing file, got nil")
+	} else if !strings.Contains(err.Error(), "exists") {
+		t.Errorf("Expected exists error, got: %v", err)
 	}
 }
 
@@ -292,13 +279,12 @@ func TestSnapshot_FlagErrors(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	_, stderr, code := runHandleSnapshot(t, []string{"--invalid-flag"}, tmpDir)
+	_, _, err = runHandleSnapshot(t, []string{"--invalid-flag"}, tmpDir)
 
-	if code != 1 {
-		t.Errorf("Expected exit code 1 for invalid flag, got %d", code)
-	}
-	if !strings.Contains(stderr, "flag provided but not defined") {
-		t.Errorf("Expected flag error in stderr, got: %s", stderr)
+	if err == nil {
+		t.Error("Expected error for invalid flag, got nil")
+	} else if !strings.Contains(err.Error(), "flag provided but not defined") {
+		t.Errorf("Expected flag error in stderr, got: %v", err)
 	}
 }
 
@@ -310,13 +296,12 @@ func TestSnapshot_DuplicateFlags(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	// Use two different output files to ensure conflict
-	_, stderr, code := runHandleSnapshot(t, []string{"-o", "out1.json", "--output-file", "out2.json"}, tmpDir)
+	_, _, err = runHandleSnapshot(t, []string{"-o", "out1.json", "--output-file", "out2.json"}, tmpDir)
 
-	if code != 1 {
-		t.Errorf("Expected exit code 1 for duplicate flags, got %d", code)
-	}
-	if !strings.Contains(stderr, "duplicate flags") && !strings.Contains(stderr, "Error:") {
-		t.Errorf("Expected duplicate flag error in stderr, got: %s", stderr)
+	if err == nil {
+		t.Error("Expected error for duplicate flags, got nil")
+	} else if !strings.Contains(err.Error(), "cannot be specified with different values") {
+		t.Errorf("Expected duplicate flag error in stderr, got: %v", err)
 	}
 }
 
@@ -331,10 +316,10 @@ func TestSnapshot_VerboseOverride(t *testing.T) {
 	setupDummyRepo(t, repo1Dir, "url", "main")
 
 	// We expect 0 exit code, but we check Stdout for the warning.
-	stdout, _, code := runHandleSnapshot(t, []string{"-v", "-j", "5", "-f", ""}, tmpDir)
+	stdout, _, err := runHandleSnapshot(t, []string{"-v", "-j", "5", "-f", ""}, tmpDir)
 
-	if code != 0 {
-		t.Errorf("Expected exit code 0, got %d", code)
+	if err != nil {
+		t.Errorf("Expected success, got error: %v", err)
 	}
 	if !strings.Contains(stdout, "Verbose is specified, so jobs is treated as 1") {
 		t.Errorf("Expected verbose warning in stdout, got: %s", stdout)
@@ -348,13 +333,12 @@ func TestSnapshot_ConfigError(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	_, stderr, code := runHandleSnapshot(t, []string{"-f", "nonexistent.json"}, tmpDir)
+	_, _, err = runHandleSnapshot(t, []string{"-f", "nonexistent.json"}, tmpDir)
 
-	if code != 1 {
-		t.Errorf("Expected exit code 1 for missing config, got %d", code)
-	}
-	if !strings.Contains(stderr, "Configuration file nonexistent.json not found") {
-		t.Errorf("Expected file error in stderr, got: %s", stderr)
+	if err == nil {
+		t.Error("Expected error for missing config, got nil")
+	} else if !strings.Contains(err.Error(), "Configuration file nonexistent.json not found") {
+		t.Errorf("Expected file error, got: %v", err)
 	}
 }
 
@@ -369,13 +353,12 @@ func TestSnapshot_WriteError(t *testing.T) {
 	// but `os.WriteFile` failing because of missing parent dir.
 	outputFile := filepath.Join("missing_dir", "output.json")
 
-	_, stderr, code := runHandleSnapshot(t, []string{"-o", outputFile, "-f", ""}, tmpDir)
+	_, _, err = runHandleSnapshot(t, []string{"-o", outputFile, "-f", ""}, tmpDir)
 
-	if code != 1 {
-		t.Errorf("Expected exit code 1 for write error, got %d", code)
-	}
-	if !strings.Contains(stderr, "Error writing to file") {
-		t.Errorf("Expected write error in stderr, got: %s", stderr)
+	if err == nil {
+		t.Error("Expected error for write error, got nil")
+	} else if !strings.Contains(err.Error(), "Error writing to file") {
+		t.Errorf("Expected write error, got: %v", err)
 	}
 }
 
@@ -393,10 +376,10 @@ func TestSnapshot_GitWarnings(t *testing.T) {
 	}
 	exec.Command("git", "init").Run()
 
-	stdout, _, code := runHandleSnapshot(t, []string{"-f", ""}, tmpDir)
+	stdout, _, err := runHandleSnapshot(t, []string{"-f", ""}, tmpDir)
 
-	if code != 0 {
-		t.Errorf("Expected exit code 0, got %d", code)
+	if err != nil {
+		t.Errorf("Expected success, got error: %v", err)
 	}
 
 	// We simply verify that we can run without panic and that output indicates completion.
@@ -432,10 +415,10 @@ func TestSnapshot_WithConfigBaseBranch(t *testing.T) {
 	}
 
 	outputFile := "snapshot.json"
-	_, _, code := runHandleSnapshot(t, []string{"-f", "config.json", "-o", outputFile}, tmpDir)
+	_, _, err = runHandleSnapshot(t, []string{"-f", "config.json", "-o", outputFile}, tmpDir)
 
-	if code != 0 {
-		t.Errorf("Expected exit code 0, got %d", code)
+	if err != nil {
+		t.Errorf("Expected success, got error: %v", err)
 	}
 
 	// Read output

@@ -62,7 +62,7 @@ func configureUpstreamIfSafe(dir, branch, gitPath string, verbose bool) {
 	}
 }
 
-func handleSwitch(args []string, opts GlobalOptions) {
+func handleSwitch(args []string, opts GlobalOptions) error {
 	var (
 		fShort, fLong           string
 		createShort, createLong string
@@ -87,9 +87,7 @@ func handleSwitch(args []string, opts GlobalOptions) {
 	fs.BoolVar(&yesShort, "y", false, "Automatically answer 'yes' to all prompts (shorthand)")
 
 	if err := ParseFlagsFlexible(fs, args); err != nil {
-		fmt.Fprintln(sys.Stderr, "Error parsing flags:", err)
-		osExit(1)
-		return
+		return fmt.Errorf("Error parsing flags: %w", err)
 	}
 
 	if err := CheckFlagDuplicates(fs, [][2]string{
@@ -99,16 +97,12 @@ func handleSwitch(args []string, opts GlobalOptions) {
 		{"verbose", "v"},
 		{"yes", "y"},
 	}); err != nil {
-		fmt.Fprintln(sys.Stderr, "Error:", err)
-		osExit(1)
-		return
+		return fmt.Errorf("Error: %w", err)
 	}
 
 	configFile, jobsFlag, configData, err := ResolveCommonValues(fLong, fShort, jVal, jValShort, ignoreStdin)
 	if err != nil {
-		fmt.Fprintf(sys.Stderr, "Error: %v\n", err)
-		osExit(1)
-		return
+		return fmt.Errorf("Error: %w", err)
 	}
 
 	configFile, err = SearchParentConfig(configFile, configData, opts.GitPath)
@@ -129,17 +123,13 @@ func handleSwitch(args []string, opts GlobalOptions) {
 	}
 
 	if err != nil {
-		fmt.Fprintln(sys.Stderr, err)
-		osExit(1)
-		return
+		return err
 	}
 
 	// Resolve Jobs
 	jobs, err := DetermineJobs(jobsFlag, config)
 	if err != nil {
-		fmt.Fprintf(sys.Stderr, "Error: %v\n", err)
-		osExit(1)
-		return
+		return fmt.Errorf("Error: %w", err)
 	}
 
 	// Verbose Override
@@ -154,22 +144,16 @@ func handleSwitch(args []string, opts GlobalOptions) {
 
 	if createBranchName != "" {
 		if len(fs.Args()) > 0 {
-			fmt.Fprintf(sys.Stderr, "Error: Unexpected argument: %s.\n", fs.Args()[0])
-			osExit(1)
-			return
+			return fmt.Errorf("Error: Unexpected argument: %s.", fs.Args()[0])
 		}
 		branchName = createBranchName
 		create = true
 	} else {
 		// If create flag not set, look for positional argument
 		if len(fs.Args()) == 0 {
-			fmt.Fprintln(sys.Stderr, "Error: Branch name required.")
-			osExit(1)
-			return
+			return fmt.Errorf("Error: Branch name required.")
 		} else if len(fs.Args()) > 1 {
-			fmt.Fprintf(sys.Stderr, "Error: Too many arguments: %v.\n", fs.Args())
-			osExit(1)
-			return
+			return fmt.Errorf("Error: Too many arguments: %v.", fs.Args())
 		}
 		branchName = fs.Args()[0]
 		create = false
@@ -177,9 +161,7 @@ func handleSwitch(args []string, opts GlobalOptions) {
 
 	// Validate Integrity (Moved after argument parsing)
 	if err := ValidateRepositoriesIntegrity(config, opts.GitPath, verbose); err != nil {
-		fmt.Fprintln(sys.Stderr, err)
-		osExit(1)
-		return
+		return err
 	}
 
 	// Map to store existence status for each repo (keyed by local directory path)
@@ -188,6 +170,8 @@ func handleSwitch(args []string, opts GlobalOptions) {
 
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, jobs)
+	var threadErr error
+	var threadErrMu sync.Mutex
 
 	// Pre-check phase
 	for _, repo := range *config.Repositories {
@@ -201,12 +185,11 @@ func handleSwitch(args []string, opts GlobalOptions) {
 
 			// Check if directory exists
 			if _, err := os.Stat(dir); os.IsNotExist(err) {
-				fmt.Fprintf(sys.Stderr, "Error: Repository directory %s does not exist.\n", dir)
-				osExit(1)
-				// Note: osExit in goroutine might not be safe/clean for tests, but it mimics main behavior.
-				// In test mock, we should probably handle this.
-				// However, standard os.Exit kills the process.
-				// Here we just return.
+				threadErrMu.Lock()
+				if threadErr == nil {
+					threadErr = fmt.Errorf("Error: Repository directory %s does not exist.", dir)
+				}
+				threadErrMu.Unlock()
 				return
 			}
 
@@ -230,6 +213,10 @@ func handleSwitch(args []string, opts GlobalOptions) {
 	}
 	wg.Wait()
 
+	if threadErr != nil {
+		return threadErr
+	}
+
 	if !create {
 		// Strict mode: All must exist
 		var missing []string
@@ -241,12 +228,11 @@ func handleSwitch(args []string, opts GlobalOptions) {
 		}
 
 		if len(missing) > 0 {
-			fmt.Fprintf(sys.Stderr, "Error: Branch '%s' missing in repositories:\n", branchName)
+			msg := fmt.Sprintf("Error: Branch '%s' missing in repositories:\n", branchName)
 			for _, item := range missing {
-				fmt.Fprintln(sys.Stderr, " - "+item)
+				msg += " - " + item + "\n"
 			}
-			osExit(1)
-			return
+			return fmt.Errorf("%s", msg)
 		}
 
 		// Execute Checkout
@@ -261,8 +247,11 @@ func handleSwitch(args []string, opts GlobalOptions) {
 				repoID := *repo.ID
 				fmt.Fprintf(sys.Stdout, "[%s] Switching to branch %s...\n", repoID, branchName)
 				if err := RunGitInteractive(dir, opts.GitPath, verbose, "checkout", branchName); err != nil {
-					fmt.Fprintf(sys.Stderr, "Error switching branch for %s: %v.\n", dir, err)
-					osExit(1)
+					threadErrMu.Lock()
+					if threadErr == nil {
+						threadErr = fmt.Errorf("Error switching branch for %s: %w.", dir, err)
+					}
+					threadErrMu.Unlock()
 					return
 				}
 				configureUpstreamIfSafe(dir, branchName, opts.GitPath, verbose)
@@ -287,15 +276,21 @@ func handleSwitch(args []string, opts GlobalOptions) {
 				if exists {
 					fmt.Fprintf(sys.Stdout, "[%s] Branch %s exists. Switching...\n", repoID, branchName)
 					if err := RunGitInteractive(dir, opts.GitPath, verbose, "checkout", branchName); err != nil {
-						fmt.Fprintf(sys.Stderr, "Error switching branch for %s: %v.\n", dir, err)
-						osExit(1)
+						threadErrMu.Lock()
+						if threadErr == nil {
+							threadErr = fmt.Errorf("Error switching branch for %s: %w.", dir, err)
+						}
+						threadErrMu.Unlock()
 						return
 					}
 				} else {
 					fmt.Fprintf(sys.Stdout, "[%s] Creating and switching to branch %s...\n", repoID, branchName)
 					if err := RunGitInteractive(dir, opts.GitPath, verbose, "checkout", "-b", branchName); err != nil {
-						fmt.Fprintf(sys.Stderr, "Error creating branch for %s: %v.\n", dir, err)
-						osExit(1)
+						threadErrMu.Lock()
+						if threadErr == nil {
+							threadErr = fmt.Errorf("Error creating branch for %s: %w.", dir, err)
+						}
+						threadErrMu.Unlock()
 						return
 					}
 				}
@@ -304,4 +299,8 @@ func handleSwitch(args []string, opts GlobalOptions) {
 		}
 		wg.Wait()
 	}
+	if threadErr != nil {
+		return threadErr
+	}
+	return nil
 }

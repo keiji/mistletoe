@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-func handleVersionGh(opts GlobalOptions) {
+func handleVersionGh(opts GlobalOptions) error {
 	printCommonVersionInfo(opts)
 
 	fmt.Println()
@@ -30,4 +30,5 @@ func handleVersionGh(opts GlobalOptions) {
 	} else {
 		fmt.Println("Error getting gh version (gh might not be installed)")
 	}
+	return nil
 }

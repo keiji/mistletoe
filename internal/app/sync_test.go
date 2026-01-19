@@ -46,18 +46,16 @@ func TestHandleSync(t *testing.T) {
 	data, _ := json.Marshal(config)
 	os.WriteFile(configPath, data, 0644)
 
-	// Mock Stdout/Stderr/Stdin/osExit
+	// Mock Stdout/Stderr/Stdin
 	var stdoutBuf, stderrBuf bytes.Buffer
 	originalStdout, originalStderr, originalStdin := sys.Stdout, sys.Stderr, sys.Stdin
-	originalOsExit := osExit
 	defer func() {
 		sys.Stdout, sys.Stderr, sys.Stdin = originalStdout, originalStderr, originalStdin
-		osExit = originalOsExit
 	}()
 	sys.Stdout = &stdoutBuf
 	sys.Stderr = &stderrBuf
 
-	runHandleSync := func(input string, args ...string) (stdout string, stderr string, code int) {
+	runHandleSync := func(input string, args ...string) (stdout string, stderr string, err error) {
 		stdoutBuf.Reset()
 		stderrBuf.Reset()
 
@@ -67,16 +65,6 @@ func TestHandleSync(t *testing.T) {
 			sys.Stdin = strings.NewReader("")
 		}
 
-		osExit = func(c int) {
-			code = c
-			panic("os.Exit called")
-		}
-		defer func() {
-			recover()
-			stdout = stdoutBuf.String()
-			stderr = stderrBuf.String()
-		}()
-
 		// Ensure args has --file
 		fullArgs := append(args, "--file", configPath)
 		// Change CWD to tmpDir for relative path resolution
@@ -84,7 +72,7 @@ func TestHandleSync(t *testing.T) {
 		os.Chdir(tmpDir)
 		defer os.Chdir(cwd)
 
-		handleSync(fullArgs, GlobalOptions{GitPath: "git"})
+		err = handleSync(fullArgs, GlobalOptions{GitPath: "git"})
 
 		stdout = stdoutBuf.String()
 		stderr = stderrBuf.String()
@@ -93,9 +81,9 @@ func TestHandleSync(t *testing.T) {
 
 	// Scenario 1: Clean Sync
 	t.Run("CleanSync", func(t *testing.T) {
-		out, _, code := runHandleSync("", "--ignore-stdin")
-		if code != 0 {
-			t.Errorf("expected exit code 0, got %d", code)
+		out, _, err := runHandleSync("", "--ignore-stdin")
+		if err != nil {
+			t.Errorf("expected success, got error: %v", err)
 		}
 		if !strings.Contains(out, fmt.Sprintf("Skipping %s: Already up to date.", repo1Rel)) {
 			t.Errorf("Expected Skipping repo1 output. Got: %s", out)
@@ -137,9 +125,9 @@ func TestHandleSync(t *testing.T) {
 		exec.Command("git", "-C", repo1, "commit", "-m", "Local Diverge").Run()
 
 		// Input "merge"
-		out, _, code := runHandleSync("merge\n", "--ignore-stdin")
-		if code != 0 {
-			t.Errorf("expected exit code 0, got %d", code)
+		out, _, err := runHandleSync("merge\n", "--ignore-stdin")
+		if err != nil {
+			t.Errorf("expected success, got error: %v", err)
 		}
 		if !strings.Contains(out, "Syncing") {
 			t.Log(out)
@@ -161,37 +149,34 @@ func TestHandleSync(t *testing.T) {
 		exec.Command("git", "-C", repo1, "commit", "-m", "Conflict B").Run()
 
 		// Pass --ignore-stdin explicitly
-		out, stderr, code := runHandleSync("merge\n", "--ignore-stdin")
-		if code != 1 {
-			t.Errorf("expected exit code 1 for conflict, got %d", code)
+		out, stderr, err := runHandleSync("merge\n", "--ignore-stdin")
+		if err == nil {
+			t.Error("expected error for conflict, got nil")
 		}
-		if !strings.Contains(stderr, "Error pulling") {
-			t.Logf("Stdout: %s\nStderr: %s", out, stderr)
+		// Check error message or stderr output
+		if !strings.Contains(stderr, "Error pulling") && !strings.Contains(err.Error(), "Error pulling") {
+			t.Logf("Stdout: %s\nStderr: %s\nError: %v", out, stderr, err)
 		}
 	})
 
 	// Scenario 5: Flag Unknown
 	t.Run("Flag_Unknown", func(t *testing.T) {
-		out, stderr, code := runHandleSync("", "--unknown")
-		if code != 1 {
-			t.Errorf("expected exit code 1, got %d", code)
-		}
-		if !strings.Contains(stderr, "flag provided but not defined") {
-			t.Errorf("Expected flag error. Got: %s", stderr)
+		out, _, err := runHandleSync("", "--unknown")
+		if err == nil {
+			t.Error("expected error, got nil")
+		} else if !strings.Contains(err.Error(), "flag provided but not defined") {
+			t.Errorf("Expected flag error. Got: %v", err)
 		}
 		_ = out
 	})
 
 	// Scenario 6: Flag Duplicate
 	t.Run("Flag_Duplicate", func(t *testing.T) {
-		out, stderr, code := runHandleSync("", "-j", "1", "--jobs", "2")
-		if code != 1 {
-			t.Errorf("expected exit code 1, got %d", code)
-		}
-		// The error message format depends on CheckFlagDuplicates implementation:
-		// "options --%s and -%s cannot be specified with different values"
-		if !strings.Contains(stderr, "cannot be specified with different values") {
-			t.Errorf("Expected duplicate flag error. Got: %s", stderr)
+		out, _, err := runHandleSync("", "-j", "1", "--jobs", "2")
+		if err == nil {
+			t.Error("expected error, got nil")
+		} else if !strings.Contains(err.Error(), "cannot be specified with different values") {
+			t.Errorf("Expected duplicate flag error. Got: %v", err)
 		}
 		_ = out
 	})
@@ -222,9 +207,9 @@ func TestHandleSync(t *testing.T) {
 		exec.Command("git", "-C", repo1, "commit", "-m", "Local Diverge 2").Run()
 
 		// Run with -y (and no input needed)
-		out, _, code := runHandleSync("", "-y", "--ignore-stdin")
-		if code != 0 {
-			t.Errorf("expected exit code 0, got %d", code)
+		out, _, err := runHandleSync("", "-y", "--ignore-stdin")
+		if err != nil {
+			t.Errorf("expected success, got error: %v", err)
 		}
 		if !strings.Contains(out, "Using default strategy (merge) due to --yes flag") {
 			t.Errorf("Expected auto-merge message. Got: %s", out)
