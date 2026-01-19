@@ -345,10 +345,7 @@ func validateAndPrepareInitDest(dest string) (string, error) {
 }
 
 func handleInit(args []string, opts GlobalOptions) error {
-	if err := initCommand(args, opts); err != nil {
-		return err
-	}
-	return nil
+	return initCommand(args, opts)
 }
 
 func initCommand(args []string, opts GlobalOptions) error {
