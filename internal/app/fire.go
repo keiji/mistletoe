@@ -98,40 +98,52 @@ func fireCommand(config *conf.Config, opts GlobalOptions) error {
 }
 
 func processFireRepo(repoID, repoPath, gitPath, username, uuid string) {
-	branchName := fmt.Sprintf("mstl-fire-%s-%s-%s", repoID, username, uuid)
+	baseBranchName := fmt.Sprintf("mstl-fire-%s-%s-%s", repoID, username, uuid)
+	branchName := baseBranchName
 
-	// Check if branch exists on remote
-	// git ls-remote --exit-code --heads origin <branchName>
-	// If it returns 0, it exists.
-	if err := runGitFire(repoPath, gitPath, "ls-remote", "--exit-code", "--heads", "origin", branchName); err == nil {
-		fmt.Fprintf(sys.Stderr, "[%s] Branch %s already exists on remote. Skipping.\n", repoID, branchName)
+	// Retry loop to avoid collision
+	for i := 0; i < 5; i++ {
+		if i > 0 {
+			branchName = fmt.Sprintf("%s-%d", baseBranchName, i)
+		}
+
+		// Check if branch exists on remote
+		// git ls-remote --exit-code --heads origin <branchName>
+		// If it returns 0, it exists.
+		if err := runGitFire(repoPath, gitPath, "ls-remote", "--exit-code", "--heads", "origin", branchName); err == nil {
+			fmt.Fprintf(sys.Stderr, "[%s] Branch %s already exists on remote. Retrying...\n", repoID, branchName)
+			continue
+		}
+
+		// Found available branch name
+		// 1. Switch -c <branch> (or checkout -b)
+		if err := runGitFire(repoPath, gitPath, "checkout", "-b", branchName); err != nil {
+			fmt.Fprintf(sys.Stderr, "[%s] Error creating branch: %v\n", repoID, err)
+			return
+		}
+
+		// 2. Add .
+		if err := runGitFire(repoPath, gitPath, "add", "."); err != nil {
+			fmt.Fprintf(sys.Stderr, "[%s] Error staging changes: %v\n", repoID, err)
+		}
+
+		// 3. Commit
+		msg := fmt.Sprintf("Emergency commit triggered by %s fire command.", AppName)
+		if err := runGitFire(repoPath, gitPath, "commit", "-m", msg, "--no-gpg-sign"); err != nil {
+			fmt.Fprintf(sys.Stderr, "[%s] Error committing (might be empty): %v\n", repoID, err)
+		}
+
+		// 4. Push
+		if err := runGitFire(repoPath, gitPath, "push", "-u", "origin", branchName); err != nil {
+			fmt.Fprintf(sys.Stderr, "[%s] Error pushing: %v\n", repoID, err)
+			return
+		}
+
+		fmt.Fprintf(sys.Stdout, "[%s] Secured in %s\n", repoID, branchName)
 		return
 	}
 
-	// 1. Switch -c <branch> (or checkout -b)
-	if err := runGitFire(repoPath, gitPath, "checkout", "-b", branchName); err != nil {
-		fmt.Fprintf(sys.Stderr, "[%s] Error creating branch: %v\n", repoID, err)
-		return
-	}
-
-	// 2. Add .
-	if err := runGitFire(repoPath, gitPath, "add", "."); err != nil {
-		fmt.Fprintf(sys.Stderr, "[%s] Error staging changes: %v\n", repoID, err)
-	}
-
-	// 3. Commit
-	msg := fmt.Sprintf("Emergency commit triggered by %s fire command.", AppName)
-	if err := runGitFire(repoPath, gitPath, "commit", "-m", msg, "--no-gpg-sign"); err != nil {
-		fmt.Fprintf(sys.Stderr, "[%s] Error committing (might be empty): %v\n", repoID, err)
-	}
-
-	// 4. Push
-	if err := runGitFire(repoPath, gitPath, "push", "-u", "origin", branchName); err != nil {
-		fmt.Fprintf(sys.Stderr, "[%s] Error pushing: %v\n", repoID, err)
-		return
-	}
-
-	fmt.Fprintf(sys.Stdout, "[%s] Secured in %s\n", repoID, branchName)
+	fmt.Fprintf(sys.Stderr, "[%s] Failed to find available branch name after retries.\n", repoID)
 }
 
 func runGitFire(dir, gitPath string, args ...string) error {

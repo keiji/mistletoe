@@ -105,12 +105,34 @@ func TestHelperProcessFire(t *testing.T) {
 		switch subCmd {
 		case "ls-remote":
 			// git ls-remote --exit-code --heads origin <branch>
-			// Return exit 2 to say "not found" so execution continues
-			os.Exit(2)
+			// We want to simulate that the FIRST branch name exists (exit 0)
+			// and the SECOND branch name (suffix -1) does not exist (exit 2).
+
+			// Argument structure: git ls-remote --exit-code --heads origin <branch>
+			// args[0] is git (consumed)
+			// subCmd is ls-remote
+			// args: ls-remote, --exit-code, --heads, origin, <branch>
+			// So index 2: --exit-code, 3: --heads, 4: origin, 5: <branch>
+			if len(args) >= 6 {
+				branch := args[5]
+				// If branch ends with -1, we say it's new (exit 2)
+				if strings.HasSuffix(branch, "-1") {
+					os.Exit(2)
+				}
+				// Otherwise (original name), we say it exists (exit 0)
+				os.Exit(0)
+			}
+			os.Exit(2) // fallback
+
 		case "checkout":
 			// git checkout -b mstl-fire-...
 			if len(args) >= 4 && args[2] == "-b" {
 				branch := args[3]
+				// We expect the RETRIED branch name (suffix -1)
+				if !strings.HasSuffix(branch, "-1") {
+					fmt.Fprintf(os.Stderr, "Expected branch with -1 suffix, got: %s\n", branch)
+					os.Exit(1)
+				}
 				// We relax the test to match just the prefix since the username depends on env
 				if !strings.HasPrefix(branch, "mstl-fire-repo1-") {
 					fmt.Fprintf(os.Stderr, "Unexpected branch format: %s\n", branch)
