@@ -32,18 +32,15 @@ flowchart TD
     GenerateSuffix --> ParallelExec["全リポジトリ並列実行"]
 
     subgraph "各リポジトリ処理 (Parallel)"
-        ParallelExec --> CheckRemote{"リモート存在確認 (git ls-remote)"}
-        CheckRemote -- "存在する" --> RetryName["サフィックス追加 (-1, -2...)"]
-        RetryName --> CheckRemote
-        CheckRemote -- "なし" --> CreateBranch["ブランチ作成・切替 (mstl-fire-...)"]
+        ParallelExec --> CreateBranch["ブランチ作成・切替 (mstl-fire-...)"]
 
         CreateBranch --> AddAll["git add ."]
         AddAll --> Commit["git commit (no-gpg-sign)"]
         Commit --> Push{"git push origin"}
 
         Push -- "成功" --> LogSuccess["成功出力"]
-        Push -- "失敗 (衝突等)" --> RetryPush["サフィックス追加してリトライ"]
-        RetryPush --> CheckRemote
+        Push -- "失敗 (衝突等)" --> Rename["サフィックス追加 (-1, -2...)"]
+        Rename --> CreateBranch
     end
 
     LogSuccess --> End(["終了"])
@@ -67,13 +64,13 @@ flowchart TD
 2.  **Git 操作とリトライロジック**:
     *   以下の手順を最大5回までリトライします。リトライ毎にブランチ名に連番サフィックス（例: `-1`, `-2`）が付与されます。
 
-    1.  **リモート確認**: `git ls-remote` を使用して、生成したブランチ名がリモートに既に存在しないか確認します。存在する場合は即座に次のリトライ（名前変更）へ移行します。
-    2.  **Checkout**: `git checkout -b <branch_name>`
-    3.  **Add**: `git add .` (新規ファイル・変更・削除をすべて対象)
-    4.  **Commit**: `git commit -m "Emergency commit..." --no-gpg-sign`
+    1.  **Checkout**: `git checkout -b <branch_name>`
+        *   リモートブランチの事前確認 (`git ls-remote`) は行いません。
+    2.  **Add**: `git add .` (新規ファイル・変更・削除をすべて対象)
+    3.  **Commit**: `git commit -m "Emergency commit..." --no-gpg-sign`
         *   `--no-gpg-sign` により、GPGパスワード入力待ちで処理が止まることを防ぎます。
-    5.  **Push**: `git push -u origin <branch_name>`
-        *   Pushに失敗した場合（同名ブランチが競合して作られた場合など）は、警告ログを出力し、次のリトライ（名前変更）へ移行します。
+    4.  **Push**: `git push -u origin <branch_name>`
+        *   Pushに失敗した場合（同名ブランチが競合して既に存在する場合など）は、警告ログを出力し、次のリトライ（名前変更）へ移行します。
 
 3.  **並列性**:
     *   `config.json` の `jobs` 設定に従い、可能な限り並列で実行します。

@@ -107,15 +107,6 @@ func processFireRepo(repoID, repoPath, gitPath, username, uuid string) {
 			branchName = fmt.Sprintf("%s-%d", baseBranchName, i)
 		}
 
-		// Check if branch exists on remote
-		// git ls-remote --exit-code --heads origin <branchName>
-		// If it returns 0, it exists.
-		if err := runGitFire(repoPath, gitPath, "ls-remote", "--exit-code", "--heads", "origin", branchName); err == nil {
-			fmt.Fprintf(sys.Stderr, "[%s] Branch %s already exists on remote. Retrying...\n", repoID, branchName)
-			continue
-		}
-
-		// Found available branch name
 		// 1. Switch -c <branch> (or checkout -b)
 		if err := runGitFire(repoPath, gitPath, "checkout", "-b", branchName); err != nil {
 			fmt.Fprintf(sys.Stderr, "[%s] Error creating branch: %v\n", repoID, err)

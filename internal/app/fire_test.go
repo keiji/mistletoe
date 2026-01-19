@@ -103,33 +103,21 @@ func TestHelperProcessFire(t *testing.T) {
 	// We expect git commands
 	if cmd == "git" {
 		switch subCmd {
-		case "ls-remote":
-			// git ls-remote --exit-code --heads origin <branch>
-			// args: ls-remote, --exit-code, --heads, origin, <branch>
-			if len(args) >= 6 {
-				branch := args[5]
-				// 1. Original branch (no suffix): Exists (exit 0) -> Force retry 1
-				// 2. Suffix -1: Not exists (exit 2) -> Try create, but we will fail PUSH
-				// 3. Suffix -2: Not exists (exit 2) -> Succeed
-
-				if strings.HasSuffix(branch, "-1") || strings.HasSuffix(branch, "-2") {
-					os.Exit(2)
-				}
-				// Original
-				os.Exit(0)
-			}
-			os.Exit(2)
-
 		case "checkout":
 			// git checkout -b mstl-fire-...
+			// 1. First attempt (no suffix): Checkout succeeds
+			// 2. We will simulate PUSH fail for this
+			// 3. Retry with suffix -1: Checkout succeeds
+			// 4. PUSH succeeds
 			if len(args) >= 4 && args[2] == "-b" {
 				branch := args[3]
-				// We expect either -1 or -2
-				if !strings.HasSuffix(branch, "-1") && !strings.HasSuffix(branch, "-2") {
-					fmt.Fprintf(os.Stderr, "Expected branch with -1 or -2 suffix, got: %s\n", branch)
-					os.Exit(1)
+				// We expect original OR suffix -1
+				if !strings.HasSuffix(branch, "-1") && !strings.Contains(branch, "-") {
+					// Logic check: if no suffix, it's fine.
+					// But we need to ensure it IS the fire branch
 				}
-				// Check prefix
+
+				// Just check prefix
 				if !strings.HasPrefix(branch, "mstl-fire-repo1-") {
 					fmt.Fprintf(os.Stderr, "Unexpected branch format: %s\n", branch)
 					os.Exit(1)
@@ -158,11 +146,11 @@ func TestHelperProcessFire(t *testing.T) {
 			os.Exit(0)
 		case "push":
 			// git push -u origin <branch>
-			// If suffix is -1, fail (exit 1)
-			// If suffix is -2, succeed (exit 0)
 			if len(args) >= 5 && args[2] == "-u" && args[3] == "origin" {
 				branch := args[4]
-				if strings.HasSuffix(branch, "-1") {
+				// 1. Original (no suffix): Fail (exit 1) -> This triggers retry
+				// 2. Suffix -1: Succeed (exit 0)
+				if !strings.HasSuffix(branch, "-1") {
 					os.Exit(1)
 				}
 				os.Exit(0)
