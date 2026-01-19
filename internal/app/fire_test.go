@@ -13,8 +13,9 @@ import (
 // TestFireCommand verifies the git sequence for the fire command.
 func TestFireCommand(t *testing.T) {
 	// Setup helper process for git
+	oldExec := sys.ExecCommand
 	sys.ExecCommand = mockExecFire
-	defer func() { sys.ExecCommand = nil }()
+	defer func() { sys.ExecCommand = oldExec }()
 
 	// We need to set USER or USERNAME for consistent branch naming in test
 	os.Setenv("USER", "testuser")
