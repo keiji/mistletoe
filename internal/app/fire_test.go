@@ -105,35 +105,31 @@ func TestHelperProcessFire(t *testing.T) {
 		switch subCmd {
 		case "ls-remote":
 			// git ls-remote --exit-code --heads origin <branch>
-			// We want to simulate that the FIRST branch name exists (exit 0)
-			// and the SECOND branch name (suffix -1) does not exist (exit 2).
-
-			// Argument structure: git ls-remote --exit-code --heads origin <branch>
-			// args[0] is git (consumed)
-			// subCmd is ls-remote
 			// args: ls-remote, --exit-code, --heads, origin, <branch>
-			// So index 2: --exit-code, 3: --heads, 4: origin, 5: <branch>
 			if len(args) >= 6 {
 				branch := args[5]
-				// If branch ends with -1, we say it's new (exit 2)
-				if strings.HasSuffix(branch, "-1") {
+				// 1. Original branch (no suffix): Exists (exit 0) -> Force retry 1
+				// 2. Suffix -1: Not exists (exit 2) -> Try create, but we will fail PUSH
+				// 3. Suffix -2: Not exists (exit 2) -> Succeed
+
+				if strings.HasSuffix(branch, "-1") || strings.HasSuffix(branch, "-2") {
 					os.Exit(2)
 				}
-				// Otherwise (original name), we say it exists (exit 0)
+				// Original
 				os.Exit(0)
 			}
-			os.Exit(2) // fallback
+			os.Exit(2)
 
 		case "checkout":
 			// git checkout -b mstl-fire-...
 			if len(args) >= 4 && args[2] == "-b" {
 				branch := args[3]
-				// We expect the RETRIED branch name (suffix -1)
-				if !strings.HasSuffix(branch, "-1") {
-					fmt.Fprintf(os.Stderr, "Expected branch with -1 suffix, got: %s\n", branch)
+				// We expect either -1 or -2
+				if !strings.HasSuffix(branch, "-1") && !strings.HasSuffix(branch, "-2") {
+					fmt.Fprintf(os.Stderr, "Expected branch with -1 or -2 suffix, got: %s\n", branch)
 					os.Exit(1)
 				}
-				// We relax the test to match just the prefix since the username depends on env
+				// Check prefix
 				if !strings.HasPrefix(branch, "mstl-fire-repo1-") {
 					fmt.Fprintf(os.Stderr, "Unexpected branch format: %s\n", branch)
 					os.Exit(1)
@@ -162,7 +158,13 @@ func TestHelperProcessFire(t *testing.T) {
 			os.Exit(0)
 		case "push":
 			// git push -u origin <branch>
+			// If suffix is -1, fail (exit 1)
+			// If suffix is -2, succeed (exit 0)
 			if len(args) >= 5 && args[2] == "-u" && args[3] == "origin" {
+				branch := args[4]
+				if strings.HasSuffix(branch, "-1") {
+					os.Exit(1)
+				}
 				os.Exit(0)
 			}
 		}

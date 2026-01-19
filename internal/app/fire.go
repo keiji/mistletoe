@@ -135,8 +135,8 @@ func processFireRepo(repoID, repoPath, gitPath, username, uuid string) {
 
 		// 4. Push
 		if err := runGitFire(repoPath, gitPath, "push", "-u", "origin", branchName); err != nil {
-			fmt.Fprintf(sys.Stderr, "[%s] Error pushing: %v\n", repoID, err)
-			return
+			fmt.Fprintf(sys.Stderr, "[%s] Error pushing to %s: %v. Retrying with new branch...\n", repoID, branchName, err)
+			continue
 		}
 
 		fmt.Fprintf(sys.Stdout, "[%s] Secured in %s\n", repoID, branchName)
