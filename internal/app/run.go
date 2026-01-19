@@ -140,6 +140,8 @@ func RunApp(appType Type, version, hash string, args []string, extraHandler func
 		return handleSync(subcmdArgs, opts)
 	case CmdPush:
 		return handlePush(subcmdArgs, opts)
+	case CmdFire:
+		return handleFire(subcmdArgs, opts)
 	case CmdHelp:
 		return handleHelp(subcmdArgs, opts)
 	case CmdVersion:
