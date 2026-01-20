@@ -74,7 +74,6 @@ Global options for most commands:
 *   `-j, --jobs <int>`: Number of concurrent jobs to use (default: 1, or value from config).
 *   `-y, --yes`: Automatically answer "yes" to all prompts.
 *   `-v, --verbose`: Enable verbose output (shows executed git/gh commands).
-*   `--ignore-stdin`: Ignore standard input (useful when running in scripts where stdin might be unintentionally piped).
 
 Configuration loading priority:
 1.  **Standard Input (stdin)**: If standard input is provided, it takes precedence over any file specified.
