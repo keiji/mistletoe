@@ -196,9 +196,10 @@ func TestResolveResetTarget(t *testing.T) {
 	rev := "rev1"
 	base := "base1"
 	branch := "branch1"
+	id := "repo1"
 
 	repo := conf.Repository{
-		ID:         nil,
+		ID:         &id,
 		Revision:   &rev,
 		BaseBranch: &base,
 		Branch:     &branch,

@@ -32,7 +32,12 @@ func resolveResetTarget(repo conf.Repository) (string, error) {
 	if repo.Branch != nil && *repo.Branch != "" {
 		return *repo.Branch, nil
 	}
-	return "", fmt.Errorf("No target (revision, base-branch, or branch) specified for repository %s", *repo.ID)
+
+	repoID := "unknown"
+	if repo.ID != nil {
+		repoID = *repo.ID
+	}
+	return "", fmt.Errorf("No target (revision, base-branch, or branch) specified for repository %s", repoID)
 }
 
 
