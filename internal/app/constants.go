@@ -26,6 +26,7 @@ const (
 	CmdStatus   = "status"
 	CmdSync     = "sync"
 	CmdPush     = "push"
+	CmdReset    = "reset"
 	CmdHelp     = "help"
 	CmdVersion  = "version"
 )
