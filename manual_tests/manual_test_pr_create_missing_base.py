@@ -40,12 +40,12 @@ def main():
             "repositories": [
                 {
                     "id": repo_valid,
-                    "url": f"https://github.com/{env.org_name}/{repo_valid}.git",
+                    "url": f"https://github.com/{env.user}/{repo_valid}.git",
                     "base-branch": "main"
                 },
                 {
                     "id": repo_missing_base,
-                    "url": f"https://github.com/{env.org_name}/{repo_missing_base}.git",
+                    "url": f"https://github.com/{env.user}/{repo_missing_base}.git",
                     "base-branch": "non-existent-branch" # This branch doesn't exist on remote
                 }
             ]
@@ -87,12 +87,12 @@ def main():
         try:
             # We capture output to verify the behavior
             process = subprocess.run(
-                [env.mstl_path] + cmd,
+                [env.mstl_bin] + cmd,
                 cwd=env.test_dir,
                 check=False, # We want to check code manually
                 capture_output=True,
                 text=True,
-                env={**os.environ, **env.env_vars}
+                env=os.environ.copy()
             )
             result_code = process.returncode
             output = process.stdout + process.stderr
