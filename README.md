@@ -4,7 +4,7 @@ Mistletoe is a command-line tool for managing multiple Git repositories using a 
 
 This project provides two binaries:
 
-*   **`mstl`**: The core tool for standard Git operations (init, status, switch, push, sync, snapshot).
+*   **`mstl`**: The core tool for standard Git operations (init, status, switch, push, sync, snapshot, reset, fire).
 *   **`mstl-gh`**: An extended version that includes all `mstl` features plus GitHub integration (via `gh` CLI) for managing Pull Requests across multiple repositories.
 
 ## Installation
@@ -57,8 +57,8 @@ The core of Mistletoe is the configuration file (usually `config.json`) containi
 *   **url** (Required): The remote URL of the Git repository.
 *   **id** (Optional): The directory name to clone into. If omitted, the name is derived from the URL.
 *   **branch** (Optional): The branch to checkout or switch to.
-*   **revision** (Optional): A specific commit hash to checkout (primarily used by `init`).
-*   **base-branch** (Optional): The base branch for Pull Requests. If omitted, it defaults to the value of `branch`.
+*   **revision** (Optional): A specific commit hash to checkout (primarily used by `init` and `reset`).
+*   **base-branch** (Optional): The base branch for Pull Requests and `reset` operations. If omitted, it defaults to the value of `branch`.
 
 ## Usage
 
@@ -74,6 +74,7 @@ Global options for most commands:
 *   `-j, --jobs <int>`: Number of concurrent jobs to use (default: 1, or value from config).
 *   `-y, --yes`: Automatically answer "yes" to all prompts.
 *   `-v, --verbose`: Enable verbose output (shows executed git/gh commands).
+*   `--ignore-stdin`: Ignore standard input (useful when running in scripts where stdin might be unintentionally piped).
 
 Configuration loading priority:
 1.  **Standard Input (stdin)**: If standard input is provided, it takes precedence over any file specified.
@@ -177,6 +178,39 @@ mstl switch -f <config_file> -c <branch_name>
 *   `-j, --jobs <int>`: Number of concurrent jobs to use (default: 1).
 *   `-y, --yes`: Automatically answer "yes" to all prompts.
 *   `-v, --verbose`: Enable verbose output.
+
+#### `reset`
+
+Resets the current branch to the specific target defined in the configuration. The target is resolved in the following priority:
+1.  `revision` (Commit Hash)
+2.  `base-branch`
+3.  `branch`
+
+It performs a **mixed reset**, meaning changes in the working directory are preserved.
+
+**Usage:**
+```bash
+mstl reset -f <config_file> [options]
+```
+
+**Options:**
+*   `-j, --jobs <int>`: Number of concurrent jobs to use (default: 1).
+*   `-y, --yes`: Automatically answer "yes" to all prompts (skip confirmation).
+*   `-v, --verbose`: Enable verbose output.
+
+#### `fire`
+
+**Emergency Backup.** Immediately stages, commits, and pushes all changes in all repositories to a unique branch. This command is designed for emergency situations (e.g., machine failure) to save work quickly.
+
+*   It searches for the configuration file in the current or parent directories.
+*   It creates branches named `mstl-fire-[repo]-[user]-[uuid]`.
+*   It commits with `--no-gpg-sign` to avoid prompt delays.
+*   It runs without confirmation prompts.
+
+**Usage:**
+```bash
+mstl fire
+```
 
 #### `snapshot`
 
@@ -285,7 +319,10 @@ mstl-gh pr update -f <config_file> [options]
 
 #### `pr checkout`
 
-Restores the state of repositories based on the snapshot embedded in a Mistletoe-managed Pull Request. It parses the Mistletoe block from the PR body, clones missing repositories, and checks out the recorded branches or revisions.
+Restores the state of repositories based on the snapshot embedded in a Mistletoe-managed Pull Request.
+*   It parses the Mistletoe block from the PR body.
+*   It clones missing repositories and checks out the recorded branches or revisions.
+*   It saves the configuration from the snapshot to `.mstl/config.json`.
 
 **Usage:**
 ```bash
@@ -295,6 +332,7 @@ mstl-gh pr checkout -u <PR_URL> [options]
 **Options:**
 *   `-u, --url <string>`: The URL of the Pull Request containing the snapshot (Required).
 *   `--dest <path>`: Destination directory (default: current directory).
+*   `--depth <int>`: Create a shallow clone with a history truncated to the specified number of commits.
 *   `-j, --jobs <int>`: Number of concurrent jobs to use (default: 1).
 *   `-y, --yes`: Automatically answer "yes" to all prompts.
 *   `-v, --verbose`: Enable verbose output.
