@@ -93,7 +93,8 @@ func TestHandleReset_Success(t *testing.T) {
 	}
 
 	opts := GlobalOptions{GitPath: "git"}
-	err := handleReset([]string{"-f", configFile}, opts)
+	// Pass --yes to skip prompt which reads from stdin
+	err := handleReset([]string{"-f", configFile, "--yes"}, opts)
 	if err != nil {
 		t.Errorf("Expected success, got error: %v", err)
 	}
