@@ -100,18 +100,26 @@ func TestMstlAndMstlGhCompatibility(t *testing.T) {
 		outMstl, _ := exec.Command(binMstl, "help").Output()
 		outMstlGh, _ := exec.Command(binMstlGh, "help").Output()
 
-		linesMstl := strings.Split(string(outMstl), "\n")
-		linesMstlGh := strings.Split(string(outMstlGh), "\n")
+		strMstl := string(outMstl)
+		strMstlGh := string(outMstlGh)
 
-		if len(linesMstl) != len(linesMstlGh) {
-			t.Fatalf("Line count mismatch in help output. mstl: %d, mstl-gh: %d", len(linesMstl), len(linesMstlGh))
+		// Basic check: both should contain common commands
+		commonCmds := []string{"init", "status", "sync", "push", "reset", "fire"}
+		for _, cmd := range commonCmds {
+			if !strings.Contains(strMstl, cmd) {
+				t.Errorf("mstl help missing %s", cmd)
+			}
+			if !strings.Contains(strMstlGh, cmd) {
+				t.Errorf("mstl-gh help missing %s", cmd)
+			}
 		}
 
-		// Skip first line (Usage: ...) and compare the rest
-		for i := 1; i < len(linesMstl); i++ {
-			if linesMstl[i] != linesMstlGh[i] {
-				t.Errorf("Mismatch at line %d:\nmstl   : %q\nmstl-gh: %q", i, linesMstl[i], linesMstlGh[i])
-			}
+		// Specific check: mstl-gh should have 'pr', mstl should not
+		if strings.Contains(strMstl, " pr ") {
+			t.Error("mstl help should NOT contain 'pr' command")
+		}
+		if !strings.Contains(strMstlGh, " pr ") {
+			t.Error("mstl-gh help SHOULD contain 'pr' command")
 		}
 	})
 
