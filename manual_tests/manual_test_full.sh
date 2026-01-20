@@ -77,6 +77,9 @@ python3 "$SCRIPT_DIR/manual_test_gh_pr_checkout.py" --output "$OUTPUT_FILE" $YES
 echo "Running manual_test_pr_create_behind.py..."
 python3 "$SCRIPT_DIR/manual_test_pr_create_behind.py" --output "$OUTPUT_FILE" $YES_FLAG
 
+echo "Running manual_test_fire.py..."
+python3 "$SCRIPT_DIR/manual_test_fire.py" --output "$OUTPUT_FILE" $YES_FLAG
+
 echo "Running temp_repos_cleanup.py..."
 python3 "$SCRIPT_DIR/temp_repos_cleanup.py" $YES_FLAG
 
