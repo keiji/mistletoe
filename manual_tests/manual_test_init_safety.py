@@ -7,6 +7,13 @@ import tempfile
 import json
 from interactive_runner import InteractiveRunner
 
+def create_bare_repo(path):
+    """Creates a bare git repository."""
+    os.makedirs(path, exist_ok=True)
+    subprocess.run(["git", "init", "--bare", path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
+    # Set default branch to main to avoid confusion
+    subprocess.run(["git", "-C", path, "symbolic-ref", "HEAD", "refs/heads/main"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
+
 def main():
     runner = InteractiveRunner("Manual Test: Init Safety Check")
     runner.parse_args()
@@ -16,10 +23,14 @@ def main():
     print(f"Created temp directory: {temp_dir}")
 
     try:
+        # Create a dummy remote repo
+        remote_repo_dir = os.path.join(temp_dir, "remote_repo.git")
+        create_bare_repo(remote_repo_dir)
+
         # Create config.json
         config = {
             "repositories": [
-                {"url": "https://github.com/example/repo1.git", "id": "repo1"}
+                {"url": f"file://{remote_repo_dir}", "id": "repo1"}
             ]
         }
         config_path = os.path.join(temp_dir, "config.json")
@@ -82,7 +93,7 @@ def main():
         if "This directory contains files/directories not in the repository list" in stdout:
             runner.log("Safety warning displayed.", status="SUCCESS")
 
-        if "Cloning https://github.com/example/repo1.git" in stdout or "Cloning..." in stdout:
+        if f"Cloning file://{remote_repo_dir}" in stdout or "Cloning..." in stdout:
              runner.log("Proceeded to clone after confirmation.", status="SUCCESS")
         elif "Error" in stdout or "Error" in stderr:
             # If it failed at clone step, we are good.
@@ -92,6 +103,9 @@ def main():
                 runner.fail("Aborted by user despite sending 'y'.")
 
         print("Test 3: Bypass safety check with --yes")
+        # Cleanup cloned repo from Test 2 to ensure Test 3 verifies clone behavior
+        shutil.rmtree(os.path.join(temp_dir, "repo1"))
+
         # Add --yes to the command
         cmd_yes = cmd + ["--yes"]
         p = subprocess.Popen(cmd_yes, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
@@ -111,7 +125,7 @@ def main():
         if "This directory contains files/directories not in the repository list" in stdout:
              runner.log("Safety warning message still displayed (as expected).", status="SUCCESS")
 
-        if "Cloning https://github.com/example/repo1.git" in stdout or "Cloning..." in stdout:
+        if f"Cloning file://{remote_repo_dir}" in stdout or "Cloning..." in stdout:
              runner.log("Proceeded to clone automatically.", status="SUCCESS")
         elif "Error" in stdout or "Error" in stderr:
             if "initialization aborted by user" not in stdout:
