@@ -126,10 +126,10 @@ func handlePush(args []string, opts GlobalOptions) error {
 	}
 	if confirmed {
 		for _, row := range pushable {
-			fmt.Fprintf(sys.Stdout, "Pushing %s (branch: %s)...\n", row.Repo, row.BranchName)
+			fmt.Fprintf(sys.Stdout, "[%s] Pushing (branch: %s)...\n", row.Repo, row.BranchName)
 			// git push -u origin [branchname]
 			if err := RunGitInteractive(row.RepoDir, opts.GitPath, verbose, "push", "-u", "origin", row.BranchName); err != nil {
-				fmt.Fprintf(sys.Stdout, "Failed to push %s: %v.\n", row.Repo, err)
+				fmt.Fprintf(sys.Stdout, "[%s] Failed to push: %v.\n", row.Repo, err)
 			}
 		}
 	}

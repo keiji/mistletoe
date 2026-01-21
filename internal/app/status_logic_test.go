@@ -231,7 +231,7 @@ func TestCollectStatus_UpstreamFix(t *testing.T) {
 	}
 
 	// Verify message
-	if !strings.Contains(stderrBuf.String(), "Unsetting upstream for") {
+	if !strings.Contains(stderrBuf.String(), "[local] Unsetting upstream because") {
 		t.Errorf("Scenario 1: Expected message not found in stderr. Got: %s", stderrBuf.String())
 	}
 
@@ -258,7 +258,7 @@ func TestCollectStatus_UpstreamFix(t *testing.T) {
 	}
 
 	// Verify message
-	if !strings.Contains(stderrBuf.String(), "because the remote branch does not exist") {
+	if !strings.Contains(stderrBuf.String(), "[local] Unsetting upstream because the remote branch does not exist") {
 		t.Errorf("Scenario 2: Expected message not found in stderr. Got: %s", stderrBuf.String())
 	}
 }
