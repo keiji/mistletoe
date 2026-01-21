@@ -15,6 +15,8 @@ def setup_repo(env, repo_name):
         shutil.rmtree(repo_path)
     os.makedirs(repo_path)
     subprocess.check_call(["git", "init"], cwd=repo_path)
+    subprocess.check_call(["git", "config", "user.email", "test@example.com"], cwd=repo_path)
+    subprocess.check_call(["git", "config", "user.name", "Test User"], cwd=repo_path)
 
     # Commit C1
     with open(os.path.join(repo_path, "file1.txt"), "w") as f:
@@ -70,7 +72,7 @@ def test_reset_keep_changes():
         # Run mstl reset
         print(f"Resetting {repo_name} to {c1_hash}...")
         # env.run_mstl_cmd takes args list
-        env.run_mstl_cmd(["reset", "-f", config_path, "--verbose", "--ignore-stdin"])
+        env.run_mstl_cmd(["reset", "-f", config_path, "--verbose", "--ignore-stdin", "--yes"])
 
         # Verify HEAD is C1
         current_head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=repo_path).decode().strip()
