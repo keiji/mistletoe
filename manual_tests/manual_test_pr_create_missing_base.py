@@ -51,6 +51,7 @@ def main():
             ]
         }
 
+        os.makedirs(env.test_dir, exist_ok=True)
         with open(os.path.join(env.test_dir, "mistletoe.json"), "w") as f:
             json.dump(config_data, f, indent=2)
 
