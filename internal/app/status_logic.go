@@ -201,7 +201,7 @@ func getRepoStatus(repo conf.Repository, baseDir, gitPath string, verbose bool, 
 				// Condition 1: Local branch name and upstream name are different
 				// We assume remote is always "origin" per ValidateRepositoriesIntegrity
 				if currentUpstream != "origin/"+branchName {
-					msg := fmt.Sprintf("Unsetting upstream for %s because the configuration is invalid (differs from origin/%s).\n", repoName, branchName)
+					msg := fmt.Sprintf("[%s] Unsetting upstream because the configuration is invalid (differs from origin/%s).\n", repoName, branchName)
 					fmt.Fprint(sys.Stderr, msg)
 					_, _ = RunGit(targetDir, gitPath, verbose, "branch", "--unset-upstream")
 				} else {
@@ -212,7 +212,7 @@ func getRepoStatus(repo conf.Repository, baseDir, gitPath string, verbose bool, 
 						lsOut, lsErr := RunGit(targetDir, gitPath, verbose, "ls-remote", "--heads", "origin", branchName)
 						// If ls-remote succeeded (network ok) but returned no output, branch is missing.
 						if lsErr == nil && lsOut == "" {
-							msg := fmt.Sprintf("Unsetting upstream for %s because the remote branch does not exist. It will be set again if you push.\n", repoName)
+							msg := fmt.Sprintf("[%s] Unsetting upstream because the remote branch does not exist. It will be set again if you push.\n", repoName)
 							fmt.Fprint(sys.Stderr, msg)
 							_, _ = RunGit(targetDir, gitPath, verbose, "branch", "--unset-upstream")
 						}

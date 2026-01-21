@@ -91,7 +91,7 @@ func TestHandlePush(t *testing.T) {
 		if err != nil {
 			t.Errorf("expected success, got error: %v", err)
 		}
-		if !strings.Contains(out, "Pushing repo1") {
+		if !strings.Contains(out, "[repo1] Pushing") {
 			t.Errorf("Expected Pushing repo1. Got: %s", out)
 		}
 
@@ -121,7 +121,7 @@ func TestHandlePush(t *testing.T) {
 		if err != nil {
 			t.Errorf("expected success, got error: %v", err)
 		}
-		if strings.Contains(out, "Pushing repo1") {
+		if strings.Contains(out, "[repo1] Pushing") {
 			t.Errorf("Should not push")
 		}
 	})
@@ -195,7 +195,7 @@ func TestHandlePush(t *testing.T) {
 		if err != nil {
 			t.Errorf("expected success, got error: %v", err)
 		}
-		if !strings.Contains(out, "Pushing repo1") {
+		if !strings.Contains(out, "[repo1] Pushing") {
 			t.Errorf("Expected Pushing repo1. Got: %s", out)
 		}
 	})

@@ -153,7 +153,7 @@ func handleSync(args []string, opts GlobalOptions) error {
 	// Execute Pull
 	for _, row := range rows {
 		if row.RemoteRev == "" {
-			fmt.Fprintf(sys.Stdout, "Skipping %s: Remote branch not found.\n", row.Repo)
+			fmt.Fprintf(sys.Stdout, "[%s] Skipping: Remote branch not found.\n", row.Repo)
 			continue
 		}
 
@@ -167,13 +167,13 @@ func handleSync(args []string, opts GlobalOptions) error {
 		// - We are Behind but 'repo.Branch' config doesn't match current branch -> IsPullable is false (gated).
 		//   In this case, we MUST run pull (which behaves like standard git pull).
 		if !row.IsPullable && row.LocalHeadFull == row.RemoteHeadFull {
-			fmt.Fprintf(sys.Stdout, "Skipping %s: Already up to date.\n", row.Repo)
+			fmt.Fprintf(sys.Stdout, "[%s] Skipping: Already up to date.\n", row.Repo)
 			continue
 		}
 
-		fmt.Fprintf(sys.Stdout, "Syncing %s...\n", row.Repo)
+		fmt.Fprintf(sys.Stdout, "[%s] Syncing...\n", row.Repo)
 		if err := RunGitInteractive(row.RepoDir, opts.GitPath, verbose, argsPull...); err != nil {
-			return fmt.Errorf("Error pulling %s: %w", row.Repo, err)
+			return fmt.Errorf("[%s] Error pulling: %w", row.Repo, err)
 		}
 	}
 	return nil

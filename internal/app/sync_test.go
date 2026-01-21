@@ -85,7 +85,7 @@ func TestHandleSync(t *testing.T) {
 		if err != nil {
 			t.Errorf("expected success, got error: %v", err)
 		}
-		if !strings.Contains(out, fmt.Sprintf("Skipping %s: Already up to date.", repo1Rel)) {
+		if !strings.Contains(out, fmt.Sprintf("[%s] Skipping: Already up to date.", repo1Rel)) {
 			t.Errorf("Expected Skipping repo1 output. Got: %s", out)
 		}
 	})

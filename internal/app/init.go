@@ -252,20 +252,22 @@ func PerformInit(repos []conf.Repository, baseDir, gitPath string, jobs, depth i
 			// Explicitly pass target directory to avoid ambiguity and to know where to checkout later.
 			gitArgs = append(gitArgs, targetDir)
 
+			repoName := conf.GetRepoDirName(repo)
+
 			// Check if directory already exists and is a git repo.
 			shouldClone := true
 			if info, err := os.Stat(targetDir); err == nil && info.IsDir() {
 				gitDir := filepath.Join(targetDir, ".git")
 				if _, err := os.Stat(gitDir); err == nil {
-					fmt.Printf("Repository %s exists. Skipping clone.\n", targetDir)
+					fmt.Printf("[%s] Repository exists. Skipping clone.\n", repoName)
 					shouldClone = false
 				}
 			}
 
 			if shouldClone {
-				fmt.Printf("Cloning %s into %s...\n", *repo.URL, targetDir)
+				fmt.Printf("[%s] Cloning %s...\n", repoName, *repo.URL)
 				if err := RunGitInteractive("", gitPath, verbose, gitArgs...); err != nil {
-					fmt.Printf("Error cloning %s: %v\n", *repo.URL, err)
+					fmt.Printf("[%s] Error cloning %s: %v\n", repoName, *repo.URL, err)
 					// Skip checkout if clone failed
 					return
 				}
@@ -274,26 +276,26 @@ func PerformInit(repos []conf.Repository, baseDir, gitPath string, jobs, depth i
 			// 2. Switch Branch / Checkout Revision
 			if repo.Revision != nil && *repo.Revision != "" {
 				// Checkout revision
-				fmt.Printf("Checking out revision %s in %s...\n", *repo.Revision, targetDir)
+				fmt.Printf("[%s] Checking out revision %s...\n", repoName, *repo.Revision)
 				if err := RunGitInteractive(targetDir, gitPath, verbose, "checkout", *repo.Revision); err != nil {
-					fmt.Printf("Error checking out revision %s in %s: %v\n", *repo.Revision, targetDir, err)
+					fmt.Printf("[%s] Error checking out revision %s: %v\n", repoName, *repo.Revision, err)
 					return
 				}
 
 				if repo.Branch != nil && *repo.Branch != "" {
 					// Create branch (or reset if exists)
-					fmt.Printf("Creating branch %s at revision %s in %s...\n", *repo.Branch, *repo.Revision, targetDir)
+					fmt.Printf("[%s] Creating branch %s at revision %s...\n", repoName, *repo.Branch, *repo.Revision)
 					// Use -B to force create/reset branch to the revision point.
 					// This matches the intent of initializing the workspace to the specified state.
 					if err := RunGitInteractive(targetDir, gitPath, verbose, "checkout", "-B", *repo.Branch); err != nil {
-						fmt.Printf("Error creating/resetting branch %s in %s: %v\n", *repo.Branch, targetDir, err)
+						fmt.Printf("[%s] Error creating/resetting branch %s: %v\n", repoName, *repo.Branch, err)
 					}
 				}
 			} else if repo.Branch != nil && *repo.Branch != "" {
 				// "チェックアウト後、各要素についてbranchで示されたブランチに切り替える。"
-				fmt.Printf("Switching %s to branch %s...\n", targetDir, *repo.Branch)
+				fmt.Printf("[%s] Switching to branch %s...\n", repoName, *repo.Branch)
 				if err := RunGitInteractive(targetDir, gitPath, verbose, "checkout", *repo.Branch); err != nil {
-					fmt.Printf("Error switching branch for %s: %v.\n", targetDir, err)
+					fmt.Printf("[%s] Error switching branch: %v.\n", repoName, err)
 				}
 			}
 		}(repo)
