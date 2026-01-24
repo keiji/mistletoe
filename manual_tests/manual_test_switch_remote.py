@@ -33,6 +33,11 @@ def run_test_logic():
         origin_setup_dir = os.path.join(test_workspace, "origin_setup")
         os.makedirs(origin_setup_dir)
         subprocess.run(["git", "init"], cwd=origin_setup_dir, check=True, stdout=subprocess.DEVNULL)
+
+        # Configure git user
+        subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=origin_setup_dir, check=True, stdout=subprocess.DEVNULL)
+        subprocess.run(["git", "config", "user.name", "Test User"], cwd=origin_setup_dir, check=True, stdout=subprocess.DEVNULL)
+
         with open(os.path.join(origin_setup_dir, "README.md"), "w") as f:
             f.write("# Test Repo\n")
         subprocess.run(["git", "add", "README.md"], cwd=origin_setup_dir, check=True, stdout=subprocess.DEVNULL)

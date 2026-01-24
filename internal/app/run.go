@@ -73,7 +73,7 @@ func validateGhAuth(ghPath string) error {
 // Run is the entry point for the application logic.
 func Run(appType Type, version, hash string, args []string, extraHandler func(string, []string, GlobalOptions) bool) {
 	if err := RunApp(appType, version, hash, args, extraHandler); err != nil {
-		fmt.Println(err)
+		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
