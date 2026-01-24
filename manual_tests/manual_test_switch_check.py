@@ -55,12 +55,14 @@ class SwitchCheckTest:
         self.run_git(self.repo1_dir, "init")
         self.run_git(self.repo1_dir, "remote", "add", "origin", "dummy1")
         self.run_git(self.repo1_dir, "commit", "--allow-empty", "-m", "init")
-        self.run_git(self.repo1_dir, "checkout", "-b", "main")
+        # Use -B to force create/reset in case main already exists as default
+        self.run_git(self.repo1_dir, "checkout", "-B", "main")
 
         self.run_git(self.repo2_dir, "init")
         self.run_git(self.repo2_dir, "remote", "add", "origin", "dummy2")
         self.run_git(self.repo2_dir, "commit", "--allow-empty", "-m", "init")
-        self.run_git(self.repo2_dir, "checkout", "-b", "dev") # Different branch
+        # Use -B for consistency
+        self.run_git(self.repo2_dir, "checkout", "-B", "dev") # Different branch
 
         # Config
         config = {
