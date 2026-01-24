@@ -70,7 +70,11 @@ flowchart TD
         GitCheckout --> SetUpstream["Upstream設定処理"]
     end
 
-    CheckMode -- Yes (Create Mode) --> ExecLoopCreate["実行ループ (並列)"]
+    CheckMode -- Yes (Create Mode) --> CheckConsistency{"カレントブランチ一致?"}
+    CheckConsistency -- No --> Prompt{"続行確認 (Yes/No)"}
+    Prompt -- No --> Stop
+    Prompt -- Yes --> ExecLoopCreate
+    CheckConsistency -- Yes --> ExecLoopCreate
 
     subgraph "実行: 作成モード"
         ExecLoopCreate --> CheckMap{"マップ確認: 存在?"}
@@ -93,6 +97,8 @@ flowchart TD
     *   まず、`git show-ref --verify refs/heads/<branch>` を使用して、対象ブランチがローカルに存在するかを確認します。
     *   **ローカルに存在しない場合**、`git fetch origin <branch>` を試行し、続いて `git show-ref --verify refs/remotes/origin/<branch>` でリモートブランチの存在を確認します。
     *   ローカルまたはリモートのいずれかに存在すれば、そのリポジトリでは「ブランチが存在する」と判定し、結果をメモリ上に保存します。
+3.  **カレントブランチ取得 (作成モードのみ)**:
+    *   `-c` (作成モード) が指定されている場合、現在のブランチ名 (`git rev-parse --abbrev-ref HEAD`) を取得して保存します。
 
 #### 実行モードの分岐
 
@@ -103,6 +109,9 @@ flowchart TD
 *   **Upstream設定**: 切り替え後、リモートブランチ（`origin/<branch>`）が存在し、コンフリクトがない場合は Upstream に設定します。
 
 **2. 作成モード (`--create` 指定)**
+*   **カレントブランチ一貫性チェック**:
+    *   すべてのリポジトリの現在のブランチ名が一致しているかを確認します。
+    *   一致していない場合、各リポジトリの現在のブランチ名（`[repo_id] branch_name` 形式）を含む警告メッセージを表示し、ユーザーに処理を継続するか確認（yes/no）を求めます。「no」が選択された場合は処理を中止します。
 *   厳密な存在チェックは行わず、リポジトリごとの状態に合わせて処理を行います。
 *   **実行**:
     *   ブランチが既に存在する場合: `git checkout <branch>` を実行し、そのブランチへの切り替え。

@@ -56,6 +56,9 @@ python3 "$SCRIPT_DIR/manual_test_switch_upstream.py" --output "$OUTPUT_FILE" $YE
 echo "Running manual_test_switch_remote.py..."
 python3 "$SCRIPT_DIR/manual_test_switch_remote.py" --output "$OUTPUT_FILE" $YES_FLAG
 
+echo "Running manual_test_switch_check.py..."
+python3 "$SCRIPT_DIR/manual_test_switch_check.py" --output "$OUTPUT_FILE" $YES_FLAG
+
 echo "Running manual_test_upstream_safety.py..."
 python3 "$SCRIPT_DIR/manual_test_upstream_safety.py" --output "$OUTPUT_FILE" $YES_FLAG
 

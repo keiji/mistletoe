@@ -601,3 +601,84 @@ func TestHandleSwitch_RemoteFallback(t *testing.T) {
 		t.Errorf("expected branch remote-only, got %s", string(out))
 	}
 }
+
+func TestHandleSwitch_ConsistencyCheck(t *testing.T) {
+	// 1. Setup Environment
+	tmpDir, err := os.MkdirTemp("", "mstl-switch-consistency-test")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	cwd, _ := os.Getwd()
+	defer func() { _ = os.Chdir(cwd) }()
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("failed to chdir: %v", err)
+	}
+
+	// 2. Setup Repos
+	repo1 := filepath.Join(tmpDir, "repo1")
+	repo2 := filepath.Join(tmpDir, "repo2")
+	setupRepo(t, repo1, "origin1")
+	setupRepo(t, repo2, "origin2")
+
+	// Create divergent branches
+	// repo1: master
+	// repo2: feature
+	exec.Command("git", "-C", repo2, "checkout", "-b", "feature").Run()
+
+	// 3. Config
+	repo1Rel := "repo1"
+	repo2Rel := "repo2"
+	config := conf.Config{
+		Repositories: &[]conf.Repository{
+			{URL: strPtr("origin1"), ID: &repo1Rel},
+			{URL: strPtr("origin2"), ID: &repo2Rel},
+		},
+	}
+	configData, _ := json.Marshal(config)
+	configPath := filepath.Join(tmpDir, "mstl.json")
+	os.WriteFile(configPath, configData, 0644)
+
+	// 4. Mock Globals
+	var stdoutBuf, stderrBuf bytes.Buffer
+	originalStdout, originalStderr := sys.Stdout, sys.Stderr
+	defer func() {
+		sys.Stdout, sys.Stderr = originalStdout, originalStderr
+	}()
+	sys.Stdout = &stdoutBuf
+	sys.Stderr = &stderrBuf
+
+	// Helper
+	runSwitch := func(input string) error {
+		stdoutBuf.Reset()
+		stderrBuf.Reset()
+		sys.Stdin = strings.NewReader(input)
+		return handleSwitch([]string{"-c", "new-branch", "--file", configPath, "--ignore-stdin"}, GlobalOptions{GitPath: "git"})
+	}
+
+	// Case 1: Abort
+	err = runSwitch("no\n")
+	if err == nil {
+		t.Error("Expected error on abort, got nil")
+	} else if !strings.Contains(err.Error(), "Aborted by user") {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	// Verify prompt contained branch names
+	out := stdoutBuf.String()
+	if !strings.Contains(out, "[repo1] master") {
+		t.Errorf("Output missing repo1 master: %s", out)
+	}
+	if !strings.Contains(out, "[repo2] feature") {
+		t.Errorf("Output missing repo2 feature: %s", out)
+	}
+
+	// Case 2: Proceed
+	err = runSwitch("yes\n")
+	if err != nil {
+		t.Errorf("Expected success on yes, got error: %v", err)
+	}
+	// Verify switched
+	verifyBranch(t, repo1, "new-branch")
+	verifyBranch(t, repo2, "new-branch")
+}

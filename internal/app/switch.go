@@ -1,8 +1,10 @@
 package app
 
 import (
+	"bufio"
 	conf "mistletoe/internal/config"
 	"mistletoe/internal/sys"
+	"mistletoe/internal/ui"
 )
 
 import (
@@ -166,6 +168,8 @@ func handleSwitch(args []string, opts GlobalOptions) error {
 
 	// Map to store existence status for each repo (keyed by local directory path)
 	dirExists := make(map[string]bool)
+	// Map to store current branch for each repo (keyed by repo ID)
+	currentBranches := make(map[string]string)
 	var mu sync.Mutex
 
 	var wg sync.WaitGroup
@@ -193,6 +197,14 @@ func handleSwitch(args []string, opts GlobalOptions) error {
 				return
 			}
 
+			// Get current branch
+			curr, err := RunGit(dir, opts.GitPath, verbose, "rev-parse", "--abbrev-ref", "HEAD")
+			if err == nil {
+				mu.Lock()
+				currentBranches[*repo.ID] = curr
+				mu.Unlock()
+			}
+
 			exists := branchExists(dir, branchName, opts.GitPath, verbose)
 			if !exists {
 				// If not found locally, check if it exists on remote (fetch first)
@@ -215,6 +227,51 @@ func handleSwitch(args []string, opts GlobalOptions) error {
 
 	if threadErr != nil {
 		return threadErr
+	}
+
+	if create {
+		// Consistency Check
+		var firstBranch string
+		allMatch := true
+		first := true
+
+		for _, repo := range *config.Repositories {
+			mu.Lock()
+			branch := currentBranches[*repo.ID]
+			mu.Unlock()
+			if first {
+				firstBranch = branch
+				first = false
+			} else {
+				if branch != firstBranch {
+					allMatch = false
+					break
+				}
+			}
+		}
+
+		if !allMatch {
+			msg := "Branch names do not match. Current status:\n"
+			for _, repo := range *config.Repositories {
+				mu.Lock()
+				branch := currentBranches[*repo.ID]
+				mu.Unlock()
+				if branch == "" {
+					branch = "(unknown)"
+				}
+				msg += fmt.Sprintf("[%s] %s\n", *repo.ID, branch)
+			}
+			msg += "\nDo you want to continue? (yes/no): "
+
+			reader := bufio.NewReader(sys.Stdin)
+			proceed, err := ui.AskForConfirmationRequired(reader, msg, yes)
+			if err != nil {
+				return fmt.Errorf("Error reading input: %w", err)
+			}
+			if !proceed {
+				return fmt.Errorf("Aborted by user.")
+			}
+		}
 	}
 
 	if !create {

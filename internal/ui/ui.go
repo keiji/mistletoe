@@ -14,10 +14,10 @@ import (
 // If yesFlag is true, it automatically assumes "yes" and returns true without prompting.
 // Returns true if the user enters 'y' or 'yes' (case-insensitive), false otherwise.
 func AskForConfirmation(reader *bufio.Reader, prompt string, yesFlag bool) (bool, error) {
-	fmt.Print(prompt)
+	fmt.Fprint(sys.Stdout, prompt)
 
 	if yesFlag {
-		fmt.Println("yes (assumed via flag)")
+		fmt.Fprintln(sys.Stdout, "yes (assumed via flag)")
 		return true, nil
 	}
 
@@ -40,7 +40,7 @@ func AskForConfirmationRequired(reader *bufio.Reader, prompt string, yesFlag boo
 	}
 
 	for {
-		fmt.Print(prompt)
+		fmt.Fprint(sys.Stdout, prompt)
 		input, err := reader.ReadString('\n')
 		if err != nil {
 			return false, err
