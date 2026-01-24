@@ -664,13 +664,18 @@ func TestHandleSwitch_ConsistencyCheck(t *testing.T) {
 	} else if !strings.Contains(err.Error(), "Aborted by user") {
 		t.Errorf("Unexpected error: %v", err)
 	}
-	// Verify prompt contained branch names
+	// Verify prompt contained table parts
 	out := stdoutBuf.String()
-	if !strings.Contains(out, "[repo1] master") {
-		t.Errorf("Output missing repo1 master: %s", out)
+	// Table writer adds borders, check for content
+	if !strings.Contains(out, "repo1") || !strings.Contains(out, "master") {
+		t.Errorf("Output missing repo1/master in table: %s", out)
 	}
-	if !strings.Contains(out, "[repo2] feature") {
-		t.Errorf("Output missing repo2 feature: %s", out)
+	if !strings.Contains(out, "repo2") || !strings.Contains(out, "feature") {
+		t.Errorf("Output missing repo2/feature in table: %s", out)
+	}
+	// Check for table header
+	if !strings.Contains(out, "Repository") || !strings.Contains(out, "Local") {
+		t.Errorf("Output missing table headers: %s", out)
 	}
 
 	// Case 2: Proceed

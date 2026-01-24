@@ -92,10 +92,13 @@ class SwitchCheckTest:
             print(f"STDOUT:\n{stdout}")
             print(f"STDERR:\n{stderr}")
             fail("Did not find warning message")
-        if "[repo1] main" not in combined:
-            fail("Did not find [repo1] main in status")
-        if "[repo2] dev" not in combined:
-            fail("Did not find [repo2] dev in status")
+        # Check for table structure indicators
+        if "repo1" not in combined or "main" not in combined:
+            fail("Did not find repo1/main in status table")
+        if "repo2" not in combined or "dev" not in combined:
+            fail("Did not find repo2/dev in status table")
+        if "Repository" not in combined or "Local" not in combined:
+            fail("Did not find table headers")
 
         log("Step 1 Passed (Aborted correctly).")
 

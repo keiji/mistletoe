@@ -251,18 +251,12 @@ func handleSwitch(args []string, opts GlobalOptions) error {
 		}
 
 		if !allMatch {
-			msg := "Branch names do not match. Current status:\n"
-			for _, repo := range *config.Repositories {
-				mu.Lock()
-				branch := currentBranches[*repo.ID]
-				mu.Unlock()
-				if branch == "" {
-					branch = "(unknown)"
-				}
-				msg += fmt.Sprintf("[%s] %s\n", *repo.ID, branch)
-			}
-			msg += "\nDo you want to continue? (yes/no): "
+			fmt.Fprintln(sys.Stderr, "Branch names do not match. Current status:")
+			// Output current status table
+			rows := CollectStatus(config, jobs, opts.GitPath, verbose, false)
+			RenderStatusTable(sys.Stdout, rows)
 
+			msg := "Do you want to continue? (yes/no): "
 			reader := bufio.NewReader(sys.Stdin)
 			proceed, err := ui.AskForConfirmationRequired(reader, msg, yes)
 			if err != nil {
