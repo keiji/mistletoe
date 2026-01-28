@@ -46,9 +46,10 @@ func TestPrStatusHelperProcess(_ *testing.T) {
 		if len(args) > 2 && args[1] == "pr" && args[2] == "list" {
 			// Check if --state all is present
 			hasStateAll := false
-			for _, arg := range args {
-				if arg == "all" {
+			for i := 0; i < len(args)-1; i++ {
+				if args[i] == "--state" && args[i+1] == "all" {
 					hasStateAll = true
+					break
 				}
 			}
 
