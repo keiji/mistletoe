@@ -146,6 +146,7 @@ flowchart TD
 
 既存のPull Requestが存在する場合でも、そのステータスが `MERGED` または `CLOSED` である場合、Descriptionの更新（スナップショットの埋め込み）は**明示的にスキップ**されます。
 これらのPRは、ステータス収集時には「既存PRあり」として検出されますが、本文更新処理（`updatePrDescriptions`）の段階でフィルタリングされ、APIコールを行わずに無視されます。したがって、Open（またはDraft）状態のPRのみが更新対象となります。
+ただし、これらのClosed/MergedなPRも、他のリポジトリのPRの「Related Pull Request(s)」リストには含まれます。
 
 ### 3.5. 依存関係の解析 (Dependency Parsing)
 
@@ -207,6 +208,7 @@ PR 本文の末尾に、自動生成された不可視（または折りたた�
         *   **Related to**: 依存関係がない、またはグラフに含まれないリポジトリのPR。
             *   **注記**: Dependencies と Used by が存在せず、Related to のみが存在する場合、"Related to" の小見出しは省略され、リストが直接表示されます。
     *   指定がない場合は、単一のリストとして全関連PRを表示します。
+    *   **注記**: 同じリモートブランチ・Baseブランチを対象とするPRであれば、Open状態だけでなく、ClosedやMerged状態のPRもリストに含まれます。
 2.  **関連 PR リンク (JSON形式, `<details>` 内)**:
     *   ファイル名: `mistletoe-related-pr-[identifier].json`
     *   内容: 関連PRのURLを分類したJSONデータ。

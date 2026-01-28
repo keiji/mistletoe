@@ -86,6 +86,9 @@ python3 "$SCRIPT_DIR/manual_test_pr_create_behind.py" --output "$OUTPUT_FILE" $Y
 echo "Running manual_test_pr_create_missing_base.py..."
 python3 "$SCRIPT_DIR/manual_test_pr_create_missing_base.py" --output "$OUTPUT_FILE" $YES_FLAG
 
+echo "Running manual_test_related_prs.py..."
+python3 "$SCRIPT_DIR/manual_test_related_prs.py" --output "$OUTPUT_FILE" $YES_FLAG
+
 echo "Running reset_test.py..."
 python3 "$SCRIPT_DIR/reset_test.py"
 
