@@ -179,18 +179,6 @@ func CollectPrStatus(statusRows []StatusRow, config *conf.Config, jobs int, ghPa
 					if err == nil {
 						var prs []PrInfo
 						if err := json.Unmarshal([]byte(out), &prs); err == nil && len(prs) > 0 {
-							// Check for Open PRs
-							hasOpenPR := false
-							for _, pr := range prs {
-								// Filter by HeadRepository matching conf.Config URL (canonical)
-								if isPrFromConfiguredRepo(pr, configCanonicalURL) {
-									if strings.EqualFold(pr.State, GitHubPrStateOpen) || (pr.IsDraft && strings.EqualFold(pr.State, GitHubPrStateOpen)) {
-										hasOpenPR = true
-										break
-									}
-								}
-							}
-
 							// Filter PRs
 							var filteredPrs []PrInfo
 							for _, pr := range prs {
@@ -199,16 +187,7 @@ func CollectPrStatus(statusRows []StatusRow, config *conf.Config, jobs int, ghPa
 									continue
 								}
 
-								if strings.EqualFold(pr.State, GitHubPrStateOpen) || (pr.IsDraft && strings.EqualFold(pr.State, GitHubPrStateOpen)) {
-									filteredPrs = append(filteredPrs, pr)
-								} else {
-									// Closed or Merged
-									// Include if (HeadRefOid matches LocalHeadFull) OR (There is an Open PR)
-									matchHead := r.LocalHeadFull != "" && pr.HeadRefOid == r.LocalHeadFull
-									if matchHead || hasOpenPR {
-										filteredPrs = append(filteredPrs, pr)
-									}
-								}
+								filteredPrs = append(filteredPrs, pr)
 							}
 
 							if len(filteredPrs) == 0 {
