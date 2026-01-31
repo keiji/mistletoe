@@ -158,9 +158,8 @@ func TestHandleVersionGh(t *testing.T) {
 	}
 	// mockGhVersionOutput contains the date, but our logic splits lines.
 	// RunGh returns output. handleVersionGh splits by newline.
-	// If output is "gh version ...", we expect that.
-	// Just verify the main part.
-	if !strings.Contains(output, "gh version 2.0.0") {
-		t.Errorf("expected output to contain gh version 2.0.0, got %s", output)
+	// We verify that the constant defined in test is present in the output.
+	if !strings.Contains(output, mockGhVersionOutput) {
+		t.Errorf("expected output to contain %q, got %s", mockGhVersionOutput, output)
 	}
 }
