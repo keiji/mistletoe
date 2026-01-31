@@ -4,7 +4,6 @@ package app
 import (
 	"fmt"
 	"mistletoe/internal/sys"
-	"os/exec"
 	"path/filepath"
 	"strings"
 )
@@ -15,7 +14,7 @@ func handleVersionGh(opts GlobalOptions) error {
 	fmt.Fprintln(sys.Stdout)
 
 	displayGhPath := opts.GhPath
-	if resolved, err := exec.LookPath(opts.GhPath); err == nil {
+	if resolved, err := lookPath(opts.GhPath); err == nil {
 		displayGhPath = resolved
 	} else if filepath.IsAbs(opts.GhPath) {
 		displayGhPath = opts.GhPath

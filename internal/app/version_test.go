@@ -61,6 +61,13 @@ func TestHandleVersionMstl(t *testing.T) {
 	sys.Stdout = &buf
 	defer func() { sys.Stdout = oldStdout }()
 
+	// Mock LookPath
+	oldLookPath := lookPath
+	lookPath = func(file string) (string, error) {
+		return "/usr/bin/" + file, nil
+	}
+	defer func() { lookPath = oldLookPath }()
+
 	// Mock ExecCommand
 	oldExec := sys.ExecCommand
 	defer func() { sys.ExecCommand = oldExec }()
@@ -102,6 +109,13 @@ func TestHandleVersionGh(t *testing.T) {
 	oldStdout := sys.Stdout
 	sys.Stdout = &buf
 	defer func() { sys.Stdout = oldStdout }()
+
+	// Mock LookPath
+	oldLookPath := lookPath
+	lookPath = func(file string) (string, error) {
+		return "/usr/bin/" + file, nil
+	}
+	defer func() { lookPath = oldLookPath }()
 
 	// Mock ExecCommand
 	oldExec := sys.ExecCommand

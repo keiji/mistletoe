@@ -4,7 +4,6 @@ package app
 import (
 	"fmt"
 	"mistletoe/internal/sys"
-	"os/exec"
 	"path/filepath"
 	"strings"
 )
@@ -25,7 +24,7 @@ func printCommonVersionInfo(opts GlobalOptions) {
 	}
 
 	displayPath := opts.GitPath
-	if resolved, err := exec.LookPath(opts.GitPath); err == nil {
+	if resolved, err := lookPath(opts.GitPath); err == nil {
 		displayPath = resolved
 	} else if filepath.IsAbs(opts.GitPath) {
 		displayPath = opts.GitPath
