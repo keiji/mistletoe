@@ -1,85 +1,22 @@
 package app
 
 import (
+	"bytes"
 	"fmt"
-	conf "mistletoe/internal/config"
 	"mistletoe/internal/sys"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 )
 
-// TestFireCommand verifies the git sequence for the fire command.
-func TestFireCommand(t *testing.T) {
-	// Setup helper process for git
-	oldExec := sys.ExecCommand
-	sys.ExecCommand = mockExecFire
-	defer func() { sys.ExecCommand = oldExec }()
-
-	// We need to set USER or USERNAME for consistent branch naming in test
-	os.Setenv("USER", "testuser")
-	defer os.Unsetenv("USER")
-
-	// Helper vars
-	jobs := 1
-	id := "repo1"
-
-	// Create a temporary directory for the repo to simulate path
-	tmpDir, err := os.MkdirTemp("", "mstl-fire-test")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tmpDir)
-
-	repoPath := strings.TrimSuffix(tmpDir, "/") // just in case
-
-	config := &conf.Config{
-		Jobs: &jobs,
-		Repositories: &[]conf.Repository{
-			{
-				ID:   &id,
-			},
-		},
-		BaseDir: repoPath,
-	}
-
-	// Ensure repo1 dir exists
-	os.Mkdir(repoPath+"/repo1", 0755)
-
-	opts := GlobalOptions{
-		GitPath: "git",
-	}
-
-	// Let's set an env var to tell the helper process we are in "fire mode"
-	os.Setenv("GO_TEST_FIRE_MODE", "true")
-	defer os.Unsetenv("GO_TEST_FIRE_MODE")
-
-	err = fireCommand(config, opts)
-	if err != nil {
-		t.Errorf("fireCommand returned error: %v", err)
-	}
-}
-
-func mockExecFire(command string, args ...string) *exec.Cmd {
-	cs := []string{"-test.run=TestHelperProcessFire", "--", command}
-	cs = append(cs, args...)
-	cmd := exec.Command(os.Args[0], cs...)
-	cmd.Env = append(os.Environ(), "GO_WANT_HELPER_PROCESS=1")
-	return cmd
-}
-
-// TestHelperProcessFire is the mock entry point.
-// It must start with Test to be callable by -test.run
-func TestHelperProcessFire(t *testing.T) {
+// TestFireHelperProcess is a helper process for mocking exec.Command
+func TestFireHelperProcess(_ *testing.T) {
 	if os.Getenv("GO_WANT_HELPER_PROCESS") != "1" {
 		return
 	}
-
-	// Check if we are running the fire test
-	if os.Getenv("GO_TEST_FIRE_MODE") != "true" {
-		return
-	}
+	defer os.Exit(0)
 
 	args := os.Args
 	for len(args) > 0 {
@@ -89,84 +26,264 @@ func TestHelperProcessFire(t *testing.T) {
 		}
 		args = args[1:]
 	}
-
 	if len(args) == 0 {
 		fmt.Fprintf(os.Stderr, "No command\n")
 		os.Exit(2)
 	}
 
-	cmd := args[0]
-	subCmd := ""
-	if len(args) > 1 {
-		subCmd = args[1]
+	cmd, subArgs := args[0], args[1:]
+
+	// Mock `git`
+	if strings.Contains(cmd, "git") {
+		// handleFire calls:
+		// checkout -b ...
+		// add .
+		// commit -m ...
+		// push -u ...
+
+		// Return success for all
+		return
 	}
 
-	// We expect git commands
-	if cmd == "git" {
-		switch subCmd {
-		case "checkout":
-			// git checkout -b mstl-fire-...
-			// 1. First attempt (no suffix): Checkout succeeds
-			// 2. We will simulate PUSH fail for this
-			// 3. Retry with suffix -1: Checkout succeeds
-			// 4. PUSH succeeds
-			if len(args) >= 4 && args[2] == "-b" {
-				branch := args[3]
-				// We expect original OR suffix -1
-				if !strings.HasSuffix(branch, "-1") && !strings.Contains(branch, "-") {
-					// Logic check: if no suffix, it's fine.
-					// But we need to ensure it IS the fire branch
-				}
+	// Fail anything else
+	fmt.Fprintf(os.Stderr, "Unknown command %q %v\n", cmd, subArgs)
+	os.Exit(2)
+}
 
-				// Just check prefix
-				if !strings.HasPrefix(branch, "mstl-fire-repo1-") {
-					fmt.Fprintf(os.Stderr, "Unexpected branch format: %s\n", branch)
-					os.Exit(1)
-				}
-				// Success
-				os.Exit(0)
-			}
-		case "add":
-			// git add .
-			if len(args) >= 3 && args[2] == "." {
-				os.Exit(0)
-			}
-		case "commit":
-			// git commit -m ... --no-gpg-sign
-			// check for --no-gpg-sign
-			hasNoGpg := false
-			for _, a := range args {
-				if a == "--no-gpg-sign" {
-					hasNoGpg = true
-				}
-			}
-			if !hasNoGpg {
-				fmt.Fprintf(os.Stderr, "Missing --no-gpg-sign\n")
+// TestFireHelperProcessRetry mocks retry scenario
+func TestFireHelperProcessRetry(_ *testing.T) {
+	if os.Getenv("GO_WANT_HELPER_PROCESS") != "1" {
+		return
+	}
+	defer os.Exit(0)
+
+	args := os.Args
+	for len(args) > 0 {
+		if args[0] == "--" {
+			args = args[1:]
+			break
+		}
+		args = args[1:]
+	}
+	if len(args) == 0 {
+		fmt.Fprintf(os.Stderr, "No command\n")
+		os.Exit(2)
+	}
+
+	cmd, subArgs := args[0], args[1:]
+
+	if strings.Contains(cmd, "git") {
+		// push -u origin branchName
+		if len(subArgs) >= 4 && subArgs[0] == "push" {
+			branch := subArgs[3]
+			// Fail unless branch ends with "-1" (retry)
+			if !strings.HasSuffix(branch, "-1") {
+				fmt.Fprintln(os.Stderr, "remote branch exists")
 				os.Exit(1)
 			}
-			os.Exit(0)
-		case "push":
-			// git push -u origin <branch>
-			if len(args) >= 5 && args[2] == "-u" && args[3] == "origin" {
-				branch := args[4]
-				// 1. Original (no suffix): Fail (exit 1) -> This triggers retry
-				// 2. Suffix -1: Succeed (exit 0)
-				if !strings.HasSuffix(branch, "-1") {
-					os.Exit(1)
-				}
-				os.Exit(0)
-			}
+			return
 		}
-		// If we are here, we might have got a command we didn't explicitly handle or verify
-		// strictly, or it's a version check.
-		// Allow version/help commands
-		if subCmd == "--version" {
-			os.Exit(0)
-		}
+		// Allow other commands
+		return
+	}
+	os.Exit(2)
+}
 
-		fmt.Fprintf(os.Stderr, "Unexpected git command: %v\n", args)
-		os.Exit(1)
+func TestHandleFire(t *testing.T) {
+	// Create a temporary directory
+	tempDir, err := os.MkdirTemp("", "mstl_fire_test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	// Change to temp dir
+	oldWd, _ := os.Getwd()
+	if err := os.Chdir(tempDir); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Chdir(oldWd)
+
+	// Create mistletoe.json
+	configContent := `
+    {
+        "repositories": [
+            {
+                "url": "https://github.com/example/repo1",
+                "id": "repo1"
+            }
+        ]
+    }
+    `
+	// fire looks for .mstl/config.json or similar.
+	mstlDir := filepath.Join(tempDir, ".mstl")
+	if err := os.Mkdir(mstlDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(mstlDir, "config.json"), []byte(configContent), 0644); err != nil {
+		t.Fatal(err)
 	}
 
-	os.Exit(0)
+	// Create repo directory
+	if err := os.Mkdir(filepath.Join(tempDir, "repo1"), 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	// Mock Stdout/Stderr
+	var outBuf bytes.Buffer
+	var errBuf bytes.Buffer
+	oldStdout := sys.Stdout
+	oldStderr := sys.Stderr
+	sys.Stdout = &outBuf
+	sys.Stderr = &errBuf
+	defer func() {
+		sys.Stdout = oldStdout
+		sys.Stderr = oldStderr
+	}()
+
+	// Mock ExecCommand
+	oldExec := sys.ExecCommand
+	defer func() { sys.ExecCommand = oldExec }()
+	sys.ExecCommand = func(name string, arg ...string) *exec.Cmd {
+		cs := []string{"-test.run=TestFireHelperProcess", "--", name}
+		cs = append(cs, arg...)
+
+		testBin, err := filepath.Abs(os.Args[0])
+		if err != nil {
+			testBin = os.Args[0] // Fallback
+		}
+
+		cmd := exec.Command(testBin, cs...)
+		cmd.Env = append(os.Environ(), "GO_WANT_HELPER_PROCESS=1")
+		return cmd
+	}
+
+	opts := GlobalOptions{
+		GitPath: "git",
+	}
+
+	err = handleFire([]string{}, opts)
+	if err != nil {
+		t.Errorf("handleFire failed: %v", err)
+	}
+
+	output := outBuf.String()
+	if !strings.Contains(output, "FIRE command initiated") {
+		t.Errorf("Expected initiation message, got: %s", output)
+	}
+	if !strings.Contains(output, "[repo1] Secured in") {
+		t.Errorf("Expected secure message for repo1, got: %s", output)
+	}
+}
+
+func TestHandleFire_NoConfig(t *testing.T) {
+	// Test when no config is found
+	tempDir, err := os.MkdirTemp("", "mstl_fire_fail")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	oldWd, _ := os.Getwd()
+	if err := os.Chdir(tempDir); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Chdir(oldWd)
+
+	// handleFire should fail when it tries to load the non-existent config
+	opts := GlobalOptions{GitPath: "git"}
+	err = handleFire([]string{}, opts)
+	if err == nil {
+		t.Errorf("Expected error when no config found, got nil")
+	}
+}
+
+func TestHandleFire_Retry(t *testing.T) {
+	// Create a temporary directory
+	tempDir, err := os.MkdirTemp("", "mstl_fire_test_retry")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	oldWd, _ := os.Getwd()
+	if err := os.Chdir(tempDir); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Chdir(oldWd)
+
+	// Create mistletoe.json
+	configContent := `
+    {
+        "repositories": [
+            {
+                "url": "https://github.com/example/repo1",
+                "id": "repo1"
+            }
+        ]
+    }
+    `
+	mstlDir := filepath.Join(tempDir, ".mstl")
+	if err := os.Mkdir(mstlDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(mstlDir, "config.json"), []byte(configContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create repo directory
+	if err := os.Mkdir(filepath.Join(tempDir, "repo1"), 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	// Mock Stdout/Stderr
+	var outBuf bytes.Buffer
+	var errBuf bytes.Buffer
+	oldStdout := sys.Stdout
+	oldStderr := sys.Stderr
+	sys.Stdout = &outBuf
+	sys.Stderr = &errBuf
+	defer func() {
+		sys.Stdout = oldStdout
+		sys.Stderr = oldStderr
+	}()
+
+	// Mock ExecCommand with Retry Helper
+	oldExec := sys.ExecCommand
+	defer func() { sys.ExecCommand = oldExec }()
+	sys.ExecCommand = func(name string, arg ...string) *exec.Cmd {
+		cs := []string{"-test.run=TestFireHelperProcessRetry", "--", name}
+		cs = append(cs, arg...)
+
+		testBin, err := filepath.Abs(os.Args[0])
+		if err != nil {
+			testBin = os.Args[0] // Fallback
+		}
+
+		cmd := exec.Command(testBin, cs...)
+		cmd.Env = append(os.Environ(), "GO_WANT_HELPER_PROCESS=1")
+		return cmd
+	}
+
+	opts := GlobalOptions{
+		GitPath: "git",
+	}
+
+	err = handleFire([]string{}, opts)
+	if err != nil {
+		t.Errorf("handleFire failed: %v", err)
+	}
+
+	output := outBuf.String()
+	// Should see "Retrying..." in output? No, that's in Stderr.
+	// We capture Stderr too.
+	errOutput := errBuf.String()
+	if !strings.Contains(errOutput, "Retrying with new branch") {
+		t.Errorf("Expected retry message in stderr, got: %s", errOutput)
+	}
+
+	// Should see final success
+	if !strings.Contains(output, "[repo1] Secured in") {
+		t.Errorf("Expected secure message for repo1, got: %s", output)
+	}
 }

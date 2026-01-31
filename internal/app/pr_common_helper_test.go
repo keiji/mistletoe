@@ -76,3 +76,51 @@ func TestIsPrFromConfiguredRepo(t *testing.T) {
 		})
 	}
 }
+
+func TestValidatePrPermissionAndOverwrite(t *testing.T) {
+	tests := []struct {
+		name        string
+		item        PrInfo
+		currentUser string
+		overwrite   bool
+		wantError   bool
+	}{
+		{
+			name:        "Success - Same user, editable",
+			item:        PrInfo{ViewerCanEditFiles: true, Author: Author{Login: "me"}},
+			currentUser: "me",
+			overwrite:   false,
+			wantError:   false,
+		},
+		{
+			name:        "Fail - Not editable",
+			item:        PrInfo{ViewerCanEditFiles: false, Author: Author{Login: "me"}},
+			currentUser: "me",
+			overwrite:   false,
+			wantError:   true,
+		},
+		{
+			name:        "Fail - Different user, no overwrite",
+			item:        PrInfo{ViewerCanEditFiles: true, Author: Author{Login: "other"}},
+			currentUser: "me",
+			overwrite:   false,
+			wantError:   true,
+		},
+		{
+			name:        "Success - Different user, overwrite",
+			item:        PrInfo{ViewerCanEditFiles: true, Author: Author{Login: "other"}},
+			currentUser: "me",
+			overwrite:   true,
+			wantError:   false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidatePrPermissionAndOverwrite("repo", tt.item, tt.currentUser, tt.overwrite)
+			if (err != nil) != tt.wantError {
+				t.Errorf("got error %v, wantError %v", err, tt.wantError)
+			}
+		})
+	}
+}
