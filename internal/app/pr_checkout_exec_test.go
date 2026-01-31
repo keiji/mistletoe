@@ -48,12 +48,17 @@ func TestPrCheckoutFullHelperProcess(_ *testing.T) {
 			// Check flags
 			jsonRequested := false
 			stateRequested := false
-			for _, arg := range subCmd {
-				if arg == "body" {
-					jsonRequested = true
-				}
-				if arg == "state" {
-					stateRequested = true
+			for i, arg := range subCmd {
+				if arg == "--json" && i+1 < len(subCmd) {
+					fields := subCmd[i+1]
+					if strings.Contains(fields, "body") {
+						jsonRequested = true
+					}
+					if strings.Contains(fields, "state") {
+						stateRequested = true
+					}
+					// Don't break immediately if multiple flags are possible or repeated,
+					// but for this mock, one --json is expected.
 				}
 			}
 
