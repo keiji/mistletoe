@@ -11,6 +11,11 @@ import (
 	"testing"
 )
 
+const (
+	mockGitVersionOutput = "git version 2.30.0"
+	mockGhVersionOutput  = "gh version 2.0.0 (2021-01-01)"
+)
+
 // TestVersionHelperProcess is a helper process for mocking exec.Command
 func TestVersionHelperProcess(_ *testing.T) {
 	if os.Getenv("GO_WANT_HELPER_PROCESS") != "1" {
@@ -36,7 +41,7 @@ func TestVersionHelperProcess(_ *testing.T) {
 	// Mock `git`
 	if strings.Contains(cmd, "git") {
 		if len(subArgs) >= 1 && subArgs[0] == "--version" {
-			fmt.Println("git version 2.30.0")
+			fmt.Println(mockGitVersionOutput)
 			return
 		}
 	}
@@ -44,7 +49,7 @@ func TestVersionHelperProcess(_ *testing.T) {
 	// Mock `gh`
 	if strings.Contains(cmd, "gh") {
 		if len(subArgs) >= 1 && subArgs[0] == "--version" {
-			fmt.Println("gh version 2.0.0 (2021-01-01)")
+			fmt.Println(mockGhVersionOutput)
 			return
 		}
 	}
@@ -98,8 +103,8 @@ func TestHandleVersionMstl(t *testing.T) {
 	if !strings.Contains(output, AppName) {
 		t.Errorf("expected output to contain AppName, got %s", output)
 	}
-	if !strings.Contains(output, "git version 2.30.0") {
-		t.Errorf("expected output to contain git version, got %s", output)
+	if !strings.Contains(output, mockGitVersionOutput) {
+		t.Errorf("expected output to contain %q, got %s", mockGitVersionOutput, output)
 	}
 }
 
@@ -148,10 +153,14 @@ func TestHandleVersionGh(t *testing.T) {
 	if !strings.Contains(output, AppName) {
 		t.Errorf("expected output to contain AppName, got %s", output)
 	}
-	if !strings.Contains(output, "git version 2.30.0") {
-		t.Errorf("expected output to contain git version, got %s", output)
+	if !strings.Contains(output, mockGitVersionOutput) {
+		t.Errorf("expected output to contain %q, got %s", mockGitVersionOutput, output)
 	}
+	// mockGhVersionOutput contains the date, but our logic splits lines.
+	// RunGh returns output. handleVersionGh splits by newline.
+	// If output is "gh version ...", we expect that.
+	// Just verify the main part.
 	if !strings.Contains(output, "gh version 2.0.0") {
-		t.Errorf("expected output to contain gh version, got %s", output)
+		t.Errorf("expected output to contain gh version 2.0.0, got %s", output)
 	}
 }
